@@ -23,7 +23,7 @@ def scrape(request):
     # # For every page in the interval 1-4
     # for page in pages:
 
-    for page in range(1, 7):
+    for page in range(1,2):
         URL = ("https://www.naijanews.com/news/page/")
         req = requests.get(URL + str(page))
         # Make a get request
@@ -61,18 +61,17 @@ def scrape(request):
         sub_div = main_div.find(
             "ul", attrs={"class": "mvp-blog-story-list"})
         news = sub_div.findAll("li", attrs={"class": "mvp-blog-story-wrap"})
-        with open('news_articles.csv', 'w') as csv_file:
+
+        with open('news_articles.csv', 'w',encoding="utf-8") as csv_file:
             csv_writer = writer(csv_file)
-            headers = ['ImageLink', 'Title', 'Link', 'Date', 'Description']
+            headers = ['Date', 'Title', 'ImageLink', 'Link', 'Description']
             csv_writer.writerow(headers)
 
             for article in news:
-                img = article.find(
-                    'img', class_="mvp-reg-img", src=True)['src']
+                img = article.find('img', class_='mvp-reg-img', src=True)['data-src']
                 link = article.find('a', href=True)['href']
                 title = article.find('h2').get_text()
-                date = article.find(
-                    'span', class_='mvp-cd-date left relative').get_text()
+                date = article.find('span', class_='mvp-cd-date left relative').get_text()
                 description = article.find('p').get_text()
                 # print(img['src'])
                 # print(title.text)
@@ -81,13 +80,13 @@ def scrape(request):
                 # print(description.text)
                 # print('-'*60)
                 new_headline = Headline()
-                new_headline.title = title
+                new_headline.title = title.encode('utf-8')
                 new_headline.url = link
                 new_headline.image = img
                 new_headline.date = date
                 new_headline.description = description
                 new_headline.save()
-                csv_writer.writerow([img, title, link, date, description])
+                csv_writer.writerow([date, title, img, link, description])
                 # my_filters = {
                 #     'date': '9 hours ago',
                 #     'date': '10 hours ago',
@@ -97,10 +96,10 @@ def scrape(request):
                 # }
                 # filter(**my_filters)
                 headlines = Headline.objects.all()
-                context = {
-                    'object_list': headlines,
+                details = {
+                    'object_list': headlines
                 }
-    return render(request, "news/index.html", context)
+    return render(request, "news/index.html", details)
 
 
 # def news_list(req):
