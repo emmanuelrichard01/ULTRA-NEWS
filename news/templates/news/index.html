@@ -36,14 +36,14 @@
         </a>
       </a>
     </nav>
-    <!-- <div class="jumbotron">
+    <div class="jumbotron">
       <center>
         <h1>News Aggregator</h1>
         <a href="{% url 'scrape' %}" class="btn btn-danger"
           >Get my morning news</a
         >
       </center>
-    </div> -->
+    </div>
     {% block content %}
     <div class="card-columns" style="padding: 10px; margin: 10px">
       {% for object in object_list %}
