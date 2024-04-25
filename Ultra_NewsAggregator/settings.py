@@ -25,7 +25,7 @@ SECRET_KEY = '$*-qu)4o_a59bls@(xtd^_%=yu-t4c7=9hynve-=p)l9m$)#d-'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['.vercel.app', '.now.sh', '127.0.0.1']
+ALLOWED_HOSTS = ['.vercel.app', '.now.sh', '127.0.0.1','ultra-news-emc.koyeb.app']
 
 
 # Application definition
