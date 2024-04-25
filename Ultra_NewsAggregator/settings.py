@@ -25,7 +25,7 @@ SECRET_KEY = '$*-qu)4o_a59bls@(xtd^_%=yu-t4c7=9hynve-=p)l9m$)#d-'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['.vercel.app', '.now.sh']
 
 
 # Application definition
@@ -75,9 +75,18 @@ WSGI_APPLICATION = 'Ultra_NewsAggregator.wsgi.application'
 # https://docs.djangoproject.com/en/3.0/ref/settings/#databases
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+    # 'default': {
+    #     'ENGINE': 'django.db.backends.sqlite3',
+    #     'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+    # }
+     'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'URL': 'postgresql://postgres:uXrKLzJFyHsYmIafECfeMjBCWvttnCmo@roundhouse.proxy.rlwy.net:38498/railway',
+        'NAME': 'railway',
+        'USER': 'postgres',
+        'PASSWORD': 'uXrKLzJFyHsYmIafECfeMjBCWvttnCmo',
+        'HOST': 'roundhouse.proxy.rlwy.net',
+        'PORT': 38498,
     }
 }
 
@@ -119,3 +128,5 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/3.0/howto/static-files/
 
 STATIC_URL = '/static/'
+STATICFILES_DIRS = os.path.join(BASE_DIR, 'static'),
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles_build', 'static'),
