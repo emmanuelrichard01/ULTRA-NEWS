@@ -6,7 +6,7 @@ from django.db import models
 class Headline(models.Model):
     title = models.CharField(max_length=200)
     description = models.CharField(max_length=200)
-    date = models.CharField(max_length=10)
+    date = models.CharField(max_length=500)
     image = models.URLField(null=True, blank=True)
     url = models.TextField()
 
