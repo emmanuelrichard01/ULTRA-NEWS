@@ -4,11 +4,11 @@ from django.db import models
 
 
 class Headline(models.Model):
-    title = models.CharField(max_length=200)
-    description = models.CharField(max_length=200)
+    title = models.CharField(max_length=500)
+    description = models.TextField(max_length=500)
     date = models.CharField(max_length=500)
     image = models.URLField(null=True, blank=True)
-    url = models.TextField()
+    link = models.TextField()
 
     def __str__(self):
         return self.title

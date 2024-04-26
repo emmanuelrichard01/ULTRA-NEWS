@@ -23,4 +23,5 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('scrape/', scrape, name="scrape"),
     path('', scrape, name="home"),
+    path('clear-database/', views.clear_database, name='clear_database'),
 ]
