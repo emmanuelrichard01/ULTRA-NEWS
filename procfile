@@ -1,0 +1,1 @@
+web: gunicorn Ultra_NewsAggregator.wsgi --log-file -

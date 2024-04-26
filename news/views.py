@@ -24,7 +24,7 @@ def scrape(request):
         news = sub_div.find_all("li", class_="mvp-blog-story-wrap")
 
         for article in news:
-            img = article.find('img', class_='mvp-reg-img')['data-src']
+            img = article.find('img', class_='mvp-reg-img')['src']
             link = article.find('a')['href']
             title = article.find('h2').get_text()
             date = article.find('span', class_='mvp-cd-date').get_text()
