@@ -56,7 +56,7 @@ WSGI_APPLICATION = 'Ultra_NewsAggregator.wsgi.application'
 
 DATABASES = {
     'default': dj_database_url.config(
-        default=os.getenv('DATABASE_URL', 'postgresql://postgres:password@localhost:5432/yourdb'),
+        default=os.getenv('DATABASE_URL', 'postgresql://postgres:uXrKLzJFyHsYmIafECfeMjBCWvttnCmo@roundhouse.proxy.rlwy.net:38498/railway'),
         conn_max_age=600
     )
 }
