@@ -1,14 +1,27 @@
 {
   "builds": [
     {
-      "src": "Ultra_NewsAggregator/wsgi.py",
-      "use": "@vercel/python"
+      "src": "manage.py",
+      "use": "@vercel/python",
+      "config": {
+        "maxLambdaSize": "50mb",
+        "includeFiles": [
+          "news/templates/**/*",
+          "static/**/*",
+          "staticfiles/**/*",
+          "db.sqlite3"
+        ]
+      }
     }
   ],
   "routes": [
     {
-      "src": "/(.*)",
-      "dest": "Ultra_NewsAggregator/wsgi.py"
+      "src": "/static/(.*)",
+      "dest": "/static/$1"
+    },
+    {
+      "src": "/.*",
+      "dest": "manage.py"
     }
   ]
 }
