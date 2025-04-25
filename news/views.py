@@ -41,3 +41,7 @@ def scrape(request):
 
     details = {'object_list': news_items}
     return render(request, 'news/index.html', details)
+
+def home(request):
+    headlines = Headline.objects.all().order_by('-id')  # latest first
+    return render(request, 'news/index.html', {'object_list': headlines})
