@@ -21,6 +21,7 @@ from news import views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('', views.home, name='home'),
     path('scrape/', scrape, name="scrape"),
     path('', scrape, name="home"),
     path('clear-database/', views.clear_database, name='clear_database'),
