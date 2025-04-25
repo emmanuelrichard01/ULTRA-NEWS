@@ -5,13 +5,27 @@ from bs4 import BeautifulSoup
 from news.models import Headline
 from django.http import JsonResponse
 from django.core.paginator import Paginator
+from datetime import datetime
+import dateparser
 
 def home(request):
-    headlines = Headline.objects.all().order_by('-id')
-    paginator = Paginator(headlines, 20)
+    sort_order = request.GET.get('sort', 'desc')
+    headlines = Headline.objects.all().order_by('-id')  # fallback
+
+    if sort_order == 'asc':
+        headlines = Headline.objects.all().order_by('date')
+    elif sort_order == 'desc':
+        headlines = Headline.objects.all().order_by('-date')
+
+    paginator = Paginator(headlines, 21)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
-    return render(request, 'news/index.html', {'object_list': page_obj})
+
+    context = {
+        'object_list': page_obj,
+        'current_sort': sort_order,
+    }
+    return render(request, 'news/index.html', context)
 
 def clear_database(request):
     if request.method == 'POST':
@@ -21,7 +35,7 @@ def clear_database(request):
         return JsonResponse({'error': 'Invalid request method'}, status=400)
 
 def scrape(request):
-    for page in range(1, 4):
+    for page in range(1, 6):
         try:
             URL = f"https://www.naijanews.com/news/page/{page}"
             req = requests.get(URL)
@@ -35,10 +49,14 @@ def scrape(request):
                 img = article.find('img', class_='mvp-reg-img')['src']
                 link = article.find('a')['href']
                 title = article.find('h2').get_text()
-                date = article.find('span', class_='mvp-cd-date').get_text()
-                description = article.find('p').get_text()[:500]  # Truncate if needed
+                date_str = article.find('span', class_='mvp-cd-date').get_text()
 
-                if not Headline.objects.filter(title=title, link=link).exists():
+                # 🕒 Convert to datetime using dateparser
+                date = dateparser.parse(date_str)
+
+                description = article.find('p').get_text()[:500]
+
+                if not Headline.objects.filter(title=title, link=link).exists() and date:
                     Headline.objects.create(
                         image=img,
                         title=title,

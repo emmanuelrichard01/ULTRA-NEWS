@@ -1,27 +1,37 @@
 {
-  "builds": [
-    {
-      "src": "manage.py",
-      "use": "@vercel/python",
-      "config": {
-        "maxLambdaSize": "50mb",
-        "includeFiles": [
+    "version": 2,
+    "builds": [
+        {
+            "src": "Ultra_NewsAggregator/wsgi.py",
+            "use": "@vercel/python",
+            "config": {
+                "maxLambdaSize": "15mb",
+                "runtime": "python3.9",
+                "includeFiles": [
           "news/templates/**/*",
           "static/**/*",
           "staticfiles/**/*",
           "db.sqlite3"
         ]
-      }
-    }
-  ],
-  "routes": [
-    {
-      "src": "/static/(.*)",
-      "dest": "/static/$1"
-    },
-    {
-      "src": "/.*",
-      "dest": "manage.py"
-    }
-  ]
-}
+            }
+        },
+        {
+            "src": "build_files.sh",
+            "use": "@vercel/static-build",
+            "config": {
+                "distDir": "staticfiles"
+            }
+        }
+    ],
+    "routes": [
+        {
+            "src": "/static/(.*)",
+            "dest": "/staticfiles/$1"
+        },
+        {
+            "src": "/(.*)",
+            "dest": "Ultra_NewsAggregator/wsgi.py"
+        }
+    ],
+    "outputDirectory": "staticfiles"
+  }
