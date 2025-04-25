@@ -1,21 +1,23 @@
-from django.shortcuts import render
-import requests
-from bs4 import BeautifulSoup
+from django.shortcuts import render, redirect
+from django.core.paginator import Paginator
 from news.models import Headline
-from django.http import JsonResponse
 
-def clear_database(request):
-    if request.method == 'POST':
-        Headline.objects.all().delete()
-        return JsonResponse({'message': 'Database cleared successfully'})
-    else:
-        return JsonResponse({'error': 'Invalid request method'}, status=400)
+
+def home(request):
+    headlines = Headline.objects.all().order_by('-id')
+    paginator = Paginator(headlines, 20)  # 20 articles per page
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    return render(request, 'news/index.html', {'object_list': page_obj})
+
 
 def scrape(request):
-    news_items = []
+    import requests
+    from bs4 import BeautifulSoup
+    from news.models import Headline
 
     for page in range(1, 2, 3):
-        URL = "https://www.naijanews.com/news/page/" + str(page)
+        URL = f"https://www.naijanews.com/news/page/{page}"
         req = requests.get(URL)
         soup = BeautifulSoup(req.content, 'html.parser')
         main_section = soup.find("div", class_="mvp-main-blog-in")
@@ -30,18 +32,12 @@ def scrape(request):
             date = article.find('span', class_='mvp-cd-date').get_text()
             description = article.find('p').get_text()
 
-            news_item = Headline.objects.create(
+            Headline.objects.create(
                 image=img,
                 title=title,
                 date=date,
                 link=link,
                 description=description
             )
-            news_items.append(news_item)
 
-    details = {'object_list': news_items}
-    return render(request, 'news/index.html', details)
-
-def home(request):
-    headlines = Headline.objects.all().order_by('-id')  # latest first
-    return render(request, 'news/index.html', {'object_list': headlines})
+    return redirect('home')
