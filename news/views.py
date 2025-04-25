@@ -1,6 +1,9 @@
 from django.shortcuts import render, redirect
-from django.core.paginator import Paginator
+import requests
+from bs4 import BeautifulSoup
 from news.models import Headline
+from django.http import JsonResponse
+from django.core.paginator import Paginator
 
 
 def home(request):
@@ -10,6 +13,12 @@ def home(request):
     page_obj = paginator.get_page(page_number)
     return render(request, 'news/index.html', {'object_list': page_obj})
 
+def clear_database(request):
+    if request.method == 'POST':
+        Headline.objects.all().delete()
+        return JsonResponse({'message': 'Database cleared successfully'})
+    else:
+        return JsonResponse({'error': 'Invalid request method'}, status=400)
 
 def scrape(request):
     import requests
