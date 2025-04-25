@@ -154,6 +154,7 @@
 
     <div class="container">
       <div class="row row-cols-1 row-cols-md-3">
+        {% if object_list %}
         {% for news_item in object_list %}
         <div class="col mb-4">
           <div class="card h-100 news-card">
@@ -178,6 +179,9 @@
           <li class="page-item">
             <a class="page-link" href="?page={{ object_list.previous_page_number }}">Previous</a>
           </li>
+          {% endif %}
+          {% else %}
+          <p class="text-center">No news articles found. Click "Get News" above to scrape new headlines.</p>
           {% endif %}
 
           {% for page_num in object_list.paginator.page_range %}
