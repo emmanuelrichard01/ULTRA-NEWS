@@ -10,7 +10,6 @@
       href="{% static '/fav.ico' %}"
       type="image/x-icon"
     />
-    <!-- Bootstrap CSS -->
     <link
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css"
       rel="stylesheet"
@@ -19,19 +18,17 @@
       rel="stylesheet"
       href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
     />
-    <!-- Custom CSS -->
     <style>
-      /* Custom styles */
       body {
         position: relative;
       }
       .navbar {
-        background-color: #ffffff; /* Light grey */
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Add shadow effect */
+        background-color: #ffffff;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
       }
       .navbar-brand {
         font-weight: bold;
-        color: #343a40; /* Dark grey */
+        color: #343a40;
       }
       .search-bar {
         margin-bottom: 2rem;
@@ -43,11 +40,10 @@
       .news-card:hover {
         transform: translateY(-5px);
         box-shadow: 1px 8px 20px rgb(143, 143, 143);
-        -webkit-transition: box-shadow 0.2s ease-in;
         cursor: pointer;
       }
       .footer {
-        background-color: #dd2020; /* Dark grey */
+        background-color: #dd2020;
         color: white;
         padding: 2rem 0;
         font-weight: bold;
@@ -75,7 +71,7 @@
       .progress-bar {
         width: 0%;
         height: 3px;
-        background-color: #dd2020; /* Red */
+        background-color: #dd2020;
         transition: width 0.5s ease;
       }
       .pagination {
@@ -97,17 +93,28 @@
         font-weight: 600;
         margin-bottom: 8px;
       }
+      .loading-spinner {
+        display: none;
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 1051;
+      }
     </style>
   </head>
   <body>
-    <!-- Navigation bar -->
+    <div class="loading-spinner" id="spinner">
+      <div class="spinner-border text-danger" style="width: 3rem; height: 3rem;" role="status">
+        <span class="visually-hidden">Loading...</span>
+      </div>
+    </div>
+
     <nav class="navbar navbar-expand-lg navbar-light fixed-top pt-3 pb-3">
       <div class="container">
-        <a class="navbar-brand" href="#"
-          ><img
-            src="https://i.ibb.co/GJQnz0F/logo-tablet.png"
-            alt="logo-tablet"
-        /></a>
+        <a class="navbar-brand" href="#">
+          <img src="https://i.ibb.co/GJQnz0F/logo-tablet.png" alt="logo-tablet" />
+        </a>
         <button
           class="navbar-toggler"
           type="button"
@@ -121,29 +128,18 @@
         </button>
         <div class="collapse navbar-collapse" id="navbarNav">
           <ul class="navbar-nav ms-auto">
-            <li class="nav-item">
-              <a class="nav-link" href="#">Home</a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link" href="#">About</a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link" href="#">Contact</a>
-            </li>
+            <li class="nav-item"><a class="nav-link" href="#">Home</a></li>
+            <li class="nav-item"><a class="nav-link" href="#">About</a></li>
+            <li class="nav-item"><a class="nav-link" href="#">Contact</a></li>
           </ul>
         </div>
       </div>
     </nav>
 
-    <!-- Search bar -->
     <div class="container cn mt-2 mb-2">
       <div class="row justify-content-center">
         <div class="col-lg-6">
-          <input
-            type="text"
-            class="form-control search-bar"
-            placeholder="Search news..."
-          />
+          <input type="text" class="form-control search-bar" placeholder="Search news..." />
         </div>
       </div>
     </div>
@@ -151,66 +147,55 @@
     <div class="jumbotron mb-4 mt-4">
       <center>
         <h1>News Aggregator</h1>
-        <a href="{% url 'scrape' %}" class="btn btn-danger">Get News</a>
-        <button id="clearDatabaseBtn" class="btn btn-danger">
-          Clear Database
-        </button>
+        <a href="{% url 'scrape' %}" class="btn btn-danger" id="scrapeBtn">Get News</a>
+        <button id="clearDatabaseBtn" class="btn btn-danger">Clear Database</button>
       </center>
     </div>
 
-    <!-- News cards -->
     <div class="container">
       <div class="row row-cols-1 row-cols-md-3">
         {% for news_item in object_list %}
         <div class="col mb-4">
           <div class="card h-100 news-card">
-            <img
-              src="{{ news_item.image }}"
-              class="card-img-top"
-              alt="{{ news_item.title }}"
-            />
+            <img src="{{ news_item.image }}" class="card-img-top" alt="{{ news_item.title }}" />
             <div class="card-body d-flex flex-column justify-content-between">
               <div>
                 <h5 class="card-title card_t">{{ news_item.title }}</h5>
                 <p class="card-text date">{{ news_item.date }}</p>
                 <p class="card-text card_p">{{ news_item.description }}</p>
               </div>
-              <a href="{{ news_item.link }}" class="btn btn-danger mx-auto"
-                >Read More</a
-              >
+              <a href="{{ news_item.link }}" class="btn btn-danger mx-auto">Read More</a>
             </div>
           </div>
         </div>
-        {% if forloop.counter|divisibleby:20 %}
-        <div class="col mb-4">
-          <nav aria-label="Page navigation">
-            <ul class="pagination justify-content-center">
-              {% for page_num in object_list.paginator.page_range %}
-              <li class="page-item">
-                <a class="page-link" href="?page={{ page_num }}"
-                  >{{ page_num }}</a
-                >
-              </li>
-              {% endfor %}
-            </ul>
-          </nav>
-        </div>
-        {% endif %} {% endfor %}
+        {% endfor %}
       </div>
+
+      {% if object_list.has_other_pages %}
+      <nav aria-label="Page navigation">
+        <ul class="pagination justify-content-center">
+          {% if object_list.has_previous %}
+          <li class="page-item">
+            <a class="page-link" href="?page={{ object_list.previous_page_number }}">Previous</a>
+          </li>
+          {% endif %}
+
+          {% for page_num in object_list.paginator.page_range %}
+          <li class="page-item {% if page_num == object_list.number %}active{% endif %}">
+            <a class="page-link" href="?page={{ page_num }}">{{ page_num }}</a>
+          </li>
+          {% endfor %}
+
+          {% if object_list.has_next %}
+          <li class="page-item">
+            <a class="page-link" href="?page={{ object_list.next_page_number }}">Next</a>
+          </li>
+          {% endif %}
+        </ul>
+      </nav>
+      {% endif %}
     </div>
 
-    <!-- Carousel for new news contents -->
-    <div
-      id="carouselExampleControls"
-      class="carousel slide"
-      data-bs-ride="carousel"
-    >
-      <div class="carousel-inner">
-        <!-- Dynamically add new news contents here -->
-      </div>
-    </div>
-
-    <!-- Footer -->
     <footer class="footer">
       <div class="container">
         <div class="row">
@@ -221,61 +206,56 @@
       </div>
     </footer>
 
-    <!-- Scroll to top button -->
-    <button
-      class="btn btn-danger scroll-top-button"
-      onclick="scrollToTop()"
-      id="scroll-top-button"
-    >
+    <button class="btn btn-danger scroll-top-button" onclick="scrollToTop()" id="scroll-top-button">
       <i class="bi bi-arrow-up-square-fill"></i>
     </button>
 
-    <!-- Page progress bar -->
     <div class="progress-container">
       <div class="progress-bar" id="progress-bar"></div>
     </div>
 
     <script>
-      document
-        .getElementById('clearDatabaseBtn')
-        .addEventListener('click', function () {
-          fetch('/clear-database/', {
-            method: 'POST',
-            headers: {
-              'X-CSRFToken': '{{ csrf_token }}', // Ensure CSRF token is included
-              'Content-Type': 'application/json',
-            },
+      document.getElementById('scrapeBtn').addEventListener('click', function () {
+        const spinner = document.getElementById('spinner');
+        const btn = this;
+        spinner.style.display = 'block';
+        btn.classList.add('disabled');
+      });
+
+      document.getElementById('clearDatabaseBtn').addEventListener('click', function () {
+        fetch('/clear-database/', {
+          method: 'POST',
+          headers: {
+            'X-CSRFToken': '{{ csrf_token }}',
+            'Content-Type': 'application/json',
+          },
+        })
+          .then((response) => response.json())
+          .then((data) => {
+            alert(data.message);
+            location.reload();
           })
-            .then((response) => response.json())
-            .then((data) => {
-              alert(data.message);
-            })
-            .catch((error) => {
-              console.error('Error:', error);
-            });
-        });
+          .catch((error) => {
+            console.error('Error:', error);
+          });
+      });
 
       window.onscroll = function () {
         scrollFunction();
       };
 
       function scrollFunction() {
-        var winScroll =
-          document.body.scrollTop || document.documentElement.scrollTop;
-        var height =
-          document.documentElement.scrollHeight -
-          document.documentElement.clientHeight;
+        var winScroll = document.body.scrollTop || document.documentElement.scrollTop;
+        var height = document.documentElement.scrollHeight - document.documentElement.clientHeight;
         var scrolled = (winScroll / height) * 100;
         document.getElementById('progress-bar').style.width = scrolled + '%';
       }
 
       function scrollToTop() {
-        document.body.scrollTop = 0; // For Safari
-        document.documentElement.scrollTop = 0; // For Chrome, Firefox, IE and Opera
+        document.body.scrollTop = 0;
+        document.documentElement.scrollTop = 0;
       }
     </script>
-
-    <!-- Bootstrap JavaScript Bundle -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
   </body>
 </html>
