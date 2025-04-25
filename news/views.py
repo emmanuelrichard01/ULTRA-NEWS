@@ -8,7 +8,7 @@ from django.core.paginator import Paginator
 
 def home(request):
     headlines = Headline.objects.all().order_by('-id')
-    paginator = Paginator(headlines, 20)  # 20 articles per page
+    paginator = Paginator(headlines, 20)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     return render(request, 'news/index.html', {'object_list': page_obj})
@@ -41,12 +41,13 @@ def scrape(request):
             date = article.find('span', class_='mvp-cd-date').get_text()
             description = article.find('p').get_text()
 
-            Headline.objects.create(
-                image=img,
-                title=title,
-                date=date,
-                link=link,
-                description=description
-            )
+            if not Headline.objects.filter(title=title, link=link).exists():
+                Headline.objects.create(
+                    image=img,
+                    title=title,
+                    date=date,
+                    link=link,
+                    description=description
+                )
 
     return redirect('home')
