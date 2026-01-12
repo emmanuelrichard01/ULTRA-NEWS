@@ -1,32 +1,27 @@
 import Link from 'next/link';
 import ArticleCard from '@/components/ArticleCard';
 
-// Mock data for initial display
-const MOCK_ARTICLES = [
-  {
-    title: "Django 5.0 Released",
-    source: "Django Project",
-    url: "https://djangoproject.com",
-    published_date: new Date().toISOString(),
-    category: "Tech"
-  },
-  {
-    title: "Next.js 14 App Router Guide",
-    source: "Vercel",
-    url: "https://nextjs.org",
-    published_date: new Date().toISOString(),
-    category: "Frontend"
-  },
-  {
-    title: "The Future of AI Agents",
-    source: "DeepMind",
-    url: "https://deepmind.google",
-    published_date: new Date().toISOString(),
-    category: "AI"
-  }
-];
+async function getArticles() {
+  // Use http://backend:8000 internally within Docker network
+  // But for SSR on dev machine it might need localhost if not running in container...
+  // Actually, Next.js generic fetch is server-side.
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://backend:8000';
 
-export default function Home() {
+  try {
+    const res = await fetch(`${API_URL}/api/news`, { cache: 'no-store' });
+    if (!res.ok) {
+      throw new Error('Failed to fetch data');
+    }
+    return res.json();
+  } catch (error) {
+    console.error("Error fetching articles:", error);
+    return [];
+  }
+}
+
+export default async function Home() {
+  const articles = await getArticles();
+
   return (
     <div className="space-y-8">
       <div className="text-center">
@@ -40,18 +35,24 @@ export default function Home() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {MOCK_ARTICLES.map((article, idx) => (
-          <ArticleCard
-            key={idx}
-            title={article.title}
-            source={article.source}
-            url={article.url}
-            published_date={article.published_date}
-            category={article.category}
-          />
-        ))}
-      </div>
+      {articles.length === 0 ? (
+        <div className="text-center text-gray-500 py-12">
+          <p>No articles found. Run the ingestion command to populate data.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {articles.map((article: any, idx: number) => (
+            <ArticleCard
+              key={idx}
+              title={article.title}
+              source={article.source.name}
+              url={article.url}
+              published_date={article.published_date}
+              category="General"
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
