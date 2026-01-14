@@ -1,6 +1,7 @@
 import HeroStory from '@/components/HeroStory';
 import FeedItem from '@/components/FeedItem';
 import SearchBar from '@/components/SearchBar';
+import Pagination from '@/components/Pagination';
 
 // Define types based on API response
 interface Source {
@@ -16,20 +17,34 @@ interface Article {
   source: Source;
 }
 
-async function getArticles(query?: string): Promise<Article[]> {
+interface PaginatedResponse {
+  items: Article[];
+  count: number;
+}
+
+async function getArticles(query?: string, page: number = 1): Promise<PaginatedResponse> {
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://backend:8000';
-  const endpoint = query ? `/api/news?q=${encodeURIComponent(query)}` : '/api/news';
+  const limit = 20; // Page size
+  const offset = (page - 1) * limit;
+
+  // Ninja Pagination uses limit/offset by default
+  const params = new URLSearchParams();
+  if (query) params.set('q', query);
+  params.set('limit', limit.toString());
+  params.set('offset', offset.toString());
+
+  const endpoint = `/api/news?${params.toString()}`;
 
   try {
     const res = await fetch(`${API_URL}${endpoint}`, { cache: 'no-store' });
     if (!res.ok) {
       console.error(`Failed to fetch data: ${res.status}`);
-      return [];
+      return { items: [], count: 0 };
     }
     return res.json();
   } catch (error) {
     console.error("Error fetching articles:", error);
-    return [];
+    return { items: [], count: 0 };
   }
 }
 
@@ -40,12 +55,22 @@ interface HomeProps {
 export default async function Home({ searchParams }: HomeProps) {
   const resolvedSearchParams = await searchParams;
   const q = typeof resolvedSearchParams.q === 'string' ? resolvedSearchParams.q : undefined;
+  const page = typeof resolvedSearchParams.page === 'string' ? parseInt(resolvedSearchParams.page) : 1;
 
-  const articles = await getArticles(q);
+  const data = await getArticles(q, page);
+  const articles = data.items;
+  const totalCount = data.count;
 
-  // Layout: 1 Hero + Rest as List (No separate featured grid to maintain "List" density)
-  const heroArticle = articles.length > 0 ? articles[0] : null;
-  const feedArticles = articles.length > 1 ? articles.slice(1) : [];
+  // Layout logic
+  // If page 1: Show Hero + List
+  // If page > 1: Show List only (Hero irrelevant for p2)
+  const showHero = page === 1 && articles.length > 0;
+
+  const heroArticle = showHero ? articles[0] : null;
+  // If we showed hero, we slice it off the feed. If not (p2+), feed is all items.
+  const feedArticles = showHero ? articles.slice(1) : articles;
+
+  const hasNext = (page * 20) < totalCount;
 
   return (
     <div className="max-w-4xl mx-auto space-y-12">
@@ -73,7 +98,7 @@ export default async function Home({ searchParams }: HomeProps) {
         </div>
       ) : (
         <div>
-          {/* Hero Story */}
+          {/* Hero Story (Only on Page 1) */}
           {heroArticle && (
             <section className="mb-16">
               <HeroStory
@@ -93,7 +118,7 @@ export default async function Home({ searchParams }: HomeProps) {
           {feedArticles.length > 0 && (
             <section>
               <h2 className="text-xs font-bold uppercase tracking-widest text-[var(--foreground-muted)] mb-4 border-b border-[var(--border)] pb-2">
-                Latest Wire
+                Latest Wire {page > 1 && `(Page ${page})`}
               </h2>
               <div className="flex flex-col">
                 {feedArticles.map((article, idx) => (
@@ -110,6 +135,14 @@ export default async function Home({ searchParams }: HomeProps) {
               </div>
             </section>
           )}
+
+          {/* Pagination */}
+          <Pagination
+            currentPage={page}
+            hasNext={hasNext}
+            baseUrl="/"
+            searchParams={resolvedSearchParams}
+          />
         </div>
       )}
     </div>

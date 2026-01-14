@@ -20,6 +20,7 @@ INSTALLED_APPS = [
     # Third party
     'ninja',
     'django_celery_beat',
+    'corsheaders',  # <--- Added
     
     # Local
     'core',
@@ -30,12 +31,24 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'corsheaders.middleware.CorsMiddleware', # <--- Added (Must be before CommonMiddleware)
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+# CORS & CSRF Configuration
+# -------------------------
+# Read allowed origins from env var (comma separated)
+# Example: FRONTEND_URL=https://ultra-news.vercel.app,http://localhost:3000
+
+FRONTEND_URLS = os.environ.get('FRONTEND_URL', 'http://localhost:3000').split(',')
+
+CORS_ALLOWED_ORIGINS = FRONTEND_URLS
+CSRF_TRUSTED_ORIGINS = FRONTEND_URLS
+CORS_ALLOW_CREDENTIALS = True
 
 ROOT_URLCONF = 'config.urls'
 
@@ -57,15 +70,13 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'config.wsgi.application'
 
+import dj_database_url
+
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.environ.get('POSTGRES_DB', 'ultranews'),
-        'USER': os.environ.get('POSTGRES_USER', 'postgres'),
-        'PASSWORD': os.environ.get('POSTGRES_PASSWORD', 'postgres'),
-        'HOST': 'db',
-        'PORT': '5432',
-    }
+    'default': dj_database_url.config(
+        default=os.environ.get('DATABASE_URL', 'postgresql://postgres:postgres@db:5432/ultranews'),
+        conn_max_age=600
+    )
 }
 
 CACHES = {

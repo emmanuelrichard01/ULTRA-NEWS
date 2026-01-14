@@ -9,30 +9,33 @@
 :root {
   /* Colors - Light Mode (Stark, High Contrast) */
   --background: #FFFFFF;
-  --background-elevated: #F4F4F5;
-  --foreground: #000000;
-  --foreground-muted: #52525B;
-  --accent: #000000; /* Brutalist Accent - pure black for impact */
-  --accent-secondary: #4F46E5; /* Electric blue for functional interaction */
-  --border: #E4E4E7;
-  --border-hover: #A1A1AA;
+  --background-elevated: #F8F8F8;
+  --foreground: #000000;      /* Pure black for max contrast */
+  --foreground-muted: #404040; /* Darker gray for better legibility (WCAG AAA) */
+  --accent: #000000;
+  --accent-secondary: #2563EB; /* Vivid royal blue */
+  --border: #E5E5E5;
+  --border-hover: #A3A3A3;
   
   /* Spacing */
-  --radius-sm: 0px; /* Sharp corners for editorial feel */
+  --radius-sm: 0px; 
   --radius-md: 2px;
   --radius-lg: 4px;
+
+  /* Animation */
+  --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
 /* --- Dark Mode (OLED Black) --- */
 .dark {
   --background: #000000;
-  --background-elevated: #18181B;
-  --foreground: #FFFFFF;
-  --foreground-muted: #A1A1AA;
+  --background-elevated: #121212;
+  --foreground: #FFFFFF;       /* Pure white */
+  --foreground-muted: #D4D4D4; /* Lighter gray for dark mode legibility */
   --accent: #FFFFFF;
-  --accent-secondary: #818CF8;
-  --border: #27272A;
-  --border-hover: #3F3F46;
+  --accent-secondary: #60A5FA;
+  --border: #262626;
+  --border-hover: #525252;
 }
 
 /* --- Tailwind Theme Integration --- */

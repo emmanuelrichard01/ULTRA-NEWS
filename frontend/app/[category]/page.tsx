@@ -1,5 +1,6 @@
 import HeroStory from '@/components/HeroStory';
 import FeedItem from '@/components/FeedItem';
+import Pagination from '@/components/Pagination';
 
 // Define types based on API response
 interface Source {
@@ -15,38 +16,59 @@ interface Article {
     source: Source;
 }
 
-async function getArticles(category: string): Promise<Article[]> {
+interface PaginatedResponse {
+    items: Article[];
+    count: number;
+}
+
+async function getArticles(category: string, page: number = 1): Promise<PaginatedResponse> {
     const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://backend:8000';
-    const endpoint = `/api/news?category=${encodeURIComponent(category)}`;
+    const limit = 20;
+    const offset = (page - 1) * limit;
+
+    const params = new URLSearchParams();
+    params.set('category', category);
+    params.set('limit', limit.toString());
+    params.set('offset', offset.toString());
+
+    const endpoint = `/api/news?${params.toString()}`;
 
     try {
         const res = await fetch(`${API_URL}${endpoint}`, { cache: 'no-store' });
         if (!res.ok) {
             console.error(`Failed to fetch data: ${res.status}`);
-            return [];
+            return { items: [], count: 0 };
         }
         return res.json();
     } catch (error) {
         console.error("Error fetching articles:", error);
-        return [];
+        return { items: [], count: 0 };
     }
 }
 
 interface CategoryPageProps {
-    params: Promise<{ category: string }>
+    params: Promise<{ category: string }>;
+    searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
 function capitalize(s: string) {
     return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-export default async function CategoryPage({ params }: CategoryPageProps) {
+export default async function CategoryPage({ params, searchParams }: CategoryPageProps) {
     const { category } = await params;
-    const articles = await getArticles(category);
+    const resolvedSearchParams = await searchParams;
+    const page = typeof resolvedSearchParams.page === 'string' ? parseInt(resolvedSearchParams.page) : 1;
 
-    const heroArticle = articles.length > 0 ? articles[0] : null;
-    const featuredArticles = articles.length > 1 ? articles.slice(1, 5) : [];
-    const feedArticles = articles.length > 5 ? articles.slice(5) : [];
+    const data = await getArticles(category, page);
+    const articles = data.items;
+    const totalCount = data.count;
+
+    const showHero = page === 1 && articles.length > 0;
+    const heroArticle = showHero ? articles[0] : null;
+    const feedArticles = showHero ? articles.slice(1) : articles;
+
+    const hasNext = (page * 20) < totalCount;
 
     return (
         <div className="space-y-16">
@@ -63,20 +85,14 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
 
             {/* Content */}
             {articles.length === 0 ? (
-                <div className="py-20 text-center">
-                    <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-accent/10 flex items-center justify-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8 text-accent">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 7.5h1.5m-1.5 3h1.5m-7.5 3h7.5m-7.5 3h7.5m3-9h3.375c.621 0 1.125.504 1.125 1.125V18a2.25 2.25 0 0 1-2.25 2.25M16.5 7.5V18a2.25 2.25 0 0 0 2.25 2.25M16.5 7.5V4.875c0-.621-.504-1.125-1.125-1.125H4.125C3.504 3.75 3 4.254 3 4.875V18a2.25 2.25 0 0 0 2.25 2.25h13.5M6 7.5h3v3H6v-3Z" />
-                        </svg>
-                    </div>
-                    <h2 className="text-xl font-semibold text-foreground mb-2">No stories in {category} yet</h2>
-                    <p className="text-foreground-muted">Check back later for updates.</p>
+                <div className="py-20 text-center border-t border-[var(--border)]">
+                    <p className="text-[var(--foreground-muted)] font-mono">No data visible.</p>
                 </div>
             ) : (
-                <div className="space-y-16">
-                    {/* Hero Story */}
+                <div>
+                    {/* Hero Story (First Article) */}
                     {heroArticle && (
-                        <section>
+                        <section className="mb-16">
                             <HeroStory
                                 title={heroArticle.title}
                                 slug={heroArticle.slug}
@@ -85,40 +101,18 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
                                 imageUrl={heroArticle.image_url}
                                 publishedDate={heroArticle.published_date}
                                 category={capitalize(category)}
-                                summary={`Featured story in ${category}.`}
                             />
                         </section>
                     )}
 
-                    {/* Featured Grid */}
-                    {featuredArticles.length > 0 && (
-                        <section>
-                            <div className="flex items-center justify-between mb-8">
-                                <h2 className="text-2xl font-bold text-foreground">Trending in {capitalize(category)}</h2>
-                            </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                                {featuredArticles.map((article, idx) => (
-                                    <FeedItem
-                                        key={idx}
-                                        title={article.title}
-                                        slug={article.slug}
-                                        source={article.source.name}
-                                        url={article.url}
-                                        imageUrl={article.image_url}
-                                        publishedDate={article.published_date}
-                                    />
-                                ))}
-                            </div>
-                        </section>
-                    )}
-
-                    {/* More Stories */}
+                    {/* The List (Remaining Articles) */}
                     {feedArticles.length > 0 && (
                         <section>
-                            <div className="flex items-center justify-between mb-8">
-                                <h2 className="text-2xl font-bold text-foreground">More in {capitalize(category)}</h2>
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <h2 className="text-xs font-bold uppercase tracking-widest text-[var(--foreground-muted)] mb-4 border-b border-[var(--border)] pb-2 flex justify-between items-center">
+                                <span>Recent Stories {page > 1 && `(Page ${page})`}</span>
+                                <span>{totalCount} Total</span>
+                            </h2>
+                            <div className="flex flex-col">
                                 {feedArticles.map((article, idx) => (
                                     <FeedItem
                                         key={idx}
@@ -133,6 +127,14 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
                             </div>
                         </section>
                     )}
+
+                    {/* Pagination */}
+                    <Pagination
+                        currentPage={page}
+                        hasNext={hasNext}
+                        baseUrl={`/${category}`}
+                        searchParams={resolvedSearchParams}
+                    />
                 </div>
             )}
         </div>

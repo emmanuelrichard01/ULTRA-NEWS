@@ -70,6 +70,9 @@ ingest:
 assign-categories:
 	docker compose exec -T backend python manage.py shell < backend/assign_categories.py
 
+seed-sources:
+	docker compose exec -T backend python seed_sources.py
+
 test:
 	docker compose exec backend pytest
 
