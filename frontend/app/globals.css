@@ -1,26 +1,79 @@
 @import "tailwindcss";
 
+/* ============================================
+   ULTRA-NEWS V2 - HYBRID EDITORIAL SYSTEM
+   70% Wired (Bold) / 30% Utility (Calm)
+   ============================================ */
+
+/* --- Design Tokens --- */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Colors - Light Mode (Stark, High Contrast) */
+  --background: #FFFFFF;
+  --background-elevated: #F4F4F5;
+  --foreground: #000000;
+  --foreground-muted: #52525B;
+  --accent: #000000; /* Brutalist Accent - pure black for impact */
+  --accent-secondary: #4F46E5; /* Electric blue for functional interaction */
+  --border: #E4E4E7;
+  --border-hover: #A1A1AA;
+  
+  /* Spacing */
+  --radius-sm: 0px; /* Sharp corners for editorial feel */
+  --radius-md: 2px;
+  --radius-lg: 4px;
 }
 
+/* --- Dark Mode (OLED Black) --- */
+.dark {
+  --background: #000000;
+  --background-elevated: #18181B;
+  --foreground: #FFFFFF;
+  --foreground-muted: #A1A1AA;
+  --accent: #FFFFFF;
+  --accent-secondary: #818CF8;
+  --border: #27272A;
+  --border-hover: #3F3F46;
+}
+
+/* --- Tailwind Theme Integration --- */
 @theme inline {
   --color-background: var(--background);
+  --color-background-elevated: var(--background-elevated);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-foreground-muted: var(--foreground-muted);
+  --color-accent: var(--accent);
+  --color-accent-secondary: var(--accent-secondary);
+  --color-border: var(--border);
+  --font-sans: var(--font-inter);
+  --font-display: var(--font-inter);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* --- Base Styles --- */
+html {
+  scroll-behavior: smooth;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  letter-spacing: -0.01em; /* Tighter body text */
+}
+
+/* --- Typography Enhancements --- */
+.font-display {
+  font-weight: 800;
+  letter-spacing: -0.04em; /* Very tight headlines like Wired */
+}
+
+/* --- Image Container --- */
+.image-container {
+  overflow: hidden;
+  position: relative;
+}
+
+/* --- Selection Color --- */
+::selection {
+  background: var(--accent);
+  color: var(--background);
 }

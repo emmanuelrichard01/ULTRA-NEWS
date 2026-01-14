@@ -23,6 +23,7 @@ class Article(models.Model):
     slug = models.SlugField(max_length=500, unique=True, blank=True)
     source = models.ForeignKey(Source, on_delete=models.CASCADE, related_name='articles')
     url = models.URLField(unique=True)
+    image_url = models.URLField(max_length=1000, blank=True, null=True)
     content = models.TextField(blank=True)
     published_date = models.DateTimeField()
     created_at = models.DateTimeField(auto_now_add=True)

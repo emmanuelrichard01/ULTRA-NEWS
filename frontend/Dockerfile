@@ -1,15 +1,13 @@
-FROM node:20-alpine
+FROM node:20-slim
 
 WORKDIR /app
 
-# We expect package.json to actally exist in the future, 
-# but for the very first build, we might need to be lenient or manual.
-# This is a dev dockerfile.
-
+# Install dependencies
 COPY package*.json ./
+RUN npm ci
 
-RUN if [ -f package.json ]; then npm install; else echo "No package.json found, skipping install"; fi
-
+# Copy application code
 COPY . .
 
+# Default: development mode (override in production)
 CMD ["npm", "run", "dev"]

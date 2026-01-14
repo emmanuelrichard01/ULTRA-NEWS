@@ -19,10 +19,12 @@ INSTALLED_APPS = [
     
     # Third party
     'ninja',
+    'django_celery_beat',
     
     # Local
     'core',
     'api',
+    'django.contrib.postgres',
 ]
 
 MIDDLEWARE = [
@@ -65,6 +67,21 @@ DATABASES = {
         'PORT': '5432',
     }
 }
+
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": os.environ.get("REDIS_URL", "redis://redis:6379/1"),
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        }
+    }
+}
+
+# Celery Configuration
+CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "redis://redis:6379/1")
+CELERY_RESULT_BACKEND = os.environ.get("CELERY_RESULT_BACKEND", "redis://redis:6379/1")
+CELERY_TIMEZONE = "UTC"
 
 AUTH_PASSWORD_VALIDATORS = [
     {

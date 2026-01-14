@@ -9,3 +9,7 @@ venv
 db.sqlite3
 media
 staticfiles
+celerybeat-schedule
+celerybeat-schedule.dir
+celerybeat-schedule.bak
+celerybeat-schedule.dat

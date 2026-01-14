@@ -15,6 +15,12 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    restart: always
+    volumes:
+      - redis_data:/data
+
   backend:
     build: ./backend
     command: /bin/bash -c "if [ ! -f manage.py ]; then django-admin startproject config .; fi && python manage.py migrate && uvicorn config.asgi:application --host 0.0.0.0 --port 8000 --reload"
@@ -26,9 +32,38 @@ services:
       - DATABASE_URL=postgres://postgres:postgres@db:5432/ultranews
       - DEBUG=1
       - SECRET_KEY=insecure-dev-key-change-in-prod
+      - REDIS_URL=redis://redis:6379/1
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_started
+
+  worker:
+    build: ./backend
+    command: celery -A config worker --loglevel=info
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - redis
+      - db
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@db:5432/ultranews
+      - REDIS_URL=redis://redis:6379/1
+      - SECRET_KEY=insecure-dev-key-change-in-prod
+
+  beat:
+    build: ./backend
+    command: celery -A config beat --loglevel=info
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - redis
+      - db
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@db:5432/ultranews
+      - REDIS_URL=redis://redis:6379/1
+      - SECRET_KEY=insecure-dev-key-change-in-prod
 
   frontend:
     build:
@@ -45,3 +80,4 @@ services:
 
 volumes:
   postgres_data:
+  redis_data:

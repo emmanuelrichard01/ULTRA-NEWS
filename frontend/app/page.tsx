@@ -1,16 +1,30 @@
-import Link from 'next/link';
-import ArticleCard from '@/components/ArticleCard';
+import HeroStory from '@/components/HeroStory';
+import FeedItem from '@/components/FeedItem';
+import SearchBar from '@/components/SearchBar';
 
-async function getArticles() {
-  // Use http://backend:8000 internally within Docker network
-  // But for SSR on dev machine it might need localhost if not running in container...
-  // Actually, Next.js generic fetch is server-side.
+// Define types based on API response
+interface Source {
+  name: string;
+}
+
+interface Article {
+  title: string;
+  slug: string;
+  url: string;
+  image_url?: string;
+  published_date: string;
+  source: Source;
+}
+
+async function getArticles(query?: string): Promise<Article[]> {
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://backend:8000';
+  const endpoint = query ? `/api/news?q=${encodeURIComponent(query)}` : '/api/news';
 
   try {
-    const res = await fetch(`${API_URL}/api/news`, { cache: 'no-store' });
+    const res = await fetch(`${API_URL}${endpoint}`, { cache: 'no-store' });
     if (!res.ok) {
-      throw new Error('Failed to fetch data');
+      console.error(`Failed to fetch data: ${res.status}`);
+      return [];
     }
     return res.json();
   } catch (error) {
@@ -19,38 +33,83 @@ async function getArticles() {
   }
 }
 
-export default async function Home() {
-  const articles = await getArticles();
+interface HomeProps {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
+}
+
+export default async function Home({ searchParams }: HomeProps) {
+  const resolvedSearchParams = await searchParams;
+  const q = typeof resolvedSearchParams.q === 'string' ? resolvedSearchParams.q : undefined;
+
+  const articles = await getArticles(q);
+
+  // Layout: 1 Hero + Rest as List (No separate featured grid to maintain "List" density)
+  const heroArticle = articles.length > 0 ? articles[0] : null;
+  const feedArticles = articles.length > 1 ? articles.slice(1) : [];
 
   return (
-    <div className="space-y-8">
-      <div className="text-center">
-        <h1 className="text-4xl font-extrabold tracking-tight text-gray-900 sm:text-5xl md:text-6xl">
-          <span className="block xl:inline">Latest Headlines from</span>{' '}
-          <span className="block text-blue-600 xl:inline">Ultra News</span>
-        </h1>
-        <p className="mt-3 max-w-md mx-auto text-base text-gray-500 sm:text-lg md:mt-5 md:text-xl md:max-w-3xl">
-          Your daily dose of aggregated news from the best sources around the web.
-          Powered by Django Ninja and Next.js.
-        </p>
-      </div>
+    <div className="max-w-4xl mx-auto space-y-12">
+      {/* Simple Editorial Header */}
+      <header className="border-b-4 border-[var(--foreground)] pb-6 mb-8">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+          <div>
+            <h1 className="text-6xl md:text-8xl font-[900] tracking-tighter leading-none text-[var(--foreground)] mb-2 font-display uppercase">
+              The Feed
+            </h1>
+            <p className="text-lg font-medium text-[var(--foreground-muted)] max-w-xl">
+              Live intelligence stream.
+            </p>
+          </div>
+          <div className="w-full md:w-auto">
+            <SearchBar />
+          </div>
+        </div>
+      </header>
 
+      {/* Content */}
       {articles.length === 0 ? (
-        <div className="text-center text-gray-500 py-12">
-          <p>No articles found. Run the ingestion command to populate data.</p>
+        <div className="py-20 text-center border-t border-[var(--border)]">
+          <p className="text-[var(--foreground-muted)] font-mono">System Offline. Connecting...</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {articles.map((article: any, idx: number) => (
-            <ArticleCard
-              key={idx}
-              title={article.title}
-              source={article.source.name}
-              url={article.url}
-              published_date={article.published_date}
-              category="General"
-            />
-          ))}
+        <div>
+          {/* Hero Story */}
+          {heroArticle && (
+            <section className="mb-16">
+              <HeroStory
+                title={heroArticle.title}
+                slug={heroArticle.slug}
+                source={heroArticle.source.name}
+                url={heroArticle.url}
+                imageUrl={heroArticle.image_url}
+                publishedDate={heroArticle.published_date}
+                category="Editor's Choice"
+                summary="The most significant story of the moment, curated for depth and impact."
+              />
+            </section>
+          )}
+
+          {/* The List (Single Column for Density) */}
+          {feedArticles.length > 0 && (
+            <section>
+              <h2 className="text-xs font-bold uppercase tracking-widest text-[var(--foreground-muted)] mb-4 border-b border-[var(--border)] pb-2">
+                Latest Wire
+              </h2>
+              <div className="flex flex-col">
+                {feedArticles.map((article, idx) => (
+                  <FeedItem
+                    key={idx}
+                    title={article.title}
+                    slug={article.slug}
+                    source={article.source.name}
+                    url={article.url}
+                    imageUrl={article.image_url}
+                    publishedDate={article.published_date}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
         </div>
       )}
     </div>
