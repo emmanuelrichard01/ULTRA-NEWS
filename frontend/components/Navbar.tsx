@@ -33,7 +33,10 @@ export default function Navbar() {
   }, [isOpen]);
 
   return (
-    <nav className="sticky top-0 z-50 bg-[var(--background)]/85 backdrop-blur-xl border-b border-[var(--border)] supports-[backdrop-filter]:bg-[var(--background)]/60">
+    <nav className={`sticky top-0 z-50 border-b border-[var(--border)] transition-colors duration-300 ${isOpen
+        ? "bg-[var(--background)]"
+        : "bg-[var(--background)]/85 backdrop-blur-xl supports-[backdrop-filter]:bg-[var(--background)]/60"
+      }`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-14 items-center">
           {/* Editorial Wordmark */}
