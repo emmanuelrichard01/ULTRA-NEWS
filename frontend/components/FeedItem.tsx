@@ -42,7 +42,7 @@ export default function FeedItem({ title, slug, source, url, imageUrl, published
     const [imgError, setImgError] = useState(false);
 
     return (
-        <article className="group py-6 border-b border-[var(--border)] last:border-0 hover:bg-[var(--background-elevated)] transition-all duration-300 -mx-4 px-4 sm:mx-0 sm:px-0 sm:hover:bg-transparent sm:hover:-translate-y-0.5 sm:hover:shadow-lg sm:hover:shadow-[var(--foreground)]/5 sm:rounded-lg">
+        <article className="group py-6 border-b border-[var(--border)] last:border-0 hover:bg-[var(--background-elevated)] transition-colors duration-200 -mx-4 px-4 sm:rounded-lg">
             <Link href={articleLink} className="flex flex-row-reverse sm:flex-row gap-6 items-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-secondary)] focus-visible:ring-offset-2 rounded-lg">
                 {/* Image Thumbnail - Fixed Aspect Ratio */}
                 <div className="flex-shrink-0 w-24 h-24 sm:w-40 sm:h-28 relative overflow-hidden rounded-md bg-[var(--border)]">

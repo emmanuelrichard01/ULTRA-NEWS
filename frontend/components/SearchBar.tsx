@@ -61,13 +61,13 @@ export default function SearchBar() {
     return (
         <form onSubmit={handleSearch} className="relative w-full max-w-lg group">
             <div className={`
-                flex items-center gap-3 py-2.5 px-4
-                bg-[var(--background-elevated)] 
-                border rounded-lg
-                transition-all duration-200
+                flex items-center gap-3 py-2.5 px-5
+                bg-[var(--background)] 
+                border rounded-full
+                transition-all duration-300 ease-out
                 ${isFocused
-                    ? 'border-[var(--accent-secondary)] shadow-sm shadow-[var(--accent-secondary)]/20'
-                    : 'border-[var(--border)] hover:border-[var(--border-hover)]'
+                    ? 'border-[var(--accent-secondary)] ring-4 ring-[var(--accent-secondary)]/10'
+                    : 'border-[var(--border)] hover:border-[var(--border-hover)] hover:shadow-sm'
                 }
             `}>
                 {/* Search Icon / Loading Spinner */}
@@ -79,7 +79,7 @@ export default function SearchBar() {
                 >
                     {isSearching ? (
                         <svg
-                            className="w-4 h-4 animate-spin text-[var(--accent-secondary)]"
+                            className="w-5 h-5 animate-spin text-[var(--accent-secondary)]"
                             xmlns="http://www.w3.org/2000/svg"
                             fill="none"
                             viewBox="0 0 24 24"
@@ -94,7 +94,7 @@ export default function SearchBar() {
                             viewBox="0 0 24 24"
                             strokeWidth={2}
                             stroke="currentColor"
-                            className={`w-4 h-4 transition-colors ${isFocused ? 'text-[var(--accent-secondary)]' : 'text-[var(--foreground-muted)]'}`}
+                            className={`w-5 h-5 transition-colors ${isFocused ? 'text-[var(--accent-secondary)]' : 'text-[var(--foreground-muted)] group-hover:text-[var(--foreground)]'}`}
                         >
                             <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
                         </svg>
@@ -113,7 +113,7 @@ export default function SearchBar() {
                     className="
                         flex-1 min-w-0
                         bg-transparent border-none 
-                        text-[var(--foreground)] text-sm font-medium
+                        text-[var(--foreground)] text-[15px] font-medium leading-relaxed
                         placeholder-[var(--foreground-muted)]
                         focus:outline-none
                     "
@@ -136,7 +136,7 @@ export default function SearchBar() {
                 {/* Keyboard Shortcut Hint */}
                 {!query && !isFocused && (
                     <div className="hidden sm:flex items-center gap-1 flex-shrink-0">
-                        <kbd className="px-1.5 py-0.5 text-[10px] font-mono text-[var(--foreground-muted)] bg-[var(--background)] border border-[var(--border)] rounded">⌘K</kbd>
+                        <kbd className="px-2 py-1 text-[10px] font-bold text-[var(--foreground-muted)] bg-[var(--background-elevated)] border border-[var(--border)] rounded-md shadow-sm">⌘K</kbd>
                     </div>
                 )}
             </div>
