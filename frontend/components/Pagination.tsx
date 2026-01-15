@@ -7,11 +7,12 @@ interface PaginationProps {
     // but usually standard paginators do. 
     // For now, let's assume valid next/prev logic or just a simple standard approach.
     hasNext: boolean;
+    totalCount?: number;
     baseUrl: string;
     searchParams?: { [key: string]: string | string[] | undefined };
 }
 
-export default function Pagination({ currentPage, hasNext, baseUrl, searchParams }: PaginationProps) {
+export default function Pagination({ currentPage, hasNext, totalCount, baseUrl, searchParams }: PaginationProps) {
     // Helper to build URL
     const buildUrl = (page: number) => {
         const params = new URLSearchParams();
@@ -25,6 +26,10 @@ export default function Pagination({ currentPage, hasNext, baseUrl, searchParams
         params.set('page', page.toString());
         return `${baseUrl}?${params.toString()}`;
     };
+
+    const pageSize = 20;
+    const startItem = (currentPage - 1) * pageSize + 1;
+    const endItem = Math.min(currentPage * pageSize, totalCount || currentPage * pageSize);
 
     return (
         <div className="flex items-center justify-between border-t border-[var(--border)] pt-8 mt-12">
@@ -50,10 +55,16 @@ export default function Pagination({ currentPage, hasNext, baseUrl, searchParams
                 )}
             </div>
 
-            <div className="hidden md:flex">
-                <span className="text-sm font-medium text-[var(--foreground)] px-4 py-2">
-                    Page {currentPage}
-                </span>
+            <div className="hidden md:flex flex-col items-center">
+                {totalCount ? (
+                    <span className="text-sm font-medium text-[var(--foreground-muted)]">
+                        Showing <span className="text-[var(--foreground)]">{startItem}-{endItem}</span> of <span className="text-[var(--foreground)]">{totalCount.toLocaleString()}</span>
+                    </span>
+                ) : (
+                    <span className="text-sm font-medium text-[var(--foreground)]">
+                        Page {currentPage}
+                    </span>
+                )}
             </div>
 
             <div className="flex w-0 flex-1 justify-end">

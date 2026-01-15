@@ -77,9 +77,16 @@ export default async function Home({ searchParams }: HomeProps) {
       <header className="border-b-4 border-[var(--foreground)] pb-6 mb-8">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div>
-            <h1 className="text-6xl md:text-8xl font-[900] tracking-tighter leading-none text-[var(--foreground)] mb-2 font-display uppercase">
-              The Feed
-            </h1>
+            <div className="flex items-center gap-3 mb-2">
+              <h1 className="text-6xl md:text-8xl font-[900] tracking-tighter leading-none text-[var(--foreground)] font-display uppercase">
+                The Feed
+              </h1>
+              {totalCount > 0 && (
+                <span className="hidden sm:inline-flex items-center px-3 py-1 text-xs font-bold uppercase tracking-wide bg-[var(--accent-secondary)] text-white rounded-full">
+                  {totalCount.toLocaleString()} stories
+                </span>
+              )}
+            </div>
             <p className="text-lg font-medium text-[var(--foreground-muted)] max-w-xl">
               Curated intelligence for the accelerated mind.
             </p>
@@ -131,6 +138,7 @@ export default async function Home({ searchParams }: HomeProps) {
           <Pagination
             currentPage={page}
             hasNext={hasNext}
+            totalCount={totalCount}
             baseUrl="/"
             searchParams={resolvedSearchParams}
           />

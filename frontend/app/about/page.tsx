@@ -12,11 +12,12 @@ export default function AboutPage() {
         <div className="max-w-3xl mx-auto pt-8 pb-20 px-4">
             {/* Editorial Header */}
             <header className="mb-16 border-b border-[var(--border)] pb-8">
-                <h1 className="text-6xl md:text-8xl font-[900] tracking-tighter leading-none text-[var(--foreground)] mb-6 font-display uppercase">
-                    About
+                <span className="text-xs font-bold tracking-widest uppercase text-[var(--accent-secondary)] mb-4 block">About Ultra News</span>
+                <h1 className="text-5xl md:text-7xl font-[900] tracking-tighter leading-none text-[var(--foreground)] mb-6 font-display">
+                    The Information Instrument
                 </h1>
                 <p className="text-xl md:text-2xl font-serif text-[var(--foreground-muted)] max-w-2xl leading-relaxed">
-                    Ultra News is an <span className="text-[var(--foreground)] font-semibold">Information Instrument</span> engineered for clarity, density, and speed.
+                    Engineered for <span className="text-[var(--foreground)] font-semibold">clarity</span>, <span className="text-[var(--foreground)] font-semibold">density</span>, and <span className="text-[var(--foreground)] font-semibold">speed</span>.
                 </p>
             </header>
 
@@ -84,18 +85,19 @@ export default function AboutPage() {
                                     I am a full-stack engineer passionate about building high-performance systems and clean, utility-first user interfaces. Ultra News is the culmination of my journey—combining rigorous backend engineering with editorial design principles.
                                 </p>
                             </div>
-                            <div className="flex gap-6">
+                            <div className="flex flex-wrap gap-4">
                                 <a
                                     href="https://github.com/emmanuelrichard01"
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-[var(--foreground)] border-b-2 border-[var(--foreground)] hover:bg-[var(--foreground)] hover:text-[var(--background)] transition-all px-1"
+                                    className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-wider bg-[var(--foreground)] text-[var(--background)] px-4 py-2 rounded-md hover:opacity-90 transition-opacity"
                                 >
-                                    GitHub Profile ↗
+                                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path fillRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clipRule="evenodd" /></svg>
+                                    GitHub Profile
                                 </a>
                                 <a
                                     href="mailto:contact@ultranews.demo"
-                                    className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-all"
+                                    className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-[var(--foreground-muted)] border border-[var(--border)] px-4 py-2 rounded-md hover:text-[var(--foreground)] hover:border-[var(--foreground)] transition-all"
                                 >
                                     Contact Me
                                 </a>
