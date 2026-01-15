@@ -12,6 +12,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://ultra-news.demo"),
   title: {
     template: "%s | Ultra News",
     default: "Ultra News — Curated Intelligence for the Accelerated Mind",

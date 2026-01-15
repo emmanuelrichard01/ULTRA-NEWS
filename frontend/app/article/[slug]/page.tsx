@@ -130,9 +130,15 @@ export default async function ArticlePage({ params }: PageProps) {
                 prose-li:text-black dark:prose-li:text-gray-300
                 prose-a:text-[var(--accent)] hover:prose-a:text-[var(--accent-secondary)]">
                 {article.content ? (
-                    <div dangerouslySetInnerHTML={{ __html: article.content }} />
+                    <div className="prose prose-lg dark:prose-invert max-w-none font-serif leading-relaxed 
+                text-black dark:text-gray-300 
+                prose-headings:text-black dark:prose-headings:text-white 
+                prose-p:text-black dark:prose-p:text-gray-300 
+                prose-strong:text-black dark:prose-strong:text-white
+                prose-li:text-black dark:prose-li:text-gray-300
+                prose-a:text-[var(--accent)] hover:prose-a:text-[var(--accent-secondary)]" dangerouslySetInnerHTML={{ __html: article.content }} />
                 ) : (
-                    <div className="italic text-gray-500 text-center py-10 bg-gray-50 dark:bg-white/5 rounded-lg">
+                    <div className="italic text-black dark:text-gray-300 text-center py-10 bg-gray-50 dark:bg-white/5 rounded-lg">
                         <p>Full content not available in this preview.</p>
                         <div className="mt-4">
                             <a href={article.url} target="_blank" rel="noopener noreferrer" className="btn-primary inline-flex items-center gap-2 bg-foreground text-background px-6 py-3 rounded-md font-medium hover:opacity-90 transition-opacity">
