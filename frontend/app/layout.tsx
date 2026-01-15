@@ -13,11 +13,11 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: {
     template: "%s | Ultra News",
-    default: "Ultra News - The Daily Intelligence Stream",
+    default: "Ultra News — Curated Intelligence for the Accelerated Mind",
   },
-  description: "A modern, high-density news aggregator for tech, business, and world events. Zero friction, maximum intelligence.",
-  keywords: ["news", "aggregator", "tech", "business", "politics", "science", "ultra news"],
-  authors: [{ name: "Ultra News Team" }],
+  description: "A high-performance news aggregation platform engineered for density, speed, and clarity. Tracking Tech, Politics, and Global Markets in real-time.",
+  keywords: ["news aggregator", "tech news", "market intelligence", "minimalist news", "ultra news", "emmanuel richard moghalu"],
+  authors: [{ name: "Emmanuel Richard Moghalu", url: "https://github.com/emmanuelrichard01" }],
   openGraph: {
     type: "website",
     locale: "en_US",
@@ -25,17 +25,17 @@ export const metadata: Metadata = {
     siteName: "Ultra News",
     images: [
       {
-        url: "/og-image.jpg", // We would ideally have a real OG image here
+        url: "/images/logo-light-mode.png",
         width: 1200,
         height: 630,
-        alt: "Ultra News",
+        alt: "Ultra News Platform",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Ultra News - The Daily Intelligence Stream",
-    creator: "@ultranews",
+    title: "Ultra News — The Information Instrument",
+    creator: "@emmanuelrichard01",
   },
 };
 

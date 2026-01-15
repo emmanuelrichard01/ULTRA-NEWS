@@ -81,7 +81,7 @@ export default async function Home({ searchParams }: HomeProps) {
               The Feed
             </h1>
             <p className="text-lg font-medium text-[var(--foreground-muted)] max-w-xl">
-              Live intelligence stream.
+              Curated intelligence for the accelerated mind.
             </p>
           </div>
           <div className="w-full md:w-auto">

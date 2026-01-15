@@ -34,15 +34,16 @@ export default function Navbar() {
 
   return (
     <nav className={`sticky top-0 z-50 border-b border-[var(--border)] transition-colors duration-300 ${isOpen
-        ? "bg-[var(--background)]"
-        : "bg-[var(--background)]/85 backdrop-blur-xl supports-[backdrop-filter]:bg-[var(--background)]/60"
+      ? "bg-[var(--background)]"
+      : "bg-[var(--background)]/85 backdrop-blur-xl supports-[backdrop-filter]:bg-[var(--background)]/60"
       }`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-14 items-center">
           {/* Editorial Wordmark */}
           <Link href="/" className="flex items-center gap-2 group z-50 relative">
-            <div className="w-6 h-6 bg-[var(--foreground)] flex items-center justify-center">
-              <span className="text-[var(--background)] font-bold text-xs">U</span>
+            <div className="w-8 h-8 relative flex items-center justify-center">
+              <img src="/images/logo-light-mode.png" alt="Logo" className="absolute inset-0 w-full h-full object-contain dark:hidden" />
+              <img src="/images/logo-dark-mode.png" alt="Logo" className="absolute inset-0 w-full h-full object-contain hidden dark:block" />
             </div>
             <span className="text-xl font-[900] tracking-tighter text-[var(--foreground)] uppercase font-display border-b-2 border-transparent group-hover:border-[var(--accent)] transition-all">
               Ultra<span className="text-[var(--foreground-muted)]">News</span>

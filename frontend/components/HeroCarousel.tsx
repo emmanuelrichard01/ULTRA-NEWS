@@ -90,9 +90,8 @@ export default function HeroCarousel({ articles }: HeroCarouselProps) {
                             </span>
                         </div>
 
-                        {/* Title */}
                         <Link href={currentArticle.slug ? `/article/${currentArticle.slug}` : currentArticle.url}>
-                            <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white leading-[0.95] tracking-tighter font-display mb-4 hover:underline decoration-4 decoration-[var(--accent-secondary)] underline-offset-4 transition-all duration-200 line-clamp-3 drop-shadow-md">
+                            <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white leading-[0.95] tracking-tighter font-display mb-4 hover:underline decoration-[8px] decoration-[var(--accent-secondary)] underline-offset-4 transition-all duration-200 line-clamp-3 drop-shadow-md">
                                 {currentArticle.title}
                             </h2>
                         </Link>
