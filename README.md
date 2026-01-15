@@ -97,10 +97,15 @@ flowchart TB
         Redis[("Redis 7")]
     end
 
-    subgraph Workers["⚙️ Background Processing"]
+    subgraph Workers["⚙️ Async Workers (Scalable Production)"]
+        Beat["Celery Beat\n(Scheduler)"]
+        Worker["Celery Worker"]
+        Scraper["Trafilatura\nScraper"]
+    end
+    
+    subgraph FreeTier["✨ Free Tier Alternative"]
         Cron["⏰ Cron-Job.org\n(External Trigger)"]
         Thread["Background Thread\n(Inside Django App)"]
-        Scraper["Trafilatura\nScraper"]
     end
 
     Browser --> SSR
@@ -111,11 +116,17 @@ flowchart TB
     Ninja --> Search
     Search --> Postgres
     
-    Cron -->|"POST /trigger-ingest"| Ninja
-    Ninja -->|"Spawn Thread"| Thread
-    Thread --> Scraper
-    Scraper -->|"RSS + Full Text"| Thread
-    Thread -->|"Save Articles"| Postgres
+    %% Standard Path (Recommended)
+    Beat -->|"Every 30min"| Redis
+    Worker --> Redis
+    Worker --> Scraper
+    Scraper -->|"RSS + Full Text"| Worker
+    Worker -->|"Save Articles"| Postgres
+
+    %% Free Tier Path
+    Cron -.->|"POST /trigger-ingest"| Ninja
+    Ninja -.->|"Spawn Thread"| Thread
+    Thread -.-> Scraper
 ```
 
 ---
@@ -124,27 +135,53 @@ flowchart TB
 
 ### Article Ingestion Pipeline
 
+### Article Ingestion Pipeline
+ 
+We support two ingestion strategies: **Scalable** (Production) and **Free Tier** (Cost-Optimized).
+
+#### Option A: Scalable Production (Recommended)
+Uses **Celery + Redis** for robust, distributed background processing.
+
+```mermaid
+sequenceDiagram
+    participant Beat as ⏰ Celery Beat
+    participant Worker as ⚙️ Worker
+    participant RSS as 🌐 RSS Feeds
+    participant Traf as 📄 Trafilatura
+    participant DB as 💾 PostgreSQL
+
+    rect rgb(230, 245, 255)
+        Note over Beat,DB: Scheduled Every 30 Minutes
+        Beat->>Worker: Trigger scrape_all_sources()
+        Worker->>RSS: Fetch RSS XML
+        RSS-->>Worker: Feed entries
+        
+        loop For Each Entry
+            Worker->>Traf: Deep scrape (Headers + og:image)
+            Traf-->>Worker: Full Content + High-Res Image
+            Worker->>DB: INSERT Article
+        end
+    end
+```
+
+#### Option B: Free Tier Alternative (Current)
+Uses **Cron-Job.org + Background Threads** to bypass paid worker instances.
+
+```mermaid
+sequenceDiagram
     participant Cron as ⏰ Cron Job
     participant API as 🔌 Django API
     participant RSS as 🌐 RSS Feeds
     participant Traf as 📄 Scraper Service
-    participant DB as 💾 PostgreSQL
 
-    rect rgb(230, 245, 255)
-        Note over Cron,DB: Triggered Hourly (Free Tier)
+    rect rgb(240, 255, 240)
+        Note over Cron,API: Triggered Hourly (External)
         Cron->>API: POST /admin/trigger-ingest
-        API-->>Cron: 200 OK (Background Thread Started)
+        API-->>Cron: 200 OK (Async Thread Started)
         
-        loop For Each Source (Async Thread)
-            API->>RSS: Fetch RSS XML
-            RSS-->>API: Entries List
-            
-            loop For Each Entry
-                API->>Traf: Deep Scrape (Resolution & Metadata)
-                Traf-->>API: Full Content + High-Res Image
-                API->>DB: INSERT Article (dedupe)
-                API->>DB: Auto-Assign Category
-            end
+        loop For Each Source (Background Thread)
+            API->>RSS: Fetch RSS
+            API->>Traf: Deep Scrape
         end
     end
 ```
