@@ -104,35 +104,61 @@ def seed_db(request):
     """
     Manually seed the database with initial Sources and Categories.
     Useful for Render Free Tier where Shell access is paid.
+    WARNING: Runs migrations first to ensure DB tables exist.
     """
+    from django.core.management import call_command
     from core.models import Source, Category
-    
-    # 1. Seed Categories
-    categories = ['Tech', 'Politics', 'Business', 'Entertainment', 'Science', 'Art']
-    cat_results = []
-    for cat_name in categories:
-        _, created = Category.objects.get_or_create(name=cat_name, slug=cat_name.lower())
-        cat_results.append(f"{cat_name}: {'Created' if created else 'Exists'}")
+    import sys
+    import io
 
-    # 2. Seed Sources
-    SOURCES = [
-        {"name": "The Verge", "url": "https://www.theverge.com/rss/index.xml", "scraper_type": "rss"},
-        {"name": "Wired", "url": "https://www.wired.com/feed/rss", "scraper_type": "rss"},
-        {"name": "BBC News", "url": "https://feeds.bbci.co.uk/news/world/rss.xml", "scraper_type": "rss"},
-        {"name": "TechCrunch", "url": "https://techcrunch.com/feed/", "scraper_type": "rss"},
-        {"name": "Ars Technica", "url": "https://arstechnica.com/feed/", "scraper_type": "rss"},
-        {"name": "NYT Technology", "url": "https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml", "scraper_type": "rss"}
-    ]
-    source_results = []
-    for s in SOURCES:
-        _, created = Source.objects.get_or_create(
-            url=s["url"],
-            defaults={"name": s["name"], "scraper_type": s["scraper_type"]}
-        )
-        source_results.append(f"{s['name']}: {'Created' if created else 'Exists'}")
+    # Capture stdout to see what happens
+    output = io.StringIO()
+    sys.stdout = output
 
-    return {
-        "status": "completed",
-        "categories": cat_results,
-        "sources": source_results
-    }
+    try:
+        # 0. Run Migrations (Critical for empty DBs)
+        call_command('migrate', interactive=False)
+        print("Migrations completed.")
+
+        # 1. Seed Categories
+        categories = ['Tech', 'Politics', 'Business', 'Entertainment', 'Science', 'Art']
+        cat_results = []
+        for cat_name in categories:
+            _, created = Category.objects.get_or_create(name=cat_name, slug=cat_name.lower())
+            cat_results.append(f"{cat_name}: {'Created' if created else 'Exists'}")
+
+        # 2. Seed Sources
+        SOURCES = [
+            {"name": "The Verge", "url": "https://www.theverge.com/rss/index.xml", "scraper_type": "rss"},
+            {"name": "Wired", "url": "https://www.wired.com/feed/rss", "scraper_type": "rss"},
+            {"name": "BBC News", "url": "https://feeds.bbci.co.uk/news/world/rss.xml", "scraper_type": "rss"},
+            {"name": "TechCrunch", "url": "https://techcrunch.com/feed/", "scraper_type": "rss"},
+            {"name": "Ars Technica", "url": "https://arstechnica.com/feed/", "scraper_type": "rss"},
+            {"name": "NYT Technology", "url": "https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml", "scraper_type": "rss"}
+        ]
+        source_results = []
+        for s in SOURCES:
+            _, created = Source.objects.get_or_create(
+                url=s["url"],
+                defaults={"name": s["name"], "scraper_type": s["scraper_type"]}
+            )
+            source_results.append(f"{s['name']}: {'Created' if created else 'Exists'}")
+        
+        # Reset stdout
+        sys.stdout = sys.__stdout__
+        
+        return {
+            "status": "completed",
+            "migration_output": "Migrations ran successfully.",
+            "categories": cat_results,
+            "sources": source_results
+        }
+
+    except Exception as e:
+        sys.stdout = sys.__stdout__
+        # Return the error details instead of 500
+        return {
+            "status": "error",
+            "error": str(e),
+            "output_log": output.getvalue()
+        }
