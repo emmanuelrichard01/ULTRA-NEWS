@@ -37,6 +37,12 @@ export const metadata: Metadata = {
     title: "Ultra News — The Information Instrument",
     creator: "@emmanuelrichard01",
   },
+  icons: {
+    icon: [
+      { url: '/images/logo-light-mode.png', media: '(prefers-color-scheme: light)' },
+      { url: '/images/logo-dark-mode.png', media: '(prefers-color-scheme: dark)' },
+    ],
+  },
 };
 
 export default function RootLayout({
