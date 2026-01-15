@@ -122,7 +122,7 @@ export default async function ArticlePage({ params }: PageProps) {
             </header>
 
             {/* Body Content */}
-            <div className="prose prose-lg dark:prose-invert max-w-none font-serif leading-relaxed text-black dark:text-gray-300 prose-headings:text-black prose-p:text-black prose-strong:text-black prose-li:text-black">
+            <div className="prose prose-lg dark:prose-invert max-w-none font-serif leading-relaxed text-black dark:text-gray-300 [&_*]:text-black dark:[&_*]:text-gray-300">
                 {article.content ? (
                     <div dangerouslySetInnerHTML={{ __html: article.content }} />
                 ) : (

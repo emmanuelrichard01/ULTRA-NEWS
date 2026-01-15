@@ -78,7 +78,7 @@ export default function HeroCarousel({ articles }: HeroCarouselProps) {
                     <div className="max-w-4xl transition-all duration-500 transform translate-y-0">
                         {/* Meta */}
                         <div className="flex items-center gap-3 mb-3 text-white">
-                            <span className="text-xs font-bold tracking-widest uppercase text-[var(--accent-secondary)]">
+                            <span className="text-[10px] font-bold tracking-widest uppercase bg-[var(--accent-secondary)] text-white px-2 py-1 rounded-sm shadow-sm">
                                 Editor's Choice
                             </span>
                             <span className="w-1 h-1 bg-white/50 rounded-full" />
