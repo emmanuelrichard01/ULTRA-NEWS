@@ -1,4 +1,7 @@
+"use client";
+
 import Link from 'next/link';
+import { useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 
 interface FeedItemProps {
@@ -15,15 +18,18 @@ export default function FeedItem({ title, slug, source, url, imageUrl, published
     const dateObj = typeof publishedDate === 'string' ? new Date(publishedDate) : publishedDate;
     const articleLink = slug ? `/article/${slug}` : url;
 
+    const [imgError, setImgError] = useState(false);
+
     return (
         <article className="group py-6 border-b border-[var(--border)] last:border-0 hover:bg-[var(--background-elevated)] transition-colors -mx-4 px-4 sm:mx-0 sm:px-0 sm:hover:bg-transparent">
             <Link href={articleLink} className="flex flex-row-reverse sm:flex-row gap-6 items-start">
                 {/* Image Thumbnail - Fixed Aspect Ratio */}
                 <div className="flex-shrink-0 w-24 h-24 sm:w-40 sm:h-28 relative overflow-hidden rounded-md bg-[var(--border)]">
-                    {imageUrl ? (
+                    {imageUrl && !imgError ? (
                         <img
                             src={imageUrl}
                             alt=""
+                            onError={() => setImgError(true)}
                             className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 will-change-transform"
                         />
                     ) : (

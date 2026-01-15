@@ -7,6 +7,7 @@ help:
 	@echo "======================================================================"
 	@echo ""
 	@echo "  Development:"
+	@echo "    make setup           Full initialization (build, up, migrate, seeds)"
 	@echo "    make up              Build and start all services (detached)"
 	@echo "    make down            Stop and remove all containers"
 	@echo "    make restart         Restart backend service"
@@ -18,6 +19,7 @@ help:
 	@echo "    make migrate         Run Django migrations"
 	@echo "    make makemigrations  Create new migration files"
 	@echo "    make seed            Seed categories (Tech, Politics, etc.)"
+	@echo "    make seed-sources    Seed news sources (Wired, Verge, etc.)"
 	@echo "    make shell           Open Django shell"
 	@echo ""
 	@echo "  Content:"
@@ -30,6 +32,18 @@ help:
 	@echo "    make clean           Stop and remove everything (incl. volumes)"
 	@echo ""
 	@echo "======================================================================"
+
+setup:
+	@echo "🚀 Starting Ultra News setup..."
+	docker compose build
+	docker compose up -d
+	@echo "⏳ Waiting for database..."
+	sleep 5
+	docker compose exec backend python manage.py migrate
+	docker compose exec -T backend python manage.py shell < backend/seed_categories.py
+	docker compose exec -T backend python seed_sources.py
+	docker compose exec -T backend python manage.py shell < backend/assign_categories.py
+	@echo "✅ Setup complete! Frontend running at http://localhost:3000"
 
 build:
 	docker compose build

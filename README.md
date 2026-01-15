@@ -32,9 +32,11 @@ ULTRA-NEWS is designed as an **Information Instrument**—not just a feed, but a
 
 *   **Hybrid Design System**: 70% editorial authority (Wired/The Verge) / 30% calm utility.
 *   **Professional Content Strategy**:
-    *   **High-Res Imagery**: Automatic `og:image` extraction for sharp 21:9 hero assets.
+    *   **Editor's Choice Carousel**: Interactive, auto-playing hero section highlighting top stories with smooth fade transitions.
+    *   **High-Res Imagery**: Smart extraction of `og:image` and `twitter:image` tags for sharp 21:9 hero assets, with robust error handling.
     *   **Deep Fetching**: Browser-grade scraper bypasses bot blocks to retrieve full content (400+ words).
 *   **Performance UX**:
+    *   **High-Contrast Reading**: Optimized typography colors (`gray-950`) for clear legibility in light mode.
     *   **Skeleton Loading**: Premium "pulsing" states for perceived speed.
     *   **Pagination**: Efficient `limit/offset` API with editorial-style controls.
 *   **Production Ready**: Docker-native, split frontend/backend architecture, Vercel + Railway optimized.
@@ -181,18 +183,12 @@ See [DEPLOYMENT.md](DEPLOYMENT.md) for a detailed, step-by-step guide for Vercel
 ## 🚀 Quick Start (Local)
 
 ```bash
-# 1. Clone & Start
+# 1. Clone & Setup
 git clone https://github.com/emmanuelrichard01/ULTRA-NEWS.git
 cd ULTRA-NEWS
-make up
+make setup
 
-# 2. Initialize Data
-make migrate
-make seed
-make seed-sources       # Seeds professional sources (Wired, Verge, etc.)
-make assign-categories
-
-# 3. Access
+# 2. Access
 # Frontend: http://localhost:3000
 # API Docs: http://localhost:8000/api/docs
 ```

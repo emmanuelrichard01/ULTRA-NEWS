@@ -1,4 +1,7 @@
+"use client";
+
 import Link from 'next/link';
+import { useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 
 interface HeroStoryProps {
@@ -16,15 +19,18 @@ export default function HeroStory({ title, slug, source, url, imageUrl, publishe
     const dateObj = typeof publishedDate === 'string' ? new Date(publishedDate) : publishedDate;
     const articleLink = slug ? `/article/${slug}` : url;
 
+    const [imgError, setImgError] = useState(false);
+
     return (
         <article className="group relative mb-16">
             <Link href={articleLink} className="block group">
                 {/* Image - Cinematic 21:9 */}
                 <div className="relative aspect-[16/9] sm:aspect-[2/1] lg:aspect-[21/9] w-full overflow-hidden rounded-[2px] mb-6">
-                    {imageUrl ? (
+                    {imageUrl && !imgError ? (
                         <img
                             src={imageUrl}
                             alt={title}
+                            onError={() => setImgError(true)}
                             className="absolute inset-0 w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-700 ease-out will-change-transform"
                         />
                     ) : (

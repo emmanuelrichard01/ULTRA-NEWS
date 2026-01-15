@@ -71,28 +71,36 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
     const hasNext = (page * 20) < totalCount;
 
     return (
-        <div className="space-y-16">
-            {/* Header */}
-            <header className="text-center max-w-4xl mx-auto pt-8">
-                <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-foreground tracking-tight leading-[1.1] mb-4">
-                    {capitalize(category)}
-                    <span className="text-accent">.</span>
-                </h1>
-                <p className="text-lg text-foreground-muted">
-                    The latest stories in {category}.
-                </p>
+        <div className="space-y-20 pb-20">
+            {/* Editorial Header */}
+            <header className="pt-12 sm:pt-20 border-b border-[var(--border)] pb-8">
+                <div className="flex flex-col gap-4">
+                    <span className="text-xs font-bold tracking-widest uppercase text-[var(--accent)]">
+                        Topic
+                    </span>
+                    <h1 className="text-6xl sm:text-8xl font-black text-[var(--foreground)] tracking-tighter leading-[0.9] font-display uppercase">
+                        {category}
+                    </h1>
+                    <p className="text-xl sm:text-2xl text-[var(--foreground-muted)] max-w-2xl font-serif italic antialiased opacity-80 decoration-slice">
+                        Curated stories and breaking news from the world of {category}.
+                    </p>
+                </div>
             </header>
 
             {/* Content */}
             {articles.length === 0 ? (
-                <div className="py-20 text-center border-t border-[var(--border)]">
-                    <p className="text-[var(--foreground-muted)] font-mono">No data visible.</p>
+                <div className="py-32 flex flex-col items-center justify-center border-b border-[var(--border)] bg-[var(--background-elevated)]/30 rounded-lg border-dashed">
+                    <div className="w-16 h-16 mb-6 rounded-full bg-[var(--background-elevated)] flex items-center justify-center">
+                        <span className="text-2xl text-[var(--foreground-muted)] opacity-50">?</span>
+                    </div>
+                    <h3 className="text-xl font-bold text-[var(--foreground)] mb-2 tracking-tight">No stories found</h3>
+                    <p className="text-[var(--foreground-muted)] font-mono text-sm">We couldn't find any articles for this category yet.</p>
                 </div>
             ) : (
-                <div>
+                <div className="space-y-16">
                     {/* Hero Story (First Article) */}
                     {heroArticle && (
-                        <section className="mb-16">
+                        <section>
                             <HeroStory
                                 title={heroArticle.title}
                                 slug={heroArticle.slug}
@@ -101,16 +109,18 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
                                 imageUrl={heroArticle.image_url}
                                 publishedDate={heroArticle.published_date}
                                 category={capitalize(category)}
+                                summary="Top story of the moment." // Placeholder summary
                             />
                         </section>
                     )}
 
                     {/* The List (Remaining Articles) */}
                     {feedArticles.length > 0 && (
-                        <section>
-                            <h2 className="text-xs font-bold uppercase tracking-widest text-[var(--foreground-muted)] mb-4 border-b border-[var(--border)] pb-2 flex justify-between items-center">
-                                <span>Recent Stories {page > 1 && `(Page ${page})`}</span>
-                                <span>{totalCount} Total</span>
+                        <section className="max-w-4xl">
+                            <h2 className="text-xs font-bold uppercase tracking-widest text-[var(--foreground-muted)] mb-8 flex items-center gap-4">
+                                <span className="bg-[var(--foreground)] text-[var(--background)] px-2 py-0.5">Latest</span>
+                                <span className="flex-1 h-px bg-[var(--border)]"></span>
+                                <span>Page {page}</span>
                             </h2>
                             <div className="flex flex-col">
                                 {feedArticles.map((article, idx) => (
@@ -129,12 +139,14 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
                     )}
 
                     {/* Pagination */}
-                    <Pagination
-                        currentPage={page}
-                        hasNext={hasNext}
-                        baseUrl={`/${category}`}
-                        searchParams={resolvedSearchParams}
-                    />
+                    <div className="pt-8 border-t border-[var(--border)]">
+                        <Pagination
+                            currentPage={page}
+                            hasNext={hasNext}
+                            baseUrl={`/${category}`}
+                            searchParams={resolvedSearchParams}
+                        />
+                    </div>
                 </div>
             )}
         </div>

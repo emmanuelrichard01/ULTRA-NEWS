@@ -55,9 +55,12 @@ gunicorn config.wsgi:application --bind 0.0.0.0:$PORT
 2.  Set Root Directory: `/backend`.
 3.  Set Start Command: `celery -A config worker -l info`.
 4.  Copy all Environment Variables from the Main Django App variables (or use Railway's "Shared Variables").
-
-### 6. Scraper Optimization (Important)
-Since standard shared IPs can be blocked by news sites:
+### 6. Deploy Celery Beat (Scheduler)
+1.  Add a **New Service** -> **GitHub Repo** -> Select `ultra-news`.
+2.  Set Root Directory: `/backend`.
+3.  Set Start Command: `celery -A config beat -l info`.
+4.  Copy Environment Variables (same as Worker/Django).
+5.  *Important*: Beat triggers the scraper every 30 mins to fetch new high-res images and articles.
 *   The scraper uses a "Professional" User-Agent (Chrome 120) to mimic a real browser.
 *   If you face 403 blocks on Railway, consider using a proxy service or a dedicated IP, though the current headers should work for most RSS feeds.
 

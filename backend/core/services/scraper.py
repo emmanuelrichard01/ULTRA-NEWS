@@ -34,10 +34,10 @@ class RSSScraper(BaseScraper):
             image_url = None
             
             # 1. Try to find image in feed (media_content or enclosure)
-            if 'media_content' in entry:
-                image_url = entry.media_content[0]['url']
-            elif 'media_thumbnail' in entry:
-                image_url = entry.media_thumbnail[0]['url']
+            if 'media_content' in entry and entry.media_content:
+                image_url = entry.media_content[0].get('url')
+            elif 'media_thumbnail' in entry and entry.media_thumbnail:
+                image_url = entry.media_thumbnail[0].get('url')
             elif 'links' in entry:
                 for l in entry.links:
                     if l.rel == 'enclosure' and l.type.startswith('image/'):
@@ -65,11 +65,24 @@ class RSSScraper(BaseScraper):
                             content = "".join([f"<p>{line}</p>" for line in full_text.split('\n') if line.strip()])
                         
                         # Extract og:image if we didn't find one in RSS
-                        if not image_url:
-                            tree = html.fromstring(downloaded)
-                            og_image = tree.xpath('//meta[@property="og:image"]/@content')
-                            if og_image:
-                                image_url = og_image[0]
+                        # OR if we want to prioritize high-res social images over RSS thumbnails (BBC fix)
+                        tree = html.fromstring(downloaded)
+                        
+                        # Try og:image
+                        og_image = tree.xpath('//meta[@property="og:image"]/@content')
+                        if not og_image:
+                            # Try twitter:image
+                            og_image = tree.xpath('//meta[@name="twitter:image"]/@content')
+                        
+                        if og_image:
+                            found_url = og_image[0]
+                            # Handle relative URLs
+                            if found_url and not found_url.startswith('http'):
+                                from urllib.parse import urljoin
+                                found_url = urljoin(link, found_url)
+                            
+                            # PRIORITIZE: Overwrite RSS image with this one as it's likely higher res
+                            image_url = found_url
                 except Exception as e:
                     logger.error(f"Failed to scrape full content for {link}: {e}")
 

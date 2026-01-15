@@ -1,4 +1,4 @@
-import HeroStory from '@/components/HeroStory';
+import HeroCarousel from '@/components/HeroCarousel';
 import FeedItem from '@/components/FeedItem';
 import SearchBar from '@/components/SearchBar';
 import Pagination from '@/components/Pagination';
@@ -62,13 +62,12 @@ export default async function Home({ searchParams }: HomeProps) {
   const totalCount = data.count;
 
   // Layout logic
-  // If page 1: Show Hero + List
-  // If page > 1: Show List only (Hero irrelevant for p2)
+  // If page 1: Show Hero Carousel (Top 5) + List
+  // If page > 1: Show List only (Carousel irrelevant for p2)
   const showHero = page === 1 && articles.length > 0;
 
-  const heroArticle = showHero ? articles[0] : null;
-  // If we showed hero, we slice it off the feed. If not (p2+), feed is all items.
-  const feedArticles = showHero ? articles.slice(1) : articles;
+  const carouselArticles = showHero ? articles.slice(0, 5) : [];
+  const feedArticles = showHero ? articles.slice(5) : articles;
 
   const hasNext = (page * 20) < totalCount;
 
@@ -98,23 +97,14 @@ export default async function Home({ searchParams }: HomeProps) {
         </div>
       ) : (
         <div>
-          {/* Hero Story (Only on Page 1) */}
-          {heroArticle && (
-            <section className="mb-16">
-              <HeroStory
-                title={heroArticle.title}
-                slug={heroArticle.slug}
-                source={heroArticle.source.name}
-                url={heroArticle.url}
-                imageUrl={heroArticle.image_url}
-                publishedDate={heroArticle.published_date}
-                category="Editor's Choice"
-                summary="The most significant story of the moment, curated for depth and impact."
-              />
+          {/* Top Stories Carousel (Page 1 Only) */}
+          {showHero && (
+            <section className="mb-20">
+              <HeroCarousel articles={carouselArticles} />
             </section>
           )}
 
-          {/* The List (Single Column for Density) */}
+          {/* The List (Remaining Articles) */}
           {feedArticles.length > 0 && (
             <section>
               <h2 className="text-xs font-bold uppercase tracking-widest text-[var(--foreground-muted)] mb-4 border-b border-[var(--border)] pb-2">
