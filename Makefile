@@ -42,6 +42,7 @@ setup:
 	docker compose exec backend python manage.py migrate
 	docker compose exec -T backend python manage.py shell < backend/seed_categories.py
 	docker compose exec -T backend python seed_sources.py
+	docker compose exec backend python manage.py ingest_news
 	docker compose exec -T backend python manage.py shell < backend/assign_categories.py
 	@echo "✅ Setup complete! Frontend running at http://localhost:3000"
 

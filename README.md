@@ -39,7 +39,7 @@ ULTRA-NEWS is designed as an **Information Instrument**—not just a feed, but a
     *   **High-Contrast Reading**: Optimized typography colors (`gray-950`) for clear legibility in light mode.
     *   **Skeleton Loading**: Premium "pulsing" states for perceived speed.
     *   **Pagination**: Efficient `limit/offset` API with editorial-style controls.
-*   **Production Ready**: Docker-native, split frontend/backend architecture, Vercel + Railway optimized.
+*   **Production Ready**: Docker-native, split frontend/backend architecture, Vercel + Render optimized.
 
 ---
 
@@ -153,7 +153,7 @@ sequenceDiagram
 
 This project is Docker-native and can be deployed to any VPS (DigitalOcean, AWS, Hetzner) or PaaS.
 
-See [DEPLOYMENT.md](DEPLOYMENT.md) for a detailed, step-by-step guide for Vercel (Frontend) + Railway (Backend).
+See [DEPLOYMENT.md](DEPLOYMENT.md) for a detailed, step-by-step guide for Vercel (Frontend) + Render (Backend).
 
 ### Option A: Standard VPS (Recommended)
 *Best for: Full control, lowest cost, keeping database and app together.*

@@ -1,6 +1,6 @@
-# 🚀 Deployment Guide: Vercel + Railway
+# 🚀 Deployment Guide: Vercel + Render
 
-This guide outlines the exact production setup for Ultra News, splitting the **Frontend** (Next.js) to **Vercel** and the **Backend** (Django/Redis/Postgres) to **Railway**.
+This guide outlines the exact production setup for Ultra News, splitting the **Frontend** (Next.js) to **Vercel** and the **Backend** (Django/Redis/Postgres) to **Render**.
 
 ---
 
@@ -9,60 +9,60 @@ This guide outlines the exact production setup for Ultra News, splitting the **F
 1.  **Accounts**:
     *   [GitHub](https://github.com/) (Contains your repository)
     *   [Vercel Account](https://vercel.com/) (For Frontend)
-    *   [Railway Account](https://railway.app/) (For Backend + DB)
+    *   [Render Account](https://render.com/) (For Backend + DB)
 2.  **Repo**: Ensure your code is pushed to a GitHub repository.
 
 ---
 
-## Part 1: Backend Deployment (Railway)
+## Part 1: Backend Deployment (Render)
 
-We will deploy the Django API, PostgreSQL Database, Redis, and Celery Worker on Railway.
+We will deploy the Django API, PostgreSQL Database, Redis, and Celery Worker on Render.
 
-### 1. Create Project & Database
-1.  Go to **Railway Dashboard** -> **New Project** -> **Provision PostgreSQL**.
-2.  Railway will modify the project and add a `PostgreSQL` service.
-3.  Click **New** (top right) -> **Database** -> **Add Redis**.
-4.  Now you have a DB and Redis running.
+### 1. Create Database & Redis
+1.  Go to **Render Dashboard** -> **New +** -> **PostgreSQL**.
+    *   Name: `ultra-news-db`
+    *   Plan: Free (or Standard for production)
+2.  Go to **New +** -> **Redis**.
+    *   Name: `ultra-news-redis`
+    *   Plan: Free (or Starter)
 
-### 2. Deploy Django App Service
-1.  Click **New** -> **GitHub Repo** -> Select `ultra-news`.
-2.  **IMMEDIATELY** click on the new service card -> **Settings** -> Scroll down to **Root Directory**.
-3.  Set Root Directory to: `/backend`
-4.  Railway will re-build. It should auto-detect `Dockerfile` or `requirements.txt`.
-    *   *Note*: Since we have a `Dockerfile` in `/backend`, Railway will utilize it.
+### 2. Deploy Django Web Service
+1.  **New +** -> **Web Service** -> Connect your GitHub repo (`ultra-news`).
+2.  **Settings**:
+    *   **Root Directory**: `backend`
+    *   **Runtime**: Docker
+    *   **Instance Type**: Free/Starter
+3.  **Environment Variables**:
+    *   `SECRET_KEY`: (Generate a random string)
+    *   `DEBUG`: `0`
+    *   `DATABASE_URL`: (Copy "Internal Database URL" from your Render Postgres dashboard)
+    *   `REDIS_URL`: (Copy "Internal Redis URL" from your Render Redis dashboard)
+    *   `CELERY_BROKER_URL`: (Same as `REDIS_URL`)
+    *   `FRONTEND_URL`: `https://your-vercel-project.vercel.app` (Add later)
+    *   `PORT`: `8000`
 
-### 3. Configure Environment Variables (Django)
-Go to the **Variables** tab of your Django service and add:
+### 3. Deploy Celery Worker
+1.  **New +** -> **Background Worker** -> Connect repo.
+2.  **Settings**:
+    *   **Root Directory**: `backend`
+    *   **Runtime**: Docker
+    *   **Docker Command**: `celery -A config worker -l info`
+3.  **Environment Variables**:
+    *   Copy *all* variables from the Web Service (DATABASE_URL, REDIS_URL, etc.).
 
-| Variable | Value |
-|----------|-------|
-| `SECRET_KEY` | (Generate a random string) |
-| `DEBUG` | `0` |
-| `DATABASE_URL` | `${{PostgreSQL.DATABASE_URL}}` (Railway references this auto-magically) |
-| `REDIS_URL` | `${{Redis.REDIS_URL}}` |
-| `CELERY_BROKER_URL` | `${{Redis.REDIS_URL}}` |
-| `FRONTEND_URL` | `https://your-vercel-project.vercel.app` (Add this later after Vercel deploy) |
-| `PORT` | `8000` |
+### 4. Deploy Celery Beat (Scheduler)
+1.  **New +** -> **Background Worker** -> Connect repo.
+2.  **Settings**:
+    *   **Root Directory**: `backend`
+    *   **Runtime**: Docker
+    *   **Docker Command**: `celery -A config beat -l info`
+3.  **Environment Variables**:
+    *   Copy *all* variables.
+    *   *Note*: Beat triggers the scraper every 30 mins.
 
-### 4. Start Command
-In **Settings** -> **Deploy** -> **Start Command**:
-```bash
-gunicorn config.wsgi:application --bind 0.0.0.0:$PORT
-```
-
-### 5. Deploy Celery Worker (Optional but Recommended)
-1.  Add a **New Service** -> **GitHub Repo** -> Select `ultra-news` (again).
-2.  Set Root Directory: `/backend`.
-3.  Set Start Command: `celery -A config worker -l info`.
-4.  Copy all Environment Variables from the Main Django App variables (or use Railway's "Shared Variables").
-### 6. Deploy Celery Beat (Scheduler)
-1.  Add a **New Service** -> **GitHub Repo** -> Select `ultra-news`.
-2.  Set Root Directory: `/backend`.
-3.  Set Start Command: `celery -A config beat -l info`.
-4.  Copy Environment Variables (same as Worker/Django).
-5.  *Important*: Beat triggers the scraper every 30 mins to fetch new high-res images and articles.
-*   The scraper uses a "Professional" User-Agent (Chrome 120) to mimic a real browser.
-*   If you face 403 blocks on Railway, consider using a proxy service or a dedicated IP, though the current headers should work for most RSS feeds.
+### 5. Scale & Optimization
+*   **Persistent Storage**: Render's ephemeral disks wipe on restart. The scraper does not store files locally (it uses the DB), so this is fine.
+*   **Scraper Blocking**: If you encounter 403s, you may need a static outbound IP (Render Pro) or a proxy service.
 
 ---
 
@@ -84,7 +84,7 @@ Add the following variable:
 
 | Variable | Value |
 |----------|-------|
-| `NEXT_PUBLIC_API_URL` | The **Public Domain** of your Railway Django Service (e.g. `https://web-production-xyz.up.railway.app`) |
+| `NEXT_PUBLIC_API_URL` | The **Public Domain** of your Render Web Service (e.g. `https://ultra-news.onrender.com`) |
 
 ### 4. Deploy
 Click **Deploy**. Vercel will build the frontend.
@@ -95,30 +95,30 @@ Click **Deploy**. Vercel will build the frontend.
 
 Once Vercel deploys, you will get a permanent URL (e.g., `https://ultra-news-alpha.vercel.app`).
 
-1.  Go back to **Railway** -> **Django Service** -> **Variables**.
+1.  Go back to **Render** -> **Web Service** -> **Environment**.
 2.  Update/Add `FRONTEND_URL` with your Vercel URL:
     ```
     https://ultra-news-alpha.vercel.app
     ```
-3.  Railway will redeploy.
-4.  **Done!** Your Vercel frontend can now securely fetch data from your Railway backend.
+3.  Render will redeploy.
+4.  **Done!** Your Vercel frontend can now securely fetch data from your Render backend.
 
 ---
 
 ## 🛠 Troubleshooting
 
 *   **Images not showing?**
-    *   Ensure `FRONTEND_URL` in Railway variables exactly matches the Vercel URL (no trailing slash).
+    *   Ensure `FRONTEND_URL` in Render variables exactly matches the Vercel URL (no trailing slash).
 *   **CORS Errors?**
     *   Check Browser Console. configuration in `settings.py` relies on `FRONTEND_URL` env var.
 *   **Database connection fail?**
-    *   Verify `DATABASE_URL` variable in Railway is linked to the Postgres service.
+    *   Verify `DATABASE_URL` variable in Render is linked to the Postgres service.
 
 ---
 
 ## 🔐 Environment Variables Reference
 
-### Backend (Railway/VPS)
+### Backend (Render/VPS)
 
 | Variable | Required | Description | Example Value |
 |:---|:---:|:---|:---|
@@ -134,7 +134,7 @@ Once Vercel deploys, you will get a permanent URL (e.g., `https://ultra-news-alp
 
 | Variable | Required | Description | Example Value |
 |:---|:---:|:---|:---|
-| `NEXT_PUBLIC_API_URL` | ✅ | Public URL of your backend API. | `https://your-api.up.railway.app` |
+| `NEXT_PUBLIC_API_URL` | ✅ | Public URL of your backend API. | `https://your-service.onrender.com` |
 
 > **Note**: `NEXT_PUBLIC_API_URL` must **NOT** have a trailing slash.
 
