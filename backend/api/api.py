@@ -97,5 +97,42 @@ def trigger_ingest(request):
 
     thread = threading.Thread(target=run_ingest)
     thread.start()
-
     return {"status": "started", "message": "Ingestion triggered in background thread."}
+
+@api.post("/admin/seed-db")
+def seed_db(request):
+    """
+    Manually seed the database with initial Sources and Categories.
+    Useful for Render Free Tier where Shell access is paid.
+    """
+    from core.models import Source, Category
+    
+    # 1. Seed Categories
+    categories = ['Tech', 'Politics', 'Business', 'Entertainment', 'Science', 'Art']
+    cat_results = []
+    for cat_name in categories:
+        _, created = Category.objects.get_or_create(name=cat_name, slug=cat_name.lower())
+        cat_results.append(f"{cat_name}: {'Created' if created else 'Exists'}")
+
+    # 2. Seed Sources
+    SOURCES = [
+        {"name": "The Verge", "url": "https://www.theverge.com/rss/index.xml", "scraper_type": "rss"},
+        {"name": "Wired", "url": "https://www.wired.com/feed/rss", "scraper_type": "rss"},
+        {"name": "BBC News", "url": "https://feeds.bbci.co.uk/news/world/rss.xml", "scraper_type": "rss"},
+        {"name": "TechCrunch", "url": "https://techcrunch.com/feed/", "scraper_type": "rss"},
+        {"name": "Ars Technica", "url": "https://arstechnica.com/feed/", "scraper_type": "rss"},
+        {"name": "NYT Technology", "url": "https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml", "scraper_type": "rss"}
+    ]
+    source_results = []
+    for s in SOURCES:
+        _, created = Source.objects.get_or_create(
+            url=s["url"],
+            defaults={"name": s["name"], "scraper_type": s["scraper_type"]}
+        )
+        source_results.append(f"{s['name']}: {'Created' if created else 'Exists'}")
+
+    return {
+        "status": "completed",
+        "categories": cat_results,
+        "sources": source_results
+    }

@@ -41,7 +41,20 @@ We will deploy the Django API, PostgreSQL Database, Redis, and Celery Worker on 
     *   `FRONTEND_URL`: `https://your-vercel-project.vercel.app` (Add later)
     *   `PORT`: `8000`
 
-### 3. Deploy Celery Worker
+    *   `PORT`: `8000`
+
+### 3. Post-Deployment: Initialize Data (Free Tier Friendly)
+Since Render's "Shell Access" is a paid feature, I've created an admin endpoint to seed your database remotely.
+
+1.  After your [backend] service is deployed and "Live".
+2.  Run this command from your **local** terminal (or use Postman):
+    ```bash
+    curl -X POST https://<YOUR-RENDER-URL>.onrender.com/api/admin/seed-db
+    ```
+3.  You should see a JSON response listing the created specific categories and sources.
+4.  **Done!** Your database is seeded. Now you can trigger the ingestion.
+
+### 4. Deploy Celery Worker
 1.  **New +** -> **Background Worker** -> Connect repo.
 2.  **Settings**:
     *   **Root Directory**: `backend`
@@ -70,7 +83,7 @@ Render charges for Background Workers. You can skip **Step 3 (Worker)** and **St
     *   I've added a special endpoint: `POST /api/api/admin/trigger-ingest`
     *   You can set up a **free** Cron job (e.g., using [Cron-Job.org](https://cron-job.org) or GitHub Actions) to hit this URL every 60 minutes.
     ```bash
-    curl -X POST https://your-service.onrender.com/api/api/admin/trigger-ingest
+    curl -X POST https://your-service.onrender.com/api/admin/trigger-ingest
     ```
     *   This runs the scraper in a background thread inside your existing Web Service instances.
 
@@ -78,7 +91,7 @@ Render charges for Background Workers. You can skip **Step 3 (Worker)** and **St
     1.  Create a free account at [cron-job.org](https://cron-job.org/en/).
     2.  Click **"Create Cronjob"**.
     3.  **Title**: `Ultra News Ingest`
-    4.  **URL**: `https://<YOUR-RENDER-URL>.onrender.com/api/api/admin/trigger-ingest`
+    4.  **URL**: `https://<YOUR-RENDER-URL>.onrender.com/api/admin/trigger-ingest`
     5.  **Execution schedule**: `Every 30 minutes` (or 60).
     6.  **Advanced settings**: Change HTTP Method to `POST`.
     7.  Save.
