@@ -37,16 +37,22 @@ export default function SearchBar() {
                 transition-colors duration-200
                 ${isFocused ? 'border-[var(--accent)]' : 'border-[var(--border)]'}
             `}>
-                <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    strokeWidth={2.5}
-                    stroke="currentColor"
-                    className={`w-4 h-4 ${isFocused ? 'text-[var(--accent)]' : 'text-[var(--foreground-muted)]'}`}
+                <button
+                    type="submit"
+                    className="focus:outline-none focus:ring-0"
+                    aria-label="Search"
                 >
-                    <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
-                </svg>
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        strokeWidth={2.5}
+                        stroke="currentColor"
+                        className={`w-4 h-4 transition-colors ${isFocused ? 'text-[var(--accent)]' : 'text-[var(--foreground-muted)] hover:text-[var(--foreground)]'}`}
+                    >
+                        <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+                    </svg>
+                </button>
 
                 <input
                     ref={inputRef}

@@ -12,9 +12,30 @@ interface FeedItemProps {
     imageUrl?: string | null;
     publishedDate: string | Date;
     category?: string;
+    highlightQuery?: string;
 }
 
-export default function FeedItem({ title, slug, source, url, imageUrl, publishedDate, category }: FeedItemProps) {
+// Helper: Highlights matching text with a mark
+const HighlightText = ({ text, query }: { text: string; query?: string }) => {
+    if (!query || !query.trim()) return <>{text}</>;
+
+    const escapeRegExp = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const parts = text.split(new RegExp(`(${escapeRegExp(query)})`, 'gi'));
+
+    return (
+        <>
+            {parts.map((part, i) =>
+                part.toLowerCase() === query.toLowerCase() ? (
+                    <mark key={i} className="bg-[var(--accent)]/20 text-[var(--foreground)] px-0.5 rounded-sm">{part}</mark>
+                ) : (
+                    part
+                )
+            )}
+        </>
+    );
+};
+
+export default function FeedItem({ title, slug, source, url, imageUrl, publishedDate, category, highlightQuery }: FeedItemProps) {
     const dateObj = typeof publishedDate === 'string' ? new Date(publishedDate) : publishedDate;
     const articleLink = slug ? `/article/${slug}` : url;
 
@@ -51,7 +72,7 @@ export default function FeedItem({ title, slug, source, url, imageUrl, published
 
                         {/* Title */}
                         <h3 className="text-[17px] sm:text-[22px] font-bold text-[var(--foreground)] leading-[1.3] group-hover:text-[var(--accent)] transition-colors font-display tracking-tight">
-                            {title}
+                            <HighlightText text={title} query={highlightQuery} />
                         </h3>
 
                         {/* Summary/Excerpt (Desktop only - implied if we had it, but here just spacing) */}

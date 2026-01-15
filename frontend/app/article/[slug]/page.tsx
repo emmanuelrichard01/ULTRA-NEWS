@@ -90,8 +90,8 @@ export default async function ArticlePage({ params }: PageProps) {
                     <span className="text-sm font-bold uppercase tracking-wider text-accent">
                         {article.source.name}
                     </span>
-                    <span className="text-gray-300 dark:text-gray-700 text-xs">•</span>
-                    <time className="text-sm text-gray-500" dateTime={dateObj.toISOString()}>
+                    <span className="text-gray-400 dark:text-gray-600 text-xs">•</span>
+                    <time className="text-sm text-gray-600 dark:text-gray-400" dateTime={dateObj.toISOString()}>
                         {formatDistanceToNow(dateObj, { addSuffix: true })}
                     </time>
                 </div>
@@ -107,10 +107,10 @@ export default async function ArticlePage({ params }: PageProps) {
                 )}
 
                 <div className="flex items-center justify-center gap-4 border-t border-b border-gray-100 dark:border-gray-800 py-4">
-                    <div className="text-sm text-gray-500">
+                    <div className="text-sm text-gray-600 dark:text-gray-400">
                         <span className="font-semibold text-foreground">Read time:</span> 4 min
                     </div>
-                    <div className="h-4 w-px bg-gray-200 dark:bg-gray-800"></div>
+                    <div className="h-4 w-px bg-gray-300 dark:bg-gray-700"></div>
                     <a href={article.url} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-accent hover:text-accent/80 flex items-center gap-1">
                         Read Original
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
@@ -122,7 +122,7 @@ export default async function ArticlePage({ params }: PageProps) {
             </header>
 
             {/* Body Content */}
-            <div className="prose prose-lg dark:prose-invert max-w-none font-serif leading-relaxed text-gray-950 dark:text-gray-300">
+            <div className="prose prose-lg dark:prose-invert max-w-none font-serif leading-relaxed text-black dark:text-gray-300 prose-headings:text-black prose-p:text-black prose-strong:text-black prose-li:text-black">
                 {article.content ? (
                     <div dangerouslySetInnerHTML={{ __html: article.content }} />
                 ) : (

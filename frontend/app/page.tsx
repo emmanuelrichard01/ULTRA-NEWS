@@ -120,6 +120,7 @@ export default async function Home({ searchParams }: HomeProps) {
                     url={article.url}
                     imageUrl={article.image_url}
                     publishedDate={article.published_date}
+                    highlightQuery={q}
                   />
                 ))}
               </div>

@@ -150,7 +150,7 @@ sequenceDiagram
     participant Traf as 📄 Trafilatura
     participant DB as 💾 PostgreSQL
 
-    rect rgb(230, 245, 255)
+    rect rgb(225, 240, 255)
         Note over Beat,DB: Scheduled Every 30 Minutes
         Beat->>Worker: Trigger scrape_all_sources()
         Worker->>RSS: Fetch RSS XML
@@ -174,7 +174,7 @@ sequenceDiagram
     participant RSS as 🌐 RSS Feeds
     participant Traf as 📄 Scraper Service
 
-    rect rgb(240, 255, 240)
+    rect rgb(235, 250, 235)
         Note over Cron,API: Triggered Hourly (External)
         Cron->>API: POST /admin/trigger-ingest
         API-->>Cron: 200 OK (Async Thread Started)
