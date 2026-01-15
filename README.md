@@ -97,9 +97,9 @@ flowchart TB
         Redis[("Redis 7")]
     end
 
-    subgraph Workers["⚙️ Async Workers"]
-        Beat["Celery Beat\n(Scheduler)"]
-        Worker["Celery Worker"]
+    subgraph Workers["⚙️ Background Processing"]
+        Cron["⏰ Cron-Job.org\n(External Trigger)"]
+        Thread["Background Thread\n(Inside Django App)"]
         Scraper["Trafilatura\nScraper"]
     end
 
@@ -111,11 +111,11 @@ flowchart TB
     Ninja --> Search
     Search --> Postgres
     
-    Beat -->|"Every 30min"| Redis
-    Worker --> Redis
-    Worker --> Scraper
-    Scraper -->|"RSS + Full Text"| Worker
-    Worker -->|"Save Articles"| Postgres
+    Cron -->|"POST /trigger-ingest"| Ninja
+    Ninja -->|"Spawn Thread"| Thread
+    Thread --> Scraper
+    Scraper -->|"RSS + Full Text"| Thread
+    Thread -->|"Save Articles"| Postgres
 ```
 
 ---
@@ -124,28 +124,49 @@ flowchart TB
 
 ### Article Ingestion Pipeline
 
-```mermaid
-sequenceDiagram
-    participant Beat as ⏰ Celery Beat
-    participant Worker as ⚙️ Worker
+    participant Cron as ⏰ Cron Job
+    participant API as 🔌 Django API
     participant RSS as 🌐 RSS Feeds
-    participant Traf as 📄 Trafilatura
+    participant Traf as 📄 Scraper Service
     participant DB as 💾 PostgreSQL
 
     rect rgb(230, 245, 255)
-        Note over Beat,DB: Scheduled Every 30 Minutes
-        Beat->>Worker: Trigger scrape_all_sources()
-        Worker->>RSS: Fetch RSS XML
-        RSS-->>Worker: Feed entries
+        Note over Cron,DB: Triggered Hourly (Free Tier)
+        Cron->>API: POST /admin/trigger-ingest
+        API-->>Cron: 200 OK (Background Thread Started)
         
-        loop For Each Entry
-            Worker->>Traf: Deep scrape (Headers + og:image)
-            Traf-->>Worker: Title, Full Body, High-Res Image
-            Worker->>DB: INSERT Article (dedupe by URL)
-            Worker->>DB: SET Categories (keyword match)
+        loop For Each Source (Async Thread)
+            API->>RSS: Fetch RSS XML
+            RSS-->>API: Entries List
+            
+            loop For Each Entry
+                API->>Traf: Deep Scrape (Resolution & Metadata)
+                Traf-->>API: Full Content + High-Res Image
+                API->>DB: INSERT Article (dedupe)
+                API->>DB: Auto-Assign Category
+            end
         end
     end
 ```
+
+### 🔄 How It Works (End-to-End)
+
+1.  **Ingestion (The "Brain")**:
+    *   Every hour, an external **Cron Job** (Cron-Job.org) hits our secure API endpoint.
+    *   The backend spins up a background thread that scrapes configured RSS feeds (Wired, The Verge, etc.).
+    *   It bypasses simple RSS summaries by visiting the *actual* article page to extract the **full text** and **high-resolution social images** (`og:image`).
+    *   Articles are automatically categorized (e.g., "AI" -> "Tech") and saved to **PostgreSQL**.
+
+2.  **Delivery (The "Fast Lane")**:
+    *   When a user visits the site, **Next.js** requests data from the **Django Ninja API**.
+    *   The API serves JSON instantly from the database, optimized with search vectors.
+    *   The frontend renders the 'Editor's Choice' carousel and editorial lists using **Server Components** for maximum SEO and speed.
+
+3.  **Consumption (The "Experience")**:
+    *   Users get a distraction-free reading experience.
+    *   **Light Mode**: Sharp, high-contrast typography (`gray-950`).
+    *   **Dark Mode**: True OLED black for night reading.
+    *   **Mobile**: A native-app-like menu and smooth touch interactions.
 
 ---
 
