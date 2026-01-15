@@ -39,7 +39,7 @@ export default function SearchBar() {
             `}>
                 <button
                     type="submit"
-                    className="focus:outline-none focus:ring-0"
+                    className="focus:outline-none focus:ring-0 cursor-pointer"
                     aria-label="Search"
                 >
                     <svg
@@ -61,7 +61,7 @@ export default function SearchBar() {
                     onChange={(e) => setQuery(e.target.value)}
                     onFocus={() => setIsFocused(true)}
                     onBlur={() => setIsFocused(false)}
-                    placeholder="Search intelligence..."
+                    placeholder="Search Articles..."
                     className="
                         flex-1 
                         bg-transparent border-none 
