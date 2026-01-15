@@ -81,3 +81,35 @@ body {
   background: var(--accent);
   color: var(--background);
 }
+
+/* --- Article Prose Overrides (Force High Contrast) --- */
+/* Light Mode: Force Dark Gray (#1a1a1a) for comfortable reading */
+.prose p,
+.prose div p,
+.prose li,
+.prose span,
+.prose strong,
+.prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
+  color: #1a1a1a !important;
+}
+
+.prose a {
+  color: var(--accent-secondary) !important;
+}
+
+/* Dark Mode: Restore appropriate colors */
+.dark .prose p,
+.dark .prose div p,
+.dark .prose li,
+.dark .prose span {
+  color: #D4D4D4 !important; /* --foreground-muted for dark */
+}
+
+.dark .prose strong,
+.dark .prose h1, .dark .prose h2, .dark .prose h3, .dark .prose h4, .dark .prose h5, .dark .prose h6 {
+  color: #FFFFFF !important;
+}
+
+.dark .prose a {
+  color: var(--accent-secondary) !important;
+}

@@ -27,10 +27,10 @@ export const metadata: Metadata = {
     siteName: "Ultra News",
     images: [
       {
-        url: "/images/logo-light-mode.png",
+        url: "/og-image.png",
         width: 1200,
         height: 630,
-        alt: "Ultra News Platform",
+        alt: "Ultra News — Curated Intelligence for the Accelerated Mind",
       },
     ],
   },
@@ -38,6 +38,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Ultra News — The Information Instrument",
     creator: "@emmanuelrichard01",
+    images: ["/og-image.png"],
   },
   icons: {
     icon: [
