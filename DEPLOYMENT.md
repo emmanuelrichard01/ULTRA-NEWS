@@ -60,9 +60,29 @@ We will deploy the Django API, PostgreSQL Database, Redis, and Celery Worker on 
     *   Copy *all* variables.
     *   *Note*: Beat triggers the scraper every 30 mins.
 
-### 5. Scale & Optimization
-*   **Persistent Storage**: Render's ephemeral disks wipe on restart. The scraper does not store files locally (it uses the DB), so this is fine.
-*   **Scraper Blocking**: If you encounter 403s, you may need a static outbound IP (Render Pro) or a proxy service.
+### 6. Free Tier Option: No Background Workers (Bypass Celery)
+**Want to stay exactly on the $0.00 Free Tier?**
+Render charges for Background Workers. You can skip **Step 3 (Worker)** and **Step 4 (Beat)** and trigger ingestion manually!
+
+1.  **Do NOT** deploy the Celery Worker or Beat services.
+2.  Deploy only the **Postgres**, **Redis**, and **Django Web Service**.
+3.  **Trigger Ingestion**:
+    *   I've added a special endpoint: `POST /api/api/admin/trigger-ingest`
+    *   You can set up a **free** Cron job (e.g., using [Cron-Job.org](https://cron-job.org) or GitHub Actions) to hit this URL every 60 minutes.
+    ```bash
+    curl -X POST https://your-service.onrender.com/api/api/admin/trigger-ingest
+    ```
+    *   This runs the scraper in a background thread inside your existing Web Service instances.
+
+    #### How to set up Cron-Job.org (Free):
+    1.  Create a free account at [cron-job.org](https://cron-job.org/en/).
+    2.  Click **"Create Cronjob"**.
+    3.  **Title**: `Ultra News Ingest`
+    4.  **URL**: `https://<YOUR-RENDER-URL>.onrender.com/api/api/admin/trigger-ingest`
+    5.  **Execution schedule**: `Every 30 minutes` (or 60).
+    6.  **Advanced settings**: Change HTTP Method to `POST`.
+    7.  Save.
+    8.  Done! This service will now "poke" your Render app to scrape news for free.
 
 ---
 

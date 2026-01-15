@@ -71,5 +71,31 @@ def list_news(request, q: Optional[str] = None, category: Optional[str] = None):
 def get_article(request, slug: str):
     article = get_object_or_404(Article.objects.select_related('source'), slug=slug)
     # If using RSS scraper, 'content' might be empty or raw HTML.
-    # The frontend should handle sanitization/rendering.
     return article
+
+from core.tasks import scrape_all_sources
+import threading
+
+@api.post("/admin/trigger-ingest")
+def trigger_ingest(request):
+    """
+    Manually trigger the ingestion task (Synchronous/Threaded).
+    Useful for free-tier deployments where Celery workers are not available.
+    """
+    # Option 1: Run synchronously (might timeout if scraping takes too long)
+    # result = scrape_all_sources()
+    # return {"status": "completed", "message": result}
+
+    # Option 2: Fire and forget thread (better for preventing timeouts)
+    def run_ingest():
+        try:
+            print("Starting manual ingestion thread...")
+            scrape_all_sources()
+            print("Manual ingestion finished.")
+        except Exception as e:
+            print(f"Manual ingestion failed: {e}")
+
+    thread = threading.Thread(target=run_ingest)
+    thread.start()
+
+    return {"status": "started", "message": "Ingestion triggered in background thread."}
