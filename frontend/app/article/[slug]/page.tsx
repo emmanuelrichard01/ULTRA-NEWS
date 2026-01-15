@@ -87,31 +87,31 @@ export default async function ArticlePage({ params }: PageProps) {
             {/* Header */}
             <header className="mb-10 text-center">
                 <div className="flex items-center justify-center gap-2 mb-6">
-                    <span className="text-sm font-bold uppercase tracking-wider text-accent">
+                    <span className="text-sm font-bold uppercase tracking-wider text-[var(--accent-secondary)]">
                         {article.source.name}
                     </span>
-                    <span className="text-gray-400 dark:text-gray-600 text-xs">•</span>
-                    <time className="text-sm text-gray-600 dark:text-gray-400" dateTime={dateObj.toISOString()}>
+                    <span className="text-[var(--foreground-muted)] text-xs">•</span>
+                    <time className="text-sm text-[var(--foreground-muted)]" dateTime={dateObj.toISOString()}>
                         {formatDistanceToNow(dateObj, { addSuffix: true })}
                     </time>
                 </div>
 
-                <h1 className="text-4xl md:text-5xl font-display font-bold text-foreground leading-tight tracking-tight mb-8">
+                <h1 className="text-4xl md:text-5xl font-display font-bold text-[var(--foreground)] leading-tight tracking-tight mb-8">
                     {article.title}
                 </h1>
 
                 {article.image_url && (
-                    <div className="relative w-full aspect-video overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-800 mb-8">
+                    <div className="relative w-full aspect-video overflow-hidden rounded-lg bg-[var(--background-elevated)] mb-8">
                         <img src={article.image_url} alt="" className="object-cover w-full h-full" />
                     </div>
                 )}
 
-                <div className="flex items-center justify-center gap-4 border-t border-b border-gray-100 dark:border-gray-800 py-4">
-                    <div className="text-sm text-gray-600 dark:text-gray-400">
-                        <span className="font-semibold text-foreground">Read time:</span> 4 min
+                <div className="flex items-center justify-center gap-4 border-t border-b border-[var(--border)] py-4">
+                    <div className="text-sm text-[var(--foreground-muted)]">
+                        <span className="font-semibold text-[var(--foreground)]">Read time:</span> 4 min
                     </div>
-                    <div className="h-4 w-px bg-gray-300 dark:bg-gray-700"></div>
-                    <a href={article.url} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-accent hover:text-accent/80 flex items-center gap-1">
+                    <div className="h-4 w-px bg-[var(--border)]"></div>
+                    <a href={article.url} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-[var(--accent-secondary)] hover:opacity-80 flex items-center gap-1">
                         Read Original
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
                             <path fillRule="evenodd" d="M4.25 5.5a.75.75 0 0 0-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 0 0 .75-.75v-4a.75.75 0 0 1 1.5 0v4A2.25 2.25 0 0 1 12.75 17h-8.5A2.25 2.25 0 0 1 2 14.75v-8.5A2.25 2.25 0 0 1 4.25 4h5a.75.75 0 0 1 0 1.5h-5Z" clipRule="evenodd" />
@@ -130,18 +130,12 @@ export default async function ArticlePage({ params }: PageProps) {
                 prose-li:text-black dark:prose-li:text-gray-300
                 prose-a:text-[var(--accent)] hover:prose-a:text-[var(--accent-secondary)]">
                 {article.content ? (
-                    <div className="prose prose-lg dark:prose-invert max-w-none font-serif leading-relaxed 
-                text-black dark:text-gray-300 
-                prose-headings:text-black dark:prose-headings:text-white 
-                prose-p:text-black dark:prose-p:text-gray-300 
-                prose-strong:text-black dark:prose-strong:text-white
-                prose-li:text-black dark:prose-li:text-gray-300
-                prose-a:text-[var(--accent)] hover:prose-a:text-[var(--accent-secondary)]" dangerouslySetInnerHTML={{ __html: article.content }} />
+                    <div dangerouslySetInnerHTML={{ __html: article.content }} />
                 ) : (
-                    <div className="italic text-black dark:text-gray-300 text-center py-10 bg-gray-50 dark:bg-white/5 rounded-lg">
-                        <p>Full content not available in this preview.</p>
+                    <div className="italic text-center py-10 bg-[var(--background-elevated)] rounded-lg">
+                        <p className="text-[var(--foreground-muted)]">Full content not available in this preview.</p>
                         <div className="mt-4">
-                            <a href={article.url} target="_blank" rel="noopener noreferrer" className="btn-primary inline-flex items-center gap-2 bg-foreground text-background px-6 py-3 rounded-md font-medium hover:opacity-90 transition-opacity">
+                            <a href={article.url} target="_blank" rel="noopener noreferrer" className="not-italic inline-flex items-center gap-2 bg-[var(--foreground)] text-[var(--background)] px-6 py-3 rounded-md font-medium hover:opacity-90 transition-opacity">
                                 Continue reading on {article.source.name}
                             </a>
                         </div>
