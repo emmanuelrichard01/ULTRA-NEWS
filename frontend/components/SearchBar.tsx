@@ -61,13 +61,14 @@ export default function SearchBar() {
     return (
         <form onSubmit={handleSearch} className="relative w-full max-w-lg group">
             <div className={`
-                flex items-center gap-3 py-2.5 px-5
-                bg-[var(--background)] 
-                border rounded-full
-                transition-all duration-300 ease-out
+                flex items-center gap-3 py-3 px-0
+                bg-transparent
+                border-b-2
+                rounded-none
+                transition-colors duration-300 ease-out
                 ${isFocused
-                    ? 'border-[var(--accent-secondary)] ring-4 ring-[var(--accent-secondary)]/10'
-                    : 'border-[var(--border)] hover:border-[var(--border-hover)] hover:shadow-sm'
+                    ? 'border-[var(--accent)]'
+                    : 'border-[var(--border)] hover:border-[var(--foreground-muted)]'
                 }
             `}>
                 {/* Search Icon / Loading Spinner */}

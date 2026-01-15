@@ -82,8 +82,12 @@ export default async function Home({ searchParams }: HomeProps) {
                 The Feed
               </h1>
               {totalCount > 0 && (
-                <span className="hidden sm:inline-flex items-center px-3 py-1 text-xs font-bold uppercase tracking-wide bg-[var(--accent-secondary)] text-white rounded-full">
-                  {totalCount.toLocaleString()} stories
+                <span className="hidden sm:inline-flex items-center gap-2 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-[var(--foreground-muted)] border border-[var(--border)] rounded-full bg-[var(--background)]">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                  </span>
+                  {totalCount.toLocaleString()} Stories
                 </span>
               )}
             </div>
