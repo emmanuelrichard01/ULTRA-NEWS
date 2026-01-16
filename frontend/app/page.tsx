@@ -92,7 +92,7 @@ export default async function Home({ searchParams }: HomeProps) {
               )}
             </div>
             <p className="text-lg font-medium text-[var(--foreground-muted)] max-w-xl">
-              Curated intelligence for the accelerated mind.
+              Curated Aggregate News Content
             </p>
           </div>
           <div className="w-full md:w-auto">
