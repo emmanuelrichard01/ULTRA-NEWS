@@ -82,22 +82,30 @@ def trigger_ingest(request):
     Manually trigger the ingestion task (Synchronous/Threaded).
     Useful for free-tier deployments where Celery workers are not available.
     """
-    # Option 1: Run synchronously (might timeout if scraping takes too long)
-    # result = scrape_all_sources()
-    # return {"status": "completed", "message": result}
+    import sys
+    import os
 
-    # Option 2: Fire and forget thread (better for preventing timeouts)
+    # Fire and forget thread with suppressed output
+    # This prevents "output too large" errors from cron services
     def run_ingest():
+        # Suppress stdout/stderr in the thread to prevent output accumulation
+        devnull = open(os.devnull, 'w')
+        old_stdout = sys.stdout
+        old_stderr = sys.stderr
         try:
-            print("Starting manual ingestion thread...")
+            sys.stdout = devnull
+            sys.stderr = devnull
             scrape_all_sources()
-            print("Manual ingestion finished.")
-        except Exception as e:
-            print(f"Manual ingestion failed: {e}")
+        except Exception:
+            pass  # Silently fail - logs are already captured by Django/logging
+        finally:
+            sys.stdout = old_stdout
+            sys.stderr = old_stderr
+            devnull.close()
 
-    thread = threading.Thread(target=run_ingest)
+    thread = threading.Thread(target=run_ingest, daemon=True)
     thread.start()
-    return {"status": "started", "message": "Ingestion triggered in background thread."}
+    return {"status": "started", "message": "Ingestion triggered in background."}
 
 @api.post("/admin/seed-db")
 def seed_db(request):
