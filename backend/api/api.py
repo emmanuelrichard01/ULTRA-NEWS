@@ -73,39 +73,36 @@ def get_article(request, slug: str):
     # If using RSS scraper, 'content' might be empty or raw HTML.
     return article
 
-from core.tasks import scrape_all_sources
-import threading
+import subprocess
+import logging
 
 @api.post("/admin/trigger-ingest")
 def trigger_ingest(request):
     """
-    Manually trigger the ingestion task (Synchronous/Threaded).
-    Useful for free-tier deployments where Celery workers are not available.
+    Manually trigger the ingestion task via management command.
+    Uses subprocess to fully detach from the request context.
     """
-    import sys
     import os
-
-    # Fire and forget thread with suppressed output
-    # This prevents "output too large" errors from cron services
-    def run_ingest():
-        # Suppress stdout/stderr in the thread to prevent output accumulation
+    
+    # Use subprocess.Popen to run ingestion as a completely separate process
+    # This ensures the HTTP response returns immediately without waiting
+    # and prevents any output from being captured by the cron service
+    try:
+        # Run the Django management command in a detached subprocess
+        # Redirect all output to /dev/null to prevent "output too large" errors
         devnull = open(os.devnull, 'w')
-        old_stdout = sys.stdout
-        old_stderr = sys.stderr
-        try:
-            sys.stdout = devnull
-            sys.stderr = devnull
-            scrape_all_sources()
-        except Exception:
-            pass  # Silently fail - logs are already captured by Django/logging
-        finally:
-            sys.stdout = old_stdout
-            sys.stderr = old_stderr
-            devnull.close()
-
-    thread = threading.Thread(target=run_ingest, daemon=True)
-    thread.start()
-    return {"status": "started", "message": "Ingestion triggered in background."}
+        subprocess.Popen(
+            ['python', 'manage.py', 'run_ingest_sync'],
+            stdout=devnull,
+            stderr=devnull,
+            start_new_session=True,  # Fully detach from parent process
+            cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        )
+    except Exception as e:
+        logging.error(f"Failed to start ingestion subprocess: {e}")
+        return {"status": "error", "message": str(e)}
+    
+    return {"status": "ok"}
 
 @api.post("/admin/seed-db")
 def seed_db(request):
