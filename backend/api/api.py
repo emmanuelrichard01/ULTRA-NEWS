@@ -73,36 +73,34 @@ def get_article(request, slug: str):
     # If using RSS scraper, 'content' might be empty or raw HTML.
     return article
 
-import subprocess
-import logging
+import threading
+import time
+import os
+import sys
 
 @api.post("/admin/trigger-ingest")
 def trigger_ingest(request):
     """
-    Manually trigger the ingestion task via management command.
-    Uses subprocess to fully detach from the request context.
+    Trigger ingestion after HTTP response is sent.
+    Uses timer delay to ensure response completes before scraping starts.
     """
-    import os
+    def delayed_ingest():
+        # Wait for HTTP response to complete before starting
+        time.sleep(2)
+        # Suppress all stdout/stderr during ingestion
+        with open(os.devnull, 'w') as devnull:
+            old_stdout, old_stderr = sys.stdout, sys.stderr
+            sys.stdout = sys.stderr = devnull
+            try:
+                from core.tasks import scrape_all_sources
+                scrape_all_sources()
+            except Exception:
+                pass  # Silently fail
+            finally:
+                sys.stdout, sys.stderr = old_stdout, old_stderr
     
-    # Use subprocess.Popen to run ingestion as a completely separate process
-    # This ensures the HTTP response returns immediately without waiting
-    # and prevents any output from being captured by the cron service
-    try:
-        # Run the Django management command in a detached subprocess
-        # Redirect all output to /dev/null to prevent "output too large" errors
-        devnull = open(os.devnull, 'w')
-        subprocess.Popen(
-            ['python', 'manage.py', 'run_ingest_sync'],
-            stdout=devnull,
-            stderr=devnull,
-            start_new_session=True,  # Fully detach from parent process
-            cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        )
-    except Exception as e:
-        logging.error(f"Failed to start ingestion subprocess: {e}")
-        return {"status": "error", "message": str(e)}
-    
-    return {"status": "ok"}
+    threading.Thread(target=delayed_ingest, daemon=True).start()
+    return "OK"
 
 @api.post("/admin/seed-db")
 def seed_db(request):

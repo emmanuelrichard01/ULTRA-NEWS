@@ -119,3 +119,29 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Logging configuration - suppress verbose output in production
+# This prevents "output too large" errors from cron services
+if not DEBUG:
+    LOGGING = {
+        'version': 1,
+        'disable_existing_loggers': True,
+        'handlers': {
+            'null': {
+                'class': 'logging.NullHandler',
+            },
+        },
+        'root': {
+            'handlers': ['null'],
+            'level': 'CRITICAL',
+        },
+        'loggers': {
+            'django': {'handlers': ['null'], 'level': 'CRITICAL', 'propagate': False},
+            'django.request': {'handlers': ['null'], 'level': 'CRITICAL', 'propagate': False},
+            'core': {'handlers': ['null'], 'level': 'CRITICAL', 'propagate': False},
+            'trafilatura': {'handlers': ['null'], 'level': 'CRITICAL', 'propagate': False},
+            'feedparser': {'handlers': ['null'], 'level': 'CRITICAL', 'propagate': False},
+            'urllib3': {'handlers': ['null'], 'level': 'CRITICAL', 'propagate': False},
+        },
+    }
+
