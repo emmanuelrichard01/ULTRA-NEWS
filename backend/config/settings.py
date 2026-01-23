@@ -5,9 +5,14 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-default-key')
 
-DEBUG = os.environ.get('DEBUG', '1') == '1'
+# SECURITY: Default to False in production
+DEBUG = os.environ.get('DEBUG', '0') == '1'
 
-ALLOWED_HOSTS = ['*']
+# SECURITY: Explicit allowed hosts (no wildcards in production)
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+
+# Admin API Key for protected endpoints
+ADMIN_API_KEY = os.environ.get('ADMIN_API_KEY', '')
 
 INSTALLED_APPS = [
     'django.contrib.admin',

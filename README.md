@@ -30,24 +30,43 @@ ULTRA-NEWS is designed as an **Information Instrument**—not just a feed, but a
 
 ## ✨ Key Features
 
-*   **Hybrid Design System**: 70% editorial authority (Wired/The Verge) / 30% calm utility.
-*   **Professional Content Strategy**:
-    *   **Editor's Choice Carousel**: Interactive, auto-playing hero section highlighting top stories with smooth fade transitions.
-    *   **High-Res Imagery**: Smart extraction of `og:image` and `twitter:image` tags for sharp 21:9 hero assets, with robust error handling.
-    *   **Deep Fetching**: Browser-grade scraper bypasses bot blocks to retrieve full content (400+ words).
-*   **Performance UX**:
-    *   **High-Contrast Reading**: Optimized typography colors (`gray-950`) for clear legibility in light mode.
-    *   **Skeleton Loading**: Premium "pulsing" states for perceived speed.
-    *   **Pagination**: Efficient `limit/offset` API with editorial-style controls.
-*   **Production Ready**: Docker-native, split frontend/backend architecture, Vercel + Render optimized.
+### Content & Design
+*   **Hybrid Design System**: 70% editorial authority (Wired/The Verge) / 30% calm utility
+*   **Editor's Choice Carousel**: Interactive, auto-playing hero section with smooth fade transitions
+*   **High-Res Imagery**: Smart extraction of `og:image` and `twitter:image` tags for sharp 21:9 hero assets
+*   **Deep Fetching**: Browser-grade scraper retrieves full content (400+ words) bypassing bot blocks
+
+### Performance & UX
+*   **Edge Caching**: ISR with 60-second revalidation for sub-100ms responses
+*   **API Caching**: Redis-backed response caching for article details
+*   **Database Indexes**: Optimized queries on `published_date` and `source`
+*   **Skeleton Loading**: Premium "pulsing" states for perceived speed
+*   **Pagination**: Efficient `limit/offset` API with editorial-style controls
+
+### Production Hardening
+*   **API Key Authentication**: Protected admin endpoints with `X-Admin-Key` header
+*   **Deep Health Checks**: `/api/health` verifies database and Redis connectivity
+*   **Input Validation**: Query length limits and sanitization
+*   **Error Boundaries**: Graceful error handling with retry functionality
+*   **Docker-native**: Split frontend/backend architecture, Vercel + Render optimized
+
+---
+
+## 🔐 Security Features
+
+| Feature | Implementation |
+|---------|----------------|
+| **Admin Authentication** | API key via `X-Admin-Key` header |
+| **ALLOWED_HOSTS** | Environment-based, no wildcards |
+| **DEBUG Mode** | Defaults to `False` in production |
+| **CORS** | Explicit origin allowlist |
+| **Input Validation** | Query length limits (200 chars) |
 
 ---
 
 ## 🎨 Design System
 
 We follow a **70/30 Hybrid Rule**: 70% editorial authority (Wired/The Verge), 30% calm utility (BBC/Apple News).
-
-### Visual Language
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -83,11 +102,12 @@ flowchart TB
     subgraph Frontend["⚛️ Frontend (Next.js 16)"]
         SSR["Server-Side Rendering"]
         React["React Components"]
-        Themes["Theme Engine"]
+        ISR["ISR Cache (60s)"]
     end
 
     subgraph Backend["🐍 Backend (Django 5)"]
         Ninja["Ninja API Gateway"]
+        Auth["API Key Auth"]
         ORM["Django ORM"]
         Search["PostgreSQL TSVector"]
     end
@@ -97,36 +117,26 @@ flowchart TB
         Redis[("Redis 7")]
     end
 
-    subgraph Workers["⚙️ Async Workers (Scalable Production)"]
-        Beat["Celery Beat\n(Scheduler)"]
-        Worker["Celery Worker"]
-        Scraper["Trafilatura\nScraper"]
-    end
-    
-    subgraph FreeTier["✨ Free Tier Alternative"]
-        Cron["⏰ Cron-Job.org\n(External Trigger)"]
-        Thread["Background Thread\n(Inside Django App)"]
+    subgraph Workers["⚙️ Background Processing"]
+        GHA["⏰ GitHub Actions"]
+        Thread["Background Thread"]
+        Scraper["Trafilatura Scraper"]
     end
 
     Browser --> SSR
-    SSR --> Ninja
-    React --> Ninja
-    Ninja --> ORM
+    SSR --> ISR
+    ISR --> Ninja
+    Ninja --> Auth
+    Auth --> ORM
     ORM --> Postgres
     Ninja --> Search
     Search --> Postgres
+    Ninja --> Redis
     
-    %% Standard Path (Recommended)
-    Beat -->|"Every 30min"| Redis
-    Worker --> Redis
-    Worker --> Scraper
-    Scraper -->|"RSS + Full Text"| Worker
-    Worker -->|"Save Articles"| Postgres
-
-    %% Free Tier Path
-    Cron -.->|"POST /trigger-ingest"| Ninja
-    Ninja -.->|"Spawn Thread"| Thread
-    Thread -.-> Scraper
+    GHA -->|"POST /trigger-ingest"| Auth
+    Auth -->|"Spawn Thread"| Thread
+    Thread --> Scraper
+    Scraper -->|"Save Articles"| Postgres
 ```
 
 ---
@@ -135,8 +145,6 @@ flowchart TB
 
 ### Article Ingestion Pipeline
 
-### Article Ingestion Pipeline
- 
 We support two ingestion strategies: **Scalable** (Production) and **Free Tier** (Cost-Optimized).
 
 #### Option A: Scalable Production (Recommended)
@@ -165,45 +173,45 @@ sequenceDiagram
 ```
 
 #### Option B: Free Tier Alternative (Current)
-Uses **Cron-Job.org + Background Threads** to bypass paid worker instances.
+Uses **GitHub Actions + Background Threads** to bypass paid worker instances.
 
 ```mermaid
 sequenceDiagram
-    participant Cron as ⏰ Cron Job
+    participant GHA as ⏰ GitHub Actions
     participant API as 🔌 Django API
+    participant Auth as 🔐 API Key Auth
     participant RSS as 🌐 RSS Feeds
-    participant Traf as 📄 Scraper Service
 
     rect rgb(0, 26, 51)
-        Note over Cron,API: Triggered Hourly (External)
-        Cron->>API: POST /admin/trigger-ingest
-        API-->>Cron: 200 OK (Async Thread Started)
+        Note over GHA,API: Triggered Every 30 Minutes
+        GHA->>API: POST /admin/trigger-ingest
+        API->>Auth: Validate X-Admin-Key
+        Auth-->>API: ✓ Authenticated
+        API-->>GHA: 200 OK
         
-        loop For Each Source (Background Thread)
-            API->>RSS: Fetch RSS
-            API->>Traf: Deep Scrape
-        end
+        Note over API,RSS: Background Thread (Async)
+        API->>RSS: Fetch & Process Articles
     end
 ```
 
 ### 🔄 How It Works (End-to-End)
 
 1.  **Ingestion (The "Brain")**:
-    *   Every hour, an external **Cron Job** (Cron-Job.org) hits our secure API endpoint.
-    *   The backend spins up a background thread that scrapes configured RSS feeds (Wired, The Verge, etc.).
-    *   It bypasses simple RSS summaries by visiting the *actual* article page to extract the **full text** and **high-resolution social images** (`og:image`).
-    *   Articles are automatically categorized (e.g., "AI" -> "Tech") and saved to **PostgreSQL**.
+    *   Every 30 minutes, **GitHub Actions** triggers the authenticated API endpoint
+    *   Backend spawns a background thread to scrape RSS feeds (Wired, The Verge, etc.)
+    *   Deep fetches **full text** and **high-resolution social images** (`og:image`)
+    *   Auto-categorizes articles (e.g., "AI" → "Tech") and saves to **PostgreSQL**
 
 2.  **Delivery (The "Fast Lane")**:
-    *   When a user visits the site, **Next.js** requests data from the **Django Ninja API**.
-    *   The API serves JSON instantly from the database, optimized with search vectors.
-    *   The frontend renders the 'Editor's Choice' carousel and editorial lists using **Server Components** for maximum SEO and speed.
+    *   **Next.js ISR** caches pages for 60 seconds at the edge
+    *   **Redis** caches article detail responses for 5 minutes
+    *   **Database indexes** ensure sub-10ms query times
 
 3.  **Consumption (The "Experience")**:
-    *   Users get a distraction-free reading experience.
-    *   **Light Mode**: Sharp, high-contrast typography (`gray-950`).
-    *   **Dark Mode**: True OLED black for night reading.
-    *   **Mobile**: A native-app-like menu and smooth touch interactions.
+    *   Distraction-free reading with high-contrast typography
+    *   **Light Mode**: Sharp, high-contrast (`gray-950`)
+    *   **Dark Mode**: True OLED black for night reading
+    *   **Mobile**: Native-app-like menu and smooth touch interactions
 
 ---
 
@@ -213,28 +221,19 @@ This project is Docker-native and can be deployed to any VPS (DigitalOcean, AWS,
 
 See [DEPLOYMENT.md](DEPLOYMENT.md) for a detailed, step-by-step guide for Vercel (Frontend) + Render (Backend).
 
-### Option A: Standard VPS (Recommended)
-*Best for: Full control, lowest cost, keeping database and app together.*
+### Quick Deploy Checklist
 
-1.  **Provision a Server**: Ubuntu 22.04 LTS (minimum 2GB RAM).
-2.  **Install Docker**:
-    ```bash
-    curl -fsSL https://get.docker.com | sh
-    ```
-3.  **Clone & Configure**:
-    ```bash
-    git clone https://github.com/yourusername/ultra-news.git
-    cd ultra-news
-    cp backend/.env.example backend/.env
-    # Edit .env with production secrets (SECRET_KEY, DB credentials)
-    ```
-4.  **Run Production Build**:
-    ```bash
-    make build
-    make up
-    ```
-5.  **Set up Nginx (Reverse Proxy)**:
-    Install Nginx and point port 80 to `localhost:3000`.
+1. **Backend (Render)**:
+   - Deploy PostgreSQL, Redis, and Django Web Service
+   - Set environment variables (see table below)
+
+2. **Frontend (Vercel)**:
+   - Deploy from `frontend/` directory
+   - Set `NEXT_PUBLIC_API_URL`
+
+3. **GitHub Actions**:
+   - Add `INGEST_URL` and `ADMIN_API_KEY` secrets
+   - Ingestion runs automatically every 30 minutes
 
 ---
 
@@ -253,6 +252,35 @@ make setup
 
 ---
 
+## 🔐 Environment Variables
+
+### Backend (Render/VPS)
+
+| Variable | Required | Description |
+|:---|:---:|:---|
+| `SECRET_KEY` | ✅ | Django security key (large random string) |
+| `DEBUG` | ✅ | Set to `0` for production |
+| `ALLOWED_HOSTS` | ✅ | Comma-separated hostnames (e.g., `ultra-news.onrender.com`) |
+| `ADMIN_API_KEY` | ✅ | API key for admin endpoints (generate a secure random string) |
+| `DATABASE_URL` | ✅ | PostgreSQL connection string |
+| `REDIS_URL` | ✅ | Redis connection string |
+| `FRONTEND_URL` | ✅ | URL of deployed frontend (for CORS) |
+
+### Frontend (Vercel)
+
+| Variable | Required | Description |
+|:---|:---:|:---|
+| `NEXT_PUBLIC_API_URL` | ✅ | Public URL of backend API (no trailing slash) |
+
+### GitHub Actions Secrets
+
+| Secret | Description |
+|:---|:---|
+| `INGEST_URL` | Full trigger endpoint URL |
+| `ADMIN_API_KEY` | Same value as Render |
+
+---
+
 ## 📄 License
 
-MIT License © 2024 Ultra News
+MIT License © 2025 Ultra News

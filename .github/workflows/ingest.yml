@@ -12,6 +12,17 @@ jobs:
     steps:
       - name: Trigger ingestion endpoint
         run: |
-          curl -s -X POST "${{ secrets.INGEST_URL }}" -o /dev/null -w "%{http_code}" || echo "Request sent"
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X POST "${{ secrets.INGEST_URL }}" \
+            -H "X-Admin-Key: ${{ secrets.ADMIN_API_KEY }}")
+          
+          echo "HTTP Status: $HTTP_STATUS"
+          
+          if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 300 ]; then
+            echo "✅ Ingestion triggered successfully"
+          else
+            echo "⚠️ Request completed with status $HTTP_STATUS"
+          fi
         env:
           INGEST_URL: ${{ secrets.INGEST_URL }}
+          ADMIN_API_KEY: ${{ secrets.ADMIN_API_KEY }}

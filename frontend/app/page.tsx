@@ -36,7 +36,7 @@ async function getArticles(query?: string, page: number = 1): Promise<PaginatedR
   const endpoint = `/api/news?${params.toString()}`;
 
   try {
-    const res = await fetch(`${API_URL}${endpoint}`, { cache: 'no-store' });
+    const res = await fetch(`${API_URL}${endpoint}`, { next: { revalidate: 60 } });
     if (!res.ok) {
       console.error(`Failed to fetch data: ${res.status}`);
       return { items: [], count: 0 };

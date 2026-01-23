@@ -29,5 +29,12 @@ class Article(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     categories = models.ManyToManyField(Category, related_name='articles', blank=True)
 
+    class Meta:
+        ordering = ['-published_date']
+        indexes = [
+            models.Index(fields=['-published_date'], name='article_pub_date_idx'),
+            models.Index(fields=['source', '-published_date'], name='article_source_pub_idx'),
+        ]
+
     def __str__(self):
         return self.title
