@@ -1,0 +1,17 @@
+name: Trigger News Ingestion
+
+on:
+  schedule:
+    # Run every 30 minutes
+    - cron: '*/30 * * * *'
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  trigger-ingest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger ingestion endpoint
+        run: |
+          curl -s -X POST "${{ secrets.INGEST_URL }}" -o /dev/null -w "%{http_code}" || echo "Request sent"
+        env:
+          INGEST_URL: ${{ secrets.INGEST_URL }}
