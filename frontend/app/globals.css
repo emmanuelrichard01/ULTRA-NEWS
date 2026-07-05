@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 @plugin "@tailwindcss/typography";
 
 /* ============================================
@@ -13,12 +13,12 @@
 /* --- V3 Design Tokens --- */
 :root {
   /* Colors — Light Mode */
-  --ink: #12141C;            /* Blue-black primary text — not flat #000 */
-  --paper: #F7F5F0;          /* Warm off-white — easier on eyes than stark white */
-  --signal-amber: #E8A33D;   /* Functional: "developing" (1-2 sources) */
-  --verified-teal: #1F7A6C;  /* Functional: "corroborated" (3+ sources) */
-  --wire-red: #C4432B;       /* Breaking/urgent — spend sparingly */
-  --slate: #5B6472;          /* Secondary text, metadata, dividers */
+  --ink: #12141c; /* Blue-black primary text — not flat #000 */
+  --paper: #f7f5f0; /* Warm off-white — easier on eyes than stark white */
+  --signal-amber: #e8a33d; /* Functional: "developing" (1-2 sources) */
+  --verified-teal: #173b8a; /* Functional: "corroborated" (3+ sources) */
+  --wire-red: #c4432b; /* Breaking/urgent — spend sparingly */
+  --slate: #5b6472; /* Secondary text, metadata, dividers */
 
   /* Derived */
   --background: var(--paper);
@@ -26,9 +26,9 @@
   --foreground-muted: var(--slate);
   --accent: var(--verified-teal);
   --accent-secondary: var(--signal-amber);
-  --border: #E0DDD7;
-  --border-hover: #C8C4BC;
-  --surface-elevated: #EFECE6;
+  --border: #e0ddd7;
+  --border-hover: #c8c4bc;
+  --surface-elevated: #efece6;
 
   /* Radius — deliberate, not bubbly */
   --radius-card: 6px;
@@ -42,20 +42,20 @@
 
 /* --- Dark Mode (ink/paper swap) --- */
 .dark {
-  --ink: #F0EDE7;
-  --paper: #0E1015;
-  --signal-amber: #F0B955;
-  --verified-teal: #2ECFB3;
-  --wire-red: #E05A42;
-  --slate: #8B95A5;
+  --ink: #f0ede7;
+  --paper: #0e1015;
+  --signal-amber: #f0b955;
+  --verified-teal: #2e6ecf;
+  --wire-red: #e05a42;
+  --slate: #8b95a5;
 
   --background: var(--paper);
   --foreground: var(--ink);
   --foreground-muted: var(--slate);
   --accent: var(--verified-teal);
   --accent-secondary: var(--signal-amber);
-  --border: #1E2028;
-  --border-hover: #2E3040;
+  --border: #1e2028;
+  --border-hover: #2e3040;
   --surface-elevated: #161820;
 }
 
@@ -158,8 +158,9 @@ body {
   width: 4px;
   height: 14px;
   border-radius: 1px;
-  transition: background-color var(--duration-normal) var(--ease-out),
-              transform var(--duration-fast) var(--ease-out);
+  transition:
+    background-color var(--duration-normal) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
 }
 
 .meter-segment.filled.developing {
@@ -176,8 +177,13 @@ body {
 
 /* Meter pulse animation — only on corroboration increment */
 @keyframes meter-pulse {
-  0%, 100% { transform: scaleY(1); }
-  50% { transform: scaleY(1.3); }
+  0%,
+  100% {
+    transform: scaleY(1);
+  }
+  50% {
+    transform: scaleY(1.3);
+  }
 }
 
 /* --- Fanned Stack Shadows --- */
@@ -219,7 +225,12 @@ body {
 .prose li,
 .prose span,
 .prose strong,
-.prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
+.prose h1,
+.prose h2,
+.prose h3,
+.prose h4,
+.prose h5,
+.prose h6 {
   color: var(--foreground) !important;
 }
 
@@ -235,7 +246,12 @@ body {
 }
 
 .dark .prose strong,
-.dark .prose h1, .dark .prose h2, .dark .prose h3, .dark .prose h4, .dark .prose h5, .dark .prose h6 {
+.dark .prose h1,
+.dark .prose h2,
+.dark .prose h3,
+.dark .prose h4,
+.dark .prose h5,
+.dark .prose h6 {
   color: var(--foreground) !important;
 }
 
@@ -260,8 +276,8 @@ body {
     display: none;
   }
   .pb-scrollbar {
-    -ms-overflow-style: none;  /* IE and Edge */
-    scrollbar-width: none;  /* Firefox */
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
   }
 
   .ticker-bar {
@@ -279,6 +295,6 @@ body {
   display: none;
 }
 .pb-scrollbar {
-  -ms-overflow-style: none;  /* IE and Edge */
-  scrollbar-width: none;  /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
 }

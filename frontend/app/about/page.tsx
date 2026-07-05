@@ -51,30 +51,41 @@ export default function AboutPage() {
                             </p>
                         </div>
                     </div>
-                    <div className="bg-[var(--surface-elevated)] p-8 rounded-lg border border-[var(--border)]">
-                        <h3 className="text-sm font-bold uppercase tracking-widest mb-4">The Evolution</h3>
-                        <ul className="space-y-4 text-sm font-mono">
-                            <li className="flex gap-4">
-                                <span className="text-[var(--foreground-muted)]">2020</span>
-                                <span>Initial Prototype (PHP/MySQL)</span>
-                            </li>
-                            <li className="flex gap-4">
-                                <span className="text-[var(--foreground-muted)]">2022</span>
-                                <span>Migration to simple Python scripts</span>
-                            </li>
-                            <li className="flex gap-4">
-                                <span className="text-[var(--foreground-muted)]">2024</span>
-                                <span>Ultra News V2 (Production)</span>
-                            </li>
-                            <li className="flex gap-4">
-                                <span className="text-[var(--accent)] font-bold">2025</span>
-                                <span><strong>Ultra News V3 — The Wire Room</strong></span>
-                            </li>
-                            <li className="pl-[3.5rem] opacity-70 border-l border-[var(--border)] ml-1">Story Clusters + Corroboration System</li>
-                            <li className="pl-[3.5rem] opacity-70 border-l border-[var(--border)] ml-1">Next.js 16 + Django Ninja API</li>
-                            <li className="pl-[3.5rem] opacity-70 border-l border-[var(--border)] ml-1">Excerpt-Only + Outbound Links</li>
-                            <li className="pl-[3.5rem] opacity-70 border-l border-[var(--border)] ml-1">Structured Logging + HTML Sanitization</li>
-                        </ul>
+                    <div className="bg-[var(--surface-elevated)] p-8 rounded-[var(--radius-card)] border border-[var(--border)] relative overflow-hidden group">
+                        {/* Decorative wireframe grid background */}
+                        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMSIgY3k9IjEiIHI9IjEiIGZpbGw9InJnYmEoMTI4LDEyOCwxMjgsMC4xKSIvPjwvc3ZnPg==')] opacity-50"></div>
+
+                        <div className="relative z-10">
+                            <h3 className="font-data text-[10px] font-bold uppercase tracking-widest text-[var(--accent)] mb-6 flex items-center gap-2">
+                                Evolution Log
+                            </h3>
+                            <ul className="space-y-5 font-mono text-[13px] leading-relaxed">
+                                <li className="flex gap-4 items-start">
+                                    <span className="text-[var(--foreground-muted)] opacity-60 mt-0.5">2020</span>
+                                    <span className="text-[var(--foreground-muted)]">Initial Prototype<br /><span className="text-[11px] opacity-70">PHP / MySQL</span></span>
+                                </li>
+                                <li className="flex gap-4 items-start">
+                                    <span className="text-[var(--foreground-muted)] opacity-60 mt-0.5">2022</span>
+                                    <span className="text-[var(--foreground-muted)]">Migration to local scripts<br /><span className="text-[11px] opacity-70">Python</span></span>
+                                </li>
+                                <li className="flex gap-4 items-start">
+                                    <span className="text-[var(--foreground-muted)] opacity-60 mt-0.5">2024</span>
+                                    <span className="text-[var(--foreground-muted)]">Ultra News V2<br /><span className="text-[11px] opacity-70">Basic Cloud Production</span></span>
+                                </li>
+                                <li className="flex gap-4 items-start">
+                                    <span className="text-[var(--foreground)] font-bold mt-0.5">2025</span>
+                                    <div>
+                                        <span className="text-[var(--accent)] font-bold uppercase tracking-widest text-[12px] block mb-2">V3 — The Wire Room</span>
+                                        <div className="pl-3 border-l-2 border-[var(--border)] space-y-2 text-[12px] text-[var(--foreground)]">
+                                            <p><span className="text-[var(--accent)] font-bold">»</span> Semantic Vector Clustering (pgvector + fastembed)</p>
+                                            <p><span className="text-[var(--accent)] font-bold">»</span> The Trust Graph (Reputation Engine)</p>
+                                            <p><span className="text-[var(--accent)] font-bold">»</span> Next.js 16 + Django Ninja Architecture</p>
+                                            <p><span className="text-[var(--accent)] font-bold">»</span> Real-time Coverage Velocity Analytics</p>
+                                        </div>
+                                    </div>
+                                </li>
+                            </ul>
+                        </div>
                     </div>
                 </section>
 
@@ -94,16 +105,28 @@ export default function AboutPage() {
                                     href="https://github.com/emmanuelrichard01"
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-wider bg-[var(--foreground)] text-[var(--background)] px-4 py-2 rounded-md hover:opacity-90 transition-opacity"
+                                    className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-wider bg-[var(--foreground)] text-[var(--background)] px-4 py-2 rounded-[var(--radius-chip)] hover:opacity-90 transition-opacity"
                                 >
                                     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path fillRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clipRule="evenodd" /></svg>
-                                    GitHub Profile
+                                    GitHub
                                 </a>
                                 <a
-                                    href="mailto:contact@ultranews.demo"
-                                    className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-[var(--foreground-muted)] border border-[var(--border)] px-4 py-2 rounded-md hover:text-[var(--foreground)] hover:border-[var(--foreground)] transition-all"
+                                    href="https://x.com/mrebr"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-[var(--foreground-muted)] border border-[var(--border)] px-4 py-2 rounded-[var(--radius-chip)] hover:text-[var(--foreground)] hover:border-[var(--foreground)] transition-all"
                                 >
-                                    Contact Me
+                                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z" /></svg>
+                                    X / Twitter
+                                </a>
+                                <a
+                                    href="https://www.linkedin.com/in/e-mc/"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-[var(--foreground-muted)] border border-[var(--border)] px-4 py-2 rounded-[var(--radius-chip)] hover:text-[var(--foreground)] hover:border-[var(--foreground)] transition-all"
+                                >
+                                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" /></svg>
+                                    LinkedIn
                                 </a>
                             </div>
                         </div>
