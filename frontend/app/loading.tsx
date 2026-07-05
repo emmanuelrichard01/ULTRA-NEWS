@@ -1,43 +1,56 @@
+/**
+ * V3 Loading Skeleton — shape-matched to actual components.
+ * Per V3 UI spec §6: "the skeleton loader for each dynamic hole should be
+ * the exact shape of the real component."
+ */
+
 export default function Loading() {
-    return (
-        <div className="space-y-20 pb-20 animate-pulse">
-            {/* Header Skeleton (Editorial Style) */}
-            <div className="pt-12 sm:pt-20 border-b border-[var(--border)] pb-8">
-                <div className="flex flex-col gap-4">
-                    <div className="h-4 w-16 bg-[var(--background-elevated)] rounded"></div>
-                    <div className="h-16 sm:h-24 w-3/4 max-w-xl bg-[var(--background-elevated)] rounded-lg"></div>
-                    <div className="h-6 w-full max-w-lg bg-[var(--background-elevated)] rounded mt-2"></div>
-                </div>
-            </div>
-
-            <div className="space-y-16">
-                {/* Hero Skeleton */}
-                <section>
-                    <div className="w-full aspect-[21/9] bg-[var(--background-elevated)] rounded-sm mb-6"></div>
-                    <div className="h-4 w-32 bg-[var(--background-elevated)] rounded mb-4"></div>
-                    <div className="h-10 w-full bg-[var(--background-elevated)] rounded mb-4"></div>
-                    <div className="h-10 w-2/3 bg-[var(--background-elevated)] rounded"></div>
-                </section>
-
-                {/* List Skeleton */}
-                <section className="max-w-4xl">
-                    <div className="h-4 w-full border-b border-[var(--border)] mb-8 flex items-center gap-4">
-                        <div className="h-4 w-16 bg-[var(--background-elevated)] rounded"></div>
-                    </div>
-                    <div className="space-y-8">
-                        {[1, 2, 3, 4, 5].map((i) => (
-                            <div key={i} className="flex flex-row-reverse sm:flex-row gap-6">
-                                <div className="flex-shrink-0 w-24 h-24 sm:w-40 sm:h-28 bg-[var(--background-elevated)] rounded-md"></div>
-                                <div className="flex-1 space-y-3 py-2">
-                                    <div className="h-4 w-24 bg-[var(--background-elevated)] rounded"></div>
-                                    <div className="h-6 w-full bg-[var(--background-elevated)] rounded"></div>
-                                    <div className="h-6 w-3/4 bg-[var(--background-elevated)] rounded"></div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </section>
-            </div>
+  return (
+    <div className="max-w-4xl mx-auto animate-pulse">
+      {/* Header skeleton */}
+      <div className="border-b-2 border-[var(--border)] pb-6 mb-10">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+          <div>
+            <div className="h-12 w-48 bg-[var(--surface-elevated)] rounded mb-2" />
+            <div className="h-5 w-80 bg-[var(--surface-elevated)] rounded" />
+          </div>
+          <div className="h-10 w-64 bg-[var(--surface-elevated)] rounded-[var(--radius-card)]" />
         </div>
-    );
+      </div>
+
+      {/* Hero card skeleton — matches StoryCard hero variant shape */}
+      <div className="mb-12">
+        <div className="aspect-[16/9] sm:aspect-[2/1] lg:aspect-[21/9] w-full rounded-[var(--radius-card)] bg-[var(--surface-elevated)]" />
+      </div>
+
+      {/* Section label */}
+      <div className="h-3 w-24 bg-[var(--surface-elevated)] rounded mb-6" />
+
+      {/* Feed card skeletons — matches StoryCard standard variant */}
+      {[...Array(6)].map((_, i) => (
+        <div key={i} className="flex gap-5 py-5 border-b border-[var(--border)]">
+          {/* Thumbnail skeleton */}
+          <div className="w-24 h-24 sm:w-36 sm:h-24 rounded-[var(--radius-card)] bg-[var(--surface-elevated)] flex-shrink-0" />
+          {/* Content skeleton */}
+          <div className="flex-1 flex flex-col justify-between">
+            <div>
+              <div className="flex gap-2 mb-2">
+                <div className="h-3 w-12 bg-[var(--surface-elevated)] rounded" />
+                <div className="h-3 w-16 bg-[var(--surface-elevated)] rounded" />
+              </div>
+              <div className="h-5 w-full bg-[var(--surface-elevated)] rounded mb-1.5" />
+              <div className="h-5 w-3/4 bg-[var(--surface-elevated)] rounded" />
+            </div>
+            {/* Corroboration meter skeleton */}
+            <div className="flex items-center gap-1 mt-2">
+              {[...Array(5)].map((_, j) => (
+                <div key={j} className="w-1 bg-[var(--surface-elevated)] rounded-sm" style={{ height: `${10 + j * 2}px` }} />
+              ))}
+              <div className="h-3 w-4 bg-[var(--surface-elevated)] rounded ml-1" />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }

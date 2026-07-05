@@ -1,24 +1,39 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Fraunces, IBM_Plex_Mono, Geist } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { ThemeProvider } from "@/components/ThemeProvider";
 
-const inter = Inter({
-  variable: "--font-inter",
+// V3 Typography — three-role system, all self-hosted via next/font
+const fraunces = Fraunces({
+  variable: "--font-fraunces",
   subsets: ["latin"],
+  display: "swap",
+});
+
+const geist = Geist({
+  variable: "--font-geist",
+  subsets: ["latin"],
+  display: "swap",
+});
+
+const ibmPlexMono = IBM_Plex_Mono({
+  variable: "--font-ibm-plex-mono",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://ultra-news.demo"),
   title: {
     template: "%s | Ultra News",
-    default: "Ultra News — Curated Intelligence for the Accelerated Mind",
+    default: "Ultra News — The Wire Room",
   },
-  description: "A high-performance news aggregation platform engineered for density, speed, and clarity. Tracking Tech, Politics, and Global Markets in real-time.",
-  keywords: ["news aggregator", "tech news", "market intelligence", "minimalist news", "ultra news", "emmanuel richard moghalu"],
+  description: "A story-centric news aggregation platform. We triangulate coverage from multiple sources so you see the full picture, not just one outlet's take.",
+  keywords: ["news aggregator", "story clustering", "corroborated news", "multi-source", "ultra news"],
   authors: [{ name: "Emmanuel Richard Moghalu", url: "https://github.com/emmanuelrichard01" }],
   openGraph: {
     type: "website",
@@ -30,13 +45,13 @@ export const metadata: Metadata = {
         url: "/og-image.png",
         width: 1200,
         height: 630,
-        alt: "Ultra News — Curated Intelligence for the Accelerated Mind",
+        alt: "Ultra News — The Wire Room",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Ultra News — The Information Instrument",
+    title: "Ultra News — The Wire Room",
     creator: "@emmanuelrichard01",
     images: ["/og-image.png"],
   },
@@ -62,7 +77,8 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full" suppressHydrationWarning>
       <body
-        className={`${inter.variable} antialiased h-full flex flex-col bg-[var(--background)] text-[var(--foreground)]`}
+        className={`${fraunces.variable} ${geist.variable} ${ibmPlexMono.variable} antialiased h-full flex flex-col bg-[var(--background)] text-[var(--foreground)]`}
+        style={{ fontFamily: "var(--font-geist), system-ui, sans-serif" }}
         suppressHydrationWarning
       >
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>

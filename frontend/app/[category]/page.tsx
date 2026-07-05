@@ -1,154 +1,176 @@
-import HeroStory from '@/components/HeroStory';
-import FeedItem from '@/components/FeedItem';
-import Pagination from '@/components/Pagination';
+import { Metadata } from 'next';
+import { notFound } from 'next/navigation';
+import StoryCard from '@/components/StoryCard';
+import CategoryPill from '@/components/CategoryPill';
 
-// Define types based on API response
-interface Source {
-    name: string;
+interface StoryDetail {
+  id: number;
+  title: string;
+  slug: string;
+  summary: string;
+  first_seen_at: string;
+  last_updated_at: string;
+  source_count: number;
+  status: string;
+  image_url: string | null;
+  categories: string[];
+  sources: string[];
 }
 
-interface Article {
-    title: string;
-    slug: string;
-    url: string;
-    image_url?: string;
-    published_date: string;
-    source: Source;
-}
+const CATEGORY_MAP: Record<string, { displayName: string; description: string }> = {
+  tech: { displayName: 'Tech', description: 'Technology, AI, and the digital frontier.' },
+  politics: { displayName: 'Politics', description: 'Government, policy, and global affairs.' },
+  business: { displayName: 'Business', description: 'Markets, finance, and entrepreneurship.' },
+  entertainment: { displayName: 'Culture', description: 'Film, music, media, and the cultural conversation.' },
+  science: { displayName: 'Science', description: 'Research, discovery, and the natural world.' },
+  art: { displayName: 'Art', description: 'Visual arts, exhibitions, and creative expression.' },
+};
 
-interface PaginatedResponse {
-    items: Article[];
-    count: number;
-}
+async function getCategoryStories(category: string, cursor?: string) {
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+  const params = new URLSearchParams({ category, limit: '20' });
+  if (cursor) params.set('cursor', cursor);
 
-async function getArticles(category: string, page: number = 1): Promise<PaginatedResponse> {
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://backend:8000';
-    const limit = 20;
-    const offset = (page - 1) * limit;
-
-    const params = new URLSearchParams();
-    params.set('category', category);
-    params.set('limit', limit.toString());
-    params.set('offset', offset.toString());
-
-    const endpoint = `/api/news?${params.toString()}`;
-
-    try {
-        const res = await fetch(`${API_URL}${endpoint}`, { cache: 'no-store' });
-        if (!res.ok) {
-            console.error(`Failed to fetch data: ${res.status}`);
-            return { items: [], count: 0 };
-        }
-        return res.json();
-    } catch (error) {
-        console.error("Error fetching articles:", error);
-        return { items: [], count: 0 };
-    }
+  try {
+    const res = await fetch(`${API_URL}/api/v1/stories?${params.toString()}`, { cache: 'no-store' });
+    if (!res.ok) return { items: [], count: 0 };
+    return res.json();
+  } catch {
+    return { items: [], count: 0 };
+  }
 }
 
 interface CategoryPageProps {
-    params: Promise<{ category: string }>;
-    searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+  params: Promise<{ category: string }>;
+  searchParams: Promise<{ cursor?: string }>;
 }
 
-function capitalize(s: string) {
-    return s.charAt(0).toUpperCase() + s.slice(1);
+export async function generateMetadata({ params }: CategoryPageProps): Promise<Metadata> {
+  const { category } = await params;
+  const info = CATEGORY_MAP[category];
+  const name = info?.displayName || category.charAt(0).toUpperCase() + category.slice(1);
+
+  return {
+    title: `${name} — Ultra News`,
+    description: info?.description || `Latest ${name} news from multiple sources.`,
+    openGraph: {
+      title: `${name} — Ultra News`,
+      description: info?.description || `Latest ${name} news.`,
+    },
+  };
 }
 
 export default async function CategoryPage({ params, searchParams }: CategoryPageProps) {
-    const { category } = await params;
-    const resolvedSearchParams = await searchParams;
-    const page = typeof resolvedSearchParams.page === 'string' ? parseInt(resolvedSearchParams.page) : 1;
+  const { category } = await params;
+  const resolvedSearch = await searchParams;
+  const cursor = resolvedSearch.cursor;
 
-    const data = await getArticles(category, page);
-    const articles = data.items;
-    const totalCount = data.count;
+  const info = CATEGORY_MAP[category];
+  if (!info) notFound();
 
-    const showHero = page === 1 && articles.length > 0;
-    const heroArticle = showHero ? articles[0] : null;
-    const feedArticles = showHero ? articles.slice(1) : articles;
+  const data = await getCategoryStories(category, cursor);
+  const stories: StoryDetail[] = data.items;
 
-    const hasNext = (page * 20) < totalCount;
+  const heroStory = !cursor && stories.length > 0 ? stories[0] : null;
+  const feedStories = heroStory ? stories.slice(1) : stories;
 
-    return (
-        <div className="space-y-20 pb-20">
-            {/* Editorial Header */}
-            <header className="pt-12 sm:pt-20 border-b border-[var(--border)] pb-8">
-                <div className="flex flex-col gap-4">
-                    <span className="text-xs font-bold tracking-widest uppercase text-[var(--accent)]">
-                        Topic
-                    </span>
-                    <h1 className="text-6xl sm:text-8xl font-black text-[var(--foreground)] tracking-tighter leading-[0.9] font-display uppercase">
-                        {category}
-                    </h1>
-                    <p className="text-xl sm:text-2xl text-[var(--foreground-muted)] max-w-2xl font-serif italic antialiased opacity-80 decoration-slice">
-                        Curated stories and breaking news from the world of {category}.
-                    </p>
-                </div>
-            </header>
-
-            {/* Content */}
-            {articles.length === 0 ? (
-                <div className="py-32 flex flex-col items-center justify-center border-b border-[var(--border)] bg-[var(--background-elevated)]/30 rounded-lg border-dashed">
-                    <div className="w-16 h-16 mb-6 rounded-full bg-[var(--background-elevated)] flex items-center justify-center">
-                        <span className="text-2xl text-[var(--foreground-muted)] opacity-50">?</span>
-                    </div>
-                    <h3 className="text-xl font-bold text-[var(--foreground)] mb-2 tracking-tight">No stories found</h3>
-                    <p className="text-[var(--foreground-muted)] font-mono text-sm">We couldn't find any articles for this category yet.</p>
-                </div>
-            ) : (
-                <div className="space-y-16">
-                    {/* Hero Story (First Article) */}
-                    {heroArticle && (
-                        <section>
-                            <HeroStory
-                                title={heroArticle.title}
-                                slug={heroArticle.slug}
-                                source={heroArticle.source.name}
-                                url={heroArticle.url}
-                                imageUrl={heroArticle.image_url}
-                                publishedDate={heroArticle.published_date}
-                                category={capitalize(category)}
-                                summary="Top story of the moment." // Placeholder summary
-                            />
-                        </section>
-                    )}
-
-                    {/* The List (Remaining Articles) */}
-                    {feedArticles.length > 0 && (
-                        <section className="max-w-4xl">
-                            <h2 className="text-xs font-bold uppercase tracking-widest text-[var(--foreground-muted)] mb-8 flex items-center gap-4">
-                                <span className="bg-[var(--foreground)] text-[var(--background)] px-2 py-0.5">Latest</span>
-                                <span className="flex-1 h-px bg-[var(--border)]"></span>
-                                <span>Page {page}</span>
-                            </h2>
-                            <div className="flex flex-col">
-                                {feedArticles.map((article, idx) => (
-                                    <FeedItem
-                                        key={idx}
-                                        title={article.title}
-                                        slug={article.slug}
-                                        source={article.source.name}
-                                        url={article.url}
-                                        imageUrl={article.image_url}
-                                        publishedDate={article.published_date}
-                                    />
-                                ))}
-                            </div>
-                        </section>
-                    )}
-
-                    {/* Pagination */}
-                    <div className="pt-8 border-t border-[var(--border)]">
-                        <Pagination
-                            currentPage={page}
-                            hasNext={hasNext}
-                            baseUrl={`/${category}`}
-                            searchParams={resolvedSearchParams}
-                        />
-                    </div>
-                </div>
-            )}
+  return (
+    <div className="max-w-4xl mx-auto space-y-8">
+      {/* Category Header */}
+      <header className="border-b-2 border-[var(--foreground)] pb-6">
+        <div className="flex items-center gap-3 mb-1">
+          <CategoryPill label={info.displayName} isActive />
+          <span className="font-data text-[10px] text-[var(--foreground-muted)]">
+            {data.count} stories
+          </span>
         </div>
-    );
+        <h1 className="text-display-xl font-display text-[var(--foreground)] mt-3">
+          {info.displayName}
+        </h1>
+        <p className="text-body-md text-[var(--foreground-muted)] mt-2">
+          {info.description}
+        </p>
+
+        {/* Related categories */}
+        <div className="flex gap-2 mt-5 flex-wrap">
+          {Object.entries(CATEGORY_MAP)
+            .filter(([slug]) => slug !== category)
+            .map(([slug, cat]) => (
+              <CategoryPill key={slug} label={cat.displayName} href={`/${slug}`} />
+            ))}
+        </div>
+      </header>
+
+      {/* Content */}
+      {stories.length === 0 ? (
+        <div className="py-20 text-center">
+          <p className="font-data text-[var(--foreground-muted)]">
+            No stories in {info.displayName} yet. Check back soon.
+          </p>
+        </div>
+      ) : (
+        <div>
+          {/* Hero */}
+          {heroStory && (
+            <section className="mb-12">
+              <StoryCard
+                title={heroStory.title}
+                slug={heroStory.slug}
+                imageUrl={heroStory.image_url}
+                excerpt={heroStory.summary}
+                publishedDate={heroStory.first_seen_at}
+                sourceCount={heroStory.source_count}
+                status={heroStory.status}
+                sources={heroStory.sources}
+                storySlug={heroStory.slug}
+                categories={[info.displayName]}
+                variant="hero"
+              />
+            </section>
+          )}
+
+          {/* Feed */}
+          {feedStories.length > 0 && (
+            <section>
+              <h2 className="font-data text-[10px] font-bold uppercase tracking-widest text-[var(--foreground-muted)] mb-4 border-b border-[var(--border)] pb-2 flex justify-between items-end">
+                <span>Latest in {info.displayName}</span>
+                <span className="font-normal opacity-60">Sorted by Trending Velocity</span>
+              </h2>
+              <div className="flex flex-col">
+                {feedStories.map((story) => (
+                  <StoryCard
+                    key={story.slug}
+                    title={story.title}
+                    slug={story.slug}
+                    imageUrl={story.image_url}
+                    excerpt={story.summary}
+                    publishedDate={story.first_seen_at}
+                    sourceCount={story.source_count}
+                    status={story.status}
+                    sources={story.sources}
+                    storySlug={story.slug}
+                    categories={[info.displayName]}
+                    variant="standard"
+                  />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Cursor Pagination */}
+          {data.next_cursor && (
+            <div className="flex justify-center pt-8 border-t border-[var(--border)] mt-8">
+              <a
+                href={`/${category}?cursor=${data.next_cursor}`}
+                className="inline-flex items-center gap-2 px-6 py-3 font-data text-sm font-semibold text-[var(--foreground)] border border-[var(--border)] rounded-[var(--radius-card)] hover:bg-[var(--surface-elevated)] transition-colors duration-150"
+              >
+                Load more
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6" /></svg>
+              </a>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }

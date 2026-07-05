@@ -2,54 +2,85 @@
 @plugin "@tailwindcss/typography";
 
 /* ============================================
-   ULTRA-NEWS V2 - HYBRID EDITORIAL SYSTEM
-   70% Wired (Bold) / 30% Utility (Calm)
+   ULTRA-NEWS V3 — THE WIRE ROOM
+   Design System & Token Layer
+
+   Visual language: wire service convergence.
+   Signature: corroboration system (fanned stacks + signal meters).
+   Typography: 3-role system (display / body / data).
    ============================================ */
 
-/* --- Design Tokens --- */
+/* --- V3 Design Tokens --- */
 :root {
-  /* Colors - Light Mode (Stark, High Contrast) */
-  --background: #FFFFFF;
-  --background-elevated: #F8F8F8;
-  --foreground: #000000;      /* Pure black for max contrast */
-  --foreground-muted: #404040; /* Darker gray for better legibility (WCAG AAA) */
-  --accent: #000000;
-  --accent-secondary: #2563EB; /* Vivid royal blue */
-  --border: #E5E5E5;
-  --border-hover: #A3A3A3;
-  
-  /* Spacing */
-  --radius-sm: 0px; 
-  --radius-md: 2px;
-  --radius-lg: 4px;
+  /* Colors — Light Mode */
+  --ink: #12141C;            /* Blue-black primary text — not flat #000 */
+  --paper: #F7F5F0;          /* Warm off-white — easier on eyes than stark white */
+  --signal-amber: #E8A33D;   /* Functional: "developing" (1-2 sources) */
+  --verified-teal: #1F7A6C;  /* Functional: "corroborated" (3+ sources) */
+  --wire-red: #C4432B;       /* Breaking/urgent — spend sparingly */
+  --slate: #5B6472;          /* Secondary text, metadata, dividers */
+
+  /* Derived */
+  --background: var(--paper);
+  --foreground: var(--ink);
+  --foreground-muted: var(--slate);
+  --accent: var(--verified-teal);
+  --accent-secondary: var(--signal-amber);
+  --border: #E0DDD7;
+  --border-hover: #C8C4BC;
+  --surface-elevated: #EFECE6;
+
+  /* Radius — deliberate, not bubbly */
+  --radius-card: 6px;
+  --radius-chip: 4px;
 
   /* Animation */
-  --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast: 150ms;
+  --duration-normal: 200ms;
 }
 
-/* --- Dark Mode (OLED Black) --- */
+/* --- Dark Mode (ink/paper swap) --- */
 .dark {
-  --background: #000000;
-  --background-elevated: #121212;
-  --foreground: #FFFFFF;       /* Pure white */
-  --foreground-muted: #D4D4D4; /* Lighter gray for dark mode legibility */
-  --accent: #FFFFFF;
-  --accent-secondary: #60A5FA;
-  --border: #262626;
-  --border-hover: #525252;
+  --ink: #F0EDE7;
+  --paper: #0E1015;
+  --signal-amber: #F0B955;
+  --verified-teal: #2ECFB3;
+  --wire-red: #E05A42;
+  --slate: #8B95A5;
+
+  --background: var(--paper);
+  --foreground: var(--ink);
+  --foreground-muted: var(--slate);
+  --accent: var(--verified-teal);
+  --accent-secondary: var(--signal-amber);
+  --border: #1E2028;
+  --border-hover: #2E3040;
+  --surface-elevated: #161820;
 }
 
-/* --- Tailwind Theme Integration --- */
+/* --- Tailwind v4 Theme Integration --- */
 @theme inline {
+  --color-ink: var(--ink);
+  --color-paper: var(--paper);
+  --color-signal-amber: var(--signal-amber);
+  --color-verified-teal: var(--verified-teal);
+  --color-wire-red: var(--wire-red);
+  --color-slate: var(--slate);
   --color-background: var(--background);
-  --color-background-elevated: var(--background-elevated);
   --color-foreground: var(--foreground);
   --color-foreground-muted: var(--foreground-muted);
   --color-accent: var(--accent);
   --color-accent-secondary: var(--accent-secondary);
   --color-border: var(--border);
-  --font-sans: var(--font-inter);
-  --font-display: var(--font-inter);
+  --color-surface-elevated: var(--surface-elevated);
+
+  --font-display: var(--font-fraunces);
+  --font-body: var(--font-geist);
+  --font-mono: var(--font-ibm-plex-mono);
+
+  --radius-card: 6px;
+  --radius-chip: 4px;
 }
 
 /* --- Base Styles --- */
@@ -60,56 +91,194 @@ html {
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-sans), system-ui, sans-serif;
-  letter-spacing: -0.01em; /* Tighter body text */
+  font-family: var(--font-body), system-ui, sans-serif;
+  letter-spacing: -0.01em;
 }
 
-/* --- Typography Enhancements --- */
+/* --- V3 Typography Roles --- */
+
+/* Display: Fraunces — editorial headlines, warm serif voice */
 .font-display {
-  font-weight: 800;
-  letter-spacing: -0.04em; /* Very tight headlines like Wired */
+  font-family: var(--font-display), ui-serif, serif;
+  font-weight: 700;
+  letter-spacing: -0.03em;
 }
 
-/* --- Image Container --- */
-.image-container {
-  overflow: hidden;
-  position: relative;
+/* Mono: IBM Plex Mono — timestamps, source counts, "machine-verified fact" */
+.font-data {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.8125rem;
+  letter-spacing: 0.01em;
+}
+
+/* --- Fluid Type Scale --- */
+.text-display-xl {
+  font-size: clamp(2.25rem, 4vw + 1rem, 3.5rem);
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+
+.text-display-md {
+  font-size: clamp(1.5rem, 2vw + 1rem, 2.25rem);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.text-body-lg {
+  font-size: 1.125rem;
+  line-height: 1.7;
+}
+
+.text-body-md {
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+.text-caption {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  letter-spacing: 0.01em;
 }
 
 /* --- Selection Color --- */
 ::selection {
-  background: var(--accent);
-  color: var(--background);
+  background: var(--verified-teal);
+  color: var(--paper);
 }
 
-/* --- Article Prose Overrides (Force High Contrast) --- */
-/* Light Mode: Force Dark Gray (#1a1a1a) for comfortable reading */
+/* --- Focus Ring (Accessibility — V3 spec §9) --- */
+:focus-visible {
+  outline: 2px solid var(--verified-teal);
+  outline-offset: 2px;
+}
+
+/* --- Corroboration Meter Segments --- */
+.meter-segment {
+  width: 4px;
+  height: 14px;
+  border-radius: 1px;
+  transition: background-color var(--duration-normal) var(--ease-out),
+              transform var(--duration-fast) var(--ease-out);
+}
+
+.meter-segment.filled.developing {
+  background-color: var(--signal-amber);
+}
+
+.meter-segment.filled.corroborated {
+  background-color: var(--verified-teal);
+}
+
+.meter-segment.empty {
+  background-color: var(--border);
+}
+
+/* Meter pulse animation — only on corroboration increment */
+@keyframes meter-pulse {
+  0%, 100% { transform: scaleY(1); }
+  50% { transform: scaleY(1.3); }
+}
+
+/* --- Fanned Stack Shadows --- */
+.fanned-stack {
+  position: relative;
+}
+
+.fanned-stack::before,
+.fanned-stack::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border);
+  background: var(--background);
+  z-index: -1;
+  transition: transform var(--duration-normal) var(--ease-out);
+}
+
+.fanned-stack::before {
+  transform: rotate(1.5deg) translateY(4px) translateX(3px);
+  opacity: 0.5;
+}
+
+.fanned-stack::after {
+  transform: rotate(0.75deg) translateY(2px) translateX(1.5px);
+  opacity: 0.7;
+}
+
+/* --- Breaking Ticker --- */
+.ticker-bar {
+  border-left: 4px solid var(--wire-red);
+  background: color-mix(in srgb, var(--wire-red) 8%, var(--background));
+}
+
+/* --- Prose Overrides (Article Excerpts) --- */
 .prose p,
 .prose div p,
 .prose li,
 .prose span,
 .prose strong,
 .prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
-  color: #1a1a1a !important;
+  color: var(--foreground) !important;
 }
 
 .prose a {
-  color: var(--accent-secondary) !important;
+  color: var(--verified-teal) !important;
 }
 
-/* Dark Mode: Restore appropriate colors */
 .dark .prose p,
 .dark .prose div p,
 .dark .prose li,
 .dark .prose span {
-  color: #D4D4D4 !important; /* --foreground-muted for dark */
+  color: var(--foreground-muted) !important;
 }
 
 .dark .prose strong,
 .dark .prose h1, .dark .prose h2, .dark .prose h3, .dark .prose h4, .dark .prose h5, .dark .prose h6 {
-  color: #FFFFFF !important;
+  color: var(--foreground) !important;
 }
 
 .dark .prose a {
-  color: var(--accent-secondary) !important;
+  color: var(--verified-teal) !important;
+}
+
+/* --- Motion: prefers-reduced-motion --- */
+@media (prefers-reduced-motion: reduce) {
+  .fanned-stack::before,
+  .fanned-stack::after {
+    transform: none;
+    opacity: 0;
+  }
+
+  .meter-segment {
+    transition: none;
+  }
+
+  /* Layout Utility: Custom Scrollbar Hiding */
+  .pb-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .pb-scrollbar {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+  }
+
+  .ticker-bar {
+    animation: none;
+  }
+
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* --- Layout Utility: Custom Scrollbar Hiding --- */
+.pb-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.pb-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
 }

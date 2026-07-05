@@ -1,81 +1,125 @@
 import uuid
 import logging
+
 from celery import shared_task
+from django.db import transaction, IntegrityError
+from django.utils import timezone
 from django.utils.text import slugify
-from core.models import Source, Article, Category
+from django.core.cache import cache
+
+from core.models import Source, Article, RawDocument
 from core.services.scraper import ScraperService
+from core.categorization import assign_categories_to_article
+from core.clustering import cluster_article
 
 logger = logging.getLogger(__name__)
 
-# Keyword mappings for auto-categorization
-CATEGORY_KEYWORDS = {
-    'tech': ['tech', 'software', 'hardware', 'ai', 'artificial intelligence', 'computer', 'startup', 'google', 'apple', 'microsoft', 'amazon', 'meta', 'coding', 'programming', 'developer', 'app', 'robot', 'machine learning', 'data', 'cyber', 'internet', 'digital', 'gadget', 'smartphone', 'iphone', 'android'],
-    'politics': ['politics', 'government', 'election', 'congress', 'senate', 'president', 'democrat', 'republican', 'vote', 'policy', 'legislation', 'white house', 'parliament', 'minister', 'law', 'bill', 'campaign'],
-    'business': ['business', 'economy', 'market', 'stock', 'finance', 'investment', 'bank', 'startup', 'ceo', 'company', 'earnings', 'revenue', 'profit', 'merger', 'acquisition', 'ipo', 'wall street', 'trade', 'entrepreneur'],
-    'entertainment': ['entertainment', 'movie', 'film', 'music', 'celebrity', 'actor', 'singer', 'hollywood', 'streaming', 'netflix', 'disney', 'concert', 'album', 'tv show', 'series', 'award', 'grammy', 'oscar', 'emmys'],
-    'science': ['science', 'research', 'study', 'scientist', 'discovery', 'space', 'nasa', 'climate', 'environment', 'biology', 'physics', 'chemistry', 'medical', 'health', 'vaccine', 'experiment', 'journal'],
-    'art': ['art', 'artist', 'museum', 'gallery', 'painting', 'sculpture', 'exhibition', 'design', 'creative', 'culture', 'photography', 'architecture'],
-}
-
-def assign_categories(article, title: str, content: str):
-    """
-    Automatically assign categories to an article based on keyword matching.
-    """
-    text = f"{title} {content}".lower()
-    matched_slugs = []
-    
-    for slug, keywords in CATEGORY_KEYWORDS.items():
-        for keyword in keywords:
-            if keyword in text:
-                matched_slugs.append(slug)
-                break  # One match per category is enough
-    
-    if matched_slugs:
-        categories = Category.objects.filter(slug__in=matched_slugs)
-        if categories.exists():
-            article.categories.set(categories)
-            logger.info(f"Assigned categories {list(categories.values_list('slug', flat=True))} to article: {title[:50]}")
 
 @shared_task
 def scrape_all_sources():
     """
-    Background task to scrape all configured news sources.
+    Background task to scrape all active news sources.
+    Each source is processed independently — one source's failure
+    doesn't affect others.
     """
     logger.info("Starting background scraping task...")
-    sources = Source.objects.all()
+    sources = Source.objects.filter(is_active=True)
     service = ScraperService()
-    
+
     total_new = 0
-    
+
     for source in sources:
-        logger.info(f"Scraping {source.name}...")
+        logger.info("Scraping %s...", source.name)
         try:
             articles_data = service.scrape_source(source)
             count = 0
+
             for data in articles_data:
-                if not Article.objects.filter(url=data['url']).exists():
-                    slug = slugify(data['title'])
-                    if Article.objects.filter(slug=slug).exists():
-                         slug = f"{slug}-{uuid.uuid4().hex[:6]}"
-                    
-                    article = Article.objects.create(
-                        source=source,
-                        title=data['title'],
-                        url=data['url'],
-                        content=data['content'],
-                        published_date=data['published_date'],
-                        image_url=data.get('image_url'),  # FIX: Save image_url
-                        slug=slug
-                    )
-                    
-                    # Auto-assign categories based on content
-                    assign_categories(article, data['title'], data['content'])
-                    
-                    count += 1
-            logger.info(f"Saved {count} new articles for {source.name}")
+                try:
+                    # Atomic: check + create to prevent TOCTOU race condition
+                    with transaction.atomic():
+                        if Article.objects.filter(url=data['url']).exists():
+                            continue
+
+                        # Handle slug collision
+                        slug = slugify(data['title'])
+                        if not slug:
+                            slug = f"article-{uuid.uuid4().hex[:8]}"
+                        if Article.objects.filter(slug=slug).exists():
+                            slug = f"{slug}-{uuid.uuid4().hex[:6]}"
+
+                        article = Article.objects.create(
+                            source=source,
+                            title=data['title'],
+                            url=data['url'],
+                            content=data['content'],
+                            excerpt=data.get('excerpt', ''),
+                            content_hash=data.get('content_hash', ''),
+                            published_date=data['published_date'],
+                            image_url=data.get('image_url'),
+                            slug=slug,
+                        )
+
+                        # Store full content in RawDocument (internal only)
+                        RawDocument.objects.create(
+                            source=source,
+                            article=article,
+                            url=data['url'],
+                            raw_content=data['content'],
+                        )
+
+                        # Auto-assign categories
+                        assign_categories_to_article(
+                            article, data['title'], data['content']
+                        )
+
+                        # Cluster into Story
+                        cluster_article(article)
+
+                        count += 1
+
+                except IntegrityError:
+                    # Another worker already created this article — skip
+                    logger.debug("Duplicate article skipped: %s", data['url'][:80])
+                    continue
+
+            # Update source health tracking
+            source.last_fetched_at = timezone.now()
+            source.consecutive_failures = 0
+            source.save(update_fields=['last_fetched_at', 'consecutive_failures'])
+
+            logger.info("Saved %d new articles for %s", count, source.name)
             total_new += count
+
         except Exception as e:
-            logger.error(f"Failed to scrape {source.name}: {str(e)}")
-            
-    logger.info(f"Scraping complete. Total new articles: {total_new}")
+            # Track consecutive failures for circuit-breaker-style monitoring
+            source.consecutive_failures += 1
+            source.save(update_fields=['consecutive_failures'])
+            logger.error("Failed to scrape %s (failure #%d): %s",
+                         source.name, source.consecutive_failures, e)
+
+    logger.info("Scraping complete. Total new articles: %d", total_new)
+    
+    # Mark ingest as successful for health checks
+    cache.set("last_successful_ingest_at", timezone.now(), timeout=None)
+    
+    # Simple velocity_score update for all active stories
+    from core.models import Story
+    active_stories = Story.objects.filter(status=Story.Status.DEVELOPING)
+    for story in active_stories:
+        # Simple velocity: source_count / hours_since_first_seen
+        hours = (timezone.now() - story.first_seen_at).total_seconds() / 3600
+        if hours > 0:
+            story.velocity_score = story.source_count / hours
+        else:
+            story.velocity_score = story.source_count
+        story.save(update_fields=['velocity_score'])
+        
     return f"Scraped {total_new} articles"
+
+@shared_task
+def compute_trust_metrics():
+    """Nightly task to update source trust and corroboration metrics."""
+    from core.trust import compute_trust_graph
+    compute_trust_graph()
+    return "Trust metrics updated"

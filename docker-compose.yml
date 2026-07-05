@@ -1,82 +1,107 @@
 services:
   db:
-    image: postgres:15-alpine
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: ultranews
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    environment:
-      - POSTGRES_DB=ultranews
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-    ports:
-      - "5432:5432"
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
-      interval: 5s
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
       timeout: 5s
       retries: 5
 
   redis:
     image: redis:7-alpine
-    restart: always
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   backend:
-    build: ./backend
-    command: /bin/bash -c "if [ ! -f manage.py ]; then django-admin startproject config .; fi && python manage.py migrate && uvicorn config.asgi:application --host 0.0.0.0 --port 8000 --reload"
+    build:
+      context: ./backend
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py runserver 0.0.0.0:8000"
     volumes:
       - ./backend:/app
     ports:
       - "8000:8000"
-    environment:
-      - DATABASE_URL=postgres://postgres:postgres@db:5432/ultranews
-      - DEBUG=1
-      - SECRET_KEY=insecure-dev-key-change-in-prod
-      - REDIS_URL=redis://redis:6379/1
     depends_on:
       db:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
+    environment:
+      - SECRET_KEY=insecure-dev-key-change-in-prod
+      - DEBUG=1
+      - ALLOWED_HOSTS=localhost,127.0.0.1,backend
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/ultranews
+      - REDIS_URL=redis://redis:6379/1
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - FRONTEND_URL=http://localhost:3000
+      - ADMIN_API_KEY=dev-admin-key-change-in-prod
 
   worker:
-    build: ./backend
-    command: celery -A config worker --loglevel=info
+    build:
+      context: ./backend
+    command: celery -A config worker -l info --concurrency=2
     volumes:
       - ./backend:/app
     depends_on:
-      - redis
-      - db
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
-      - DATABASE_URL=postgres://postgres:postgres@db:5432/ultranews
-      - REDIS_URL=redis://redis:6379/1
       - SECRET_KEY=insecure-dev-key-change-in-prod
+      - DEBUG=1
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/ultranews
+      - REDIS_URL=redis://redis:6379/1
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - ADMIN_API_KEY=dev-admin-key-change-in-prod
 
   beat:
-    build: ./backend
-    command: celery -A config beat --loglevel=info
+    build:
+      context: ./backend
+    command: celery -A config beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
     volumes:
       - ./backend:/app
     depends_on:
-      - redis
-      - db
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
-      - DATABASE_URL=postgres://postgres:postgres@db:5432/ultranews
-      - REDIS_URL=redis://redis:6379/1
       - SECRET_KEY=insecure-dev-key-change-in-prod
+      - DEBUG=1
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/ultranews
+      - REDIS_URL=redis://redis:6379/1
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - ADMIN_API_KEY=dev-admin-key-change-in-prod
 
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile
     volumes:
       - ./frontend:/app
       - /app/node_modules
     ports:
       - "3000:3000"
+    depends_on:
+      - backend
     environment:
-      - NODE_ENV=development
-    tty: true
+      - NEXT_PUBLIC_API_URL=http://backend:8000
+      - NEXT_PUBLIC_APP_URL=http://localhost:3000
 
 volumes:
   postgres_data:

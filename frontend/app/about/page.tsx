@@ -51,7 +51,7 @@ export default function AboutPage() {
                             </p>
                         </div>
                     </div>
-                    <div className="bg-[var(--background-elevated)] p-8 rounded-lg border border-[var(--border)]">
+                    <div className="bg-[var(--surface-elevated)] p-8 rounded-lg border border-[var(--border)]">
                         <h3 className="text-sm font-bold uppercase tracking-widest mb-4">The Evolution</h3>
                         <ul className="space-y-4 text-sm font-mono">
                             <li className="flex gap-4">
@@ -63,13 +63,17 @@ export default function AboutPage() {
                                 <span>Migration to simple Python scripts</span>
                             </li>
                             <li className="flex gap-4">
-                                <span className="text-[var(--accent)] font-bold">2024</span>
-                                <span><strong>Ultra News V2 (Production)</strong></span>
+                                <span className="text-[var(--foreground-muted)]">2024</span>
+                                <span>Ultra News V2 (Production)</span>
                             </li>
-                            <li className="pl-[3.5rem] opacity-70 border-l border-[var(--border)] ml-1">Next.js App Router (Frontend)</li>
-                            <li className="pl-[3.5rem] opacity-70 border-l border-[var(--border)] ml-1">Django Ninja API (Backend)</li>
-                            <li className="pl-[3.5rem] opacity-70 border-l border-[var(--border)] ml-1">PostgreSQL + Vector Search</li>
-                            <li className="pl-[3.5rem] opacity-70 border-l border-[var(--border)] ml-1">Redis Caching & Queues</li>
+                            <li className="flex gap-4">
+                                <span className="text-[var(--accent)] font-bold">2025</span>
+                                <span><strong>Ultra News V3 — The Wire Room</strong></span>
+                            </li>
+                            <li className="pl-[3.5rem] opacity-70 border-l border-[var(--border)] ml-1">Story Clusters + Corroboration System</li>
+                            <li className="pl-[3.5rem] opacity-70 border-l border-[var(--border)] ml-1">Next.js 16 + Django Ninja API</li>
+                            <li className="pl-[3.5rem] opacity-70 border-l border-[var(--border)] ml-1">Excerpt-Only + Outbound Links</li>
+                            <li className="pl-[3.5rem] opacity-70 border-l border-[var(--border)] ml-1">Structured Logging + HTML Sanitization</li>
                         </ul>
                     </div>
                 </section>

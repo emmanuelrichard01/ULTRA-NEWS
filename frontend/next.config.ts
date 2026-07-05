@@ -1,7 +1,12 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  images: {
+    remotePatterns: [
+      // Allow images from common news sources
+      { protocol: "https", hostname: "**" },
+    ],
+  },
 };
 
 export default nextConfig;

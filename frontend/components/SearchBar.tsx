@@ -1,108 +1,59 @@
-'use client';
+"use client";
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 export default function SearchBar() {
     const [query, setQuery] = useState('');
     const [isFocused, setIsFocused] = useState(false);
-    const [isSearching, setIsSearching] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
     const router = useRouter();
     const searchParams = useSearchParams();
 
-    // Sync input with URL on mount (so refreshing preserves search)
+    // Initialize from URL
     useEffect(() => {
-        const urlQuery = searchParams.get('q');
-        if (urlQuery) {
-            setQuery(urlQuery);
-        }
+        const q = searchParams.get('q');
+        if (q) setQuery(q);
     }, [searchParams]);
 
-    const handleSearch = useCallback((e: React.FormEvent) => {
-        e.preventDefault();
-        if (query.trim()) {
-            setIsSearching(true);
-            router.push(`/?q=${encodeURIComponent(query.trim())}`);
-            inputRef.current?.blur();
-            // Reset loading state after navigation
-            setTimeout(() => setIsSearching(false), 500);
-        }
-    }, [query, router]);
-
-    const handleClear = useCallback(() => {
-        setQuery('');
-        router.push('/');
-        inputRef.current?.focus();
-    }, [router]);
-
-    // Keyboard shortcuts
+    // ⌘K shortcut
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            // Cmd/Ctrl + K to focus
             if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
                 e.preventDefault();
                 inputRef.current?.focus();
             }
-            // Escape to clear and blur
-            if (e.key === 'Escape' && document.activeElement === inputRef.current) {
-                e.preventDefault();
-                if (query) {
-                    setQuery('');
-                } else {
-                    inputRef.current?.blur();
-                }
+            if (e.key === 'Escape') {
+                inputRef.current?.blur();
+                setIsFocused(false);
             }
         };
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [query]);
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, []);
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (query.trim()) {
+            router.push(`/?q=${encodeURIComponent(query.trim())}`);
+        } else {
+            router.push('/');
+        }
+    };
 
     return (
-        <form onSubmit={handleSearch} className="relative w-full max-w-lg group">
-            <div className={`
-                flex items-center gap-3 py-3 px-0
-                bg-transparent
-                border-b-2
-                rounded-none
-                transition-colors duration-300 ease-out
-                ${isFocused
-                    ? 'border-[var(--accent)]'
-                    : 'border-[var(--border)] hover:border-[var(--foreground-muted)]'
-                }
-            `}>
-                {/* Search Icon / Loading Spinner */}
-                <button
-                    type="submit"
-                    className="focus:outline-none focus:ring-0 cursor-pointer flex-shrink-0"
-                    aria-label="Search"
-                    disabled={isSearching}
-                >
-                    {isSearching ? (
-                        <svg
-                            className="w-5 h-5 animate-spin text-[var(--accent-secondary)]"
-                            xmlns="http://www.w3.org/2000/svg"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                        >
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                    ) : (
-                        <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            strokeWidth={2}
-                            stroke="currentColor"
-                            className={`w-5 h-5 transition-colors ${isFocused ? 'text-[var(--accent-secondary)]' : 'text-[var(--foreground-muted)] group-hover:text-[var(--foreground)]'}`}
-                        >
-                            <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
-                        </svg>
-                    )}
-                </button>
+        <form onSubmit={handleSubmit} className="relative w-full max-w-sm">
+            <div className={`flex items-center gap-2 px-3 py-2 border rounded-[var(--radius-card)] transition-all duration-200 ${
+                isFocused
+                    ? 'border-[var(--verified-teal)] bg-[var(--background)] shadow-sm shadow-[var(--verified-teal)]/10'
+                    : 'border-[var(--border)] bg-[var(--surface-elevated)] hover:border-[var(--border-hover)]'
+            }`}>
+                {/* Search icon */}
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--foreground-muted)] flex-shrink-0">
+                    <circle cx="11" cy="11" r="8" />
+                    <path d="m21 21-4.3-4.3" />
+                </svg>
 
-                {/* Input Field */}
                 <input
                     ref={inputRef}
                     type="text"
@@ -110,35 +61,29 @@ export default function SearchBar() {
                     onChange={(e) => setQuery(e.target.value)}
                     onFocus={() => setIsFocused(true)}
                     onBlur={() => setIsFocused(false)}
-                    placeholder="Search articles..."
-                    className="
-                        flex-1 min-w-0
-                        bg-transparent border-none 
-                        text-[var(--foreground)] text-[15px] font-medium leading-relaxed
-                        placeholder-[var(--foreground-muted)]
-                        focus:outline-none
-                    "
+                    placeholder="Search stories..."
+                    maxLength={200}
+                    className="w-full bg-transparent text-sm text-[var(--foreground)] placeholder:text-[var(--foreground-muted)] focus:outline-none"
+                    aria-label="Search stories"
                 />
 
-                {/* Clear Button (when query exists) */}
+                {/* Keyboard shortcut hint */}
+                {!isFocused && !query && (
+                    <span className="hidden sm:flex items-center gap-0.5 font-data text-[10px] text-[var(--foreground-muted)] bg-[var(--background)] border border-[var(--border)] px-1.5 py-0.5 rounded flex-shrink-0">
+                        ⌘K
+                    </span>
+                )}
+
+                {/* Clear button */}
                 {query && (
                     <button
                         type="button"
-                        onClick={handleClear}
-                        className="flex-shrink-0 p-1 rounded-full text-[var(--foreground-muted)] hover:text-[var(--foreground)] hover:bg-[var(--border)] transition-colors"
+                        onClick={() => { setQuery(''); router.push('/'); }}
+                        className="p-0.5 text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-colors flex-shrink-0"
                         aria-label="Clear search"
                     >
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                        </svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
                     </button>
-                )}
-
-                {/* Keyboard Shortcut Hint */}
-                {!query && !isFocused && (
-                    <div className="hidden sm:flex items-center gap-1 flex-shrink-0">
-                        <kbd className="px-2 py-1 text-[10px] font-bold text-[var(--foreground-muted)] bg-[var(--background-elevated)] border border-[var(--border)] rounded-md shadow-sm">⌘K</kbd>
-                    </div>
                 )}
             </div>
         </form>

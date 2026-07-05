@@ -1,6 +1,5 @@
 import StoryCard from '@/components/StoryCard';
 import SearchBar from '@/components/SearchBar';
-import VelocityLeaderboard from '@/components/VelocityLeaderboard';
 
 interface StoryDetail {
   id: number;
@@ -30,6 +29,7 @@ async function getStories(query?: string, cursor?: string): Promise<PaginatedRes
   if (query) params.set('q', query);
   if (cursor) params.set('cursor', cursor);
   params.set('limit', limit.toString());
+  params.set('status', 'developing'); // Filter to developing stories
 
   const endpoint = `/api/v1/stories?${params.toString()}`;
 
@@ -46,11 +46,11 @@ async function getStories(query?: string, cursor?: string): Promise<PaginatedRes
   }
 }
 
-interface HomeProps {
+interface PageProps {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }
 
-export default async function Home({ searchParams }: HomeProps) {
+export default async function DevelopingPage({ searchParams }: PageProps) {
   const resolvedSearchParams = await searchParams;
   const q = typeof resolvedSearchParams.q === 'string' ? resolvedSearchParams.q : undefined;
   const cursor = typeof resolvedSearchParams.cursor === 'string' ? resolvedSearchParams.cursor : undefined;
@@ -59,32 +59,28 @@ export default async function Home({ searchParams }: HomeProps) {
   const stories = data.items;
   const totalCount = data.count;
 
-  // Layout: first story as hero, rest as standard cards
-  const heroStory = !cursor && stories.length > 0 ? stories[0] : null;
-  const feedStories = heroStory ? stories.slice(1) : stories;
-
   return (
     <div className="max-w-4xl mx-auto space-y-10">
-      {/* Wire Room Header */}
-      <header className="border-b-2 border-[var(--foreground)] pb-6 mb-6">
+      {/* Header */}
+      <header className="border-b-2 border-[var(--signal-amber)] pb-6 mb-6">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div>
             <div className="flex items-center gap-3 mb-2">
               <h1 className="text-display-xl font-display text-[var(--foreground)] uppercase">
-                The Wire
+                Developing
               </h1>
               {totalCount > 0 && (
                 <span className="hidden sm:inline-flex items-center gap-2 px-3 py-1 font-data text-[10px] font-bold uppercase tracking-widest text-[var(--foreground-muted)] border border-[var(--border)] rounded-[var(--radius-chip)] bg-[var(--background)]">
                   <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--verified-teal)] opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-[var(--verified-teal)]"></span>
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--signal-amber)] opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-[var(--signal-amber)]"></span>
                   </span>
-                  {totalCount.toLocaleString()} stories
+                  {totalCount.toLocaleString()} developing
                 </span>
               )}
             </div>
             <p className="text-body-md text-[var(--foreground-muted)] max-w-xl">
-              Multi-source intelligence, triangulated and verified.
+              High-velocity stories with 1-2 sources. Uncorroborated but breaking fast.
             </p>
           </div>
           <div className="w-full md:w-auto">
@@ -97,68 +93,38 @@ export default async function Home({ searchParams }: HomeProps) {
       {stories.length === 0 ? (
         <div className="py-20 text-center border-t border-[var(--border)]">
           <p className="font-data text-[var(--foreground-muted)]">
-            {q ? `No results for "${q}"` : "System Offline. Connecting..."}
+            {q ? `No developing stories found for "${q}"` : "No developing stories currently."}
           </p>
         </div>
       ) : (
         <div>
-          {/* Hero Story (first visit only, not on pagination) */}
-          {heroStory && (
-            <section className="mb-12">
-              <StoryCard
-                title={heroStory.title}
-                slug={heroStory.slug}
-                imageUrl={heroStory.image_url}
-                excerpt={heroStory.summary}
-                publishedDate={heroStory.first_seen_at}
-                sourceCount={heroStory.source_count}
-                status={heroStory.status}
-                sources={heroStory.sources}
-                categories={heroStory.categories}
-                storySlug={heroStory.slug}
-                variant="hero"
-              />
-            </section>
-          )}
-
-          {/* Velocity Leaderboard (Top trending stories) */}
-          {!cursor && (
-            <VelocityLeaderboard stories={stories as any} />
-          )}
-
           {/* Feed */}
-          {feedStories.length > 0 && (
-            <section>
-              <h2 className="font-data text-[10px] font-bold uppercase tracking-widest text-[var(--foreground-muted)] mb-4 border-b border-[var(--border)] pb-2 flex justify-between items-end">
-                <span>Latest Wire</span>
-                <span className="font-normal opacity-60">Sorted by Trending Velocity</span>
-              </h2>
-              <div className="flex flex-col">
-                {feedStories.map((story) => (
-                  <StoryCard
-                    key={story.slug}
-                    title={story.title}
-                    slug={story.slug}
-                    imageUrl={story.image_url}
-                    excerpt={story.summary}
-                    publishedDate={story.first_seen_at}
-                    sourceCount={story.source_count}
-                    status={story.status}
-                    sources={story.sources}
-                    categories={story.categories}
-                    storySlug={story.slug}
-                    variant="standard"
-                  />
-                ))}
-              </div>
-            </section>
-          )}
+          <section>
+            <div className="flex flex-col">
+              {stories.map((story) => (
+                <StoryCard
+                  key={story.slug}
+                  title={story.title}
+                  slug={story.slug}
+                  imageUrl={story.image_url}
+                  excerpt={story.summary}
+                  publishedDate={story.first_seen_at}
+                  sourceCount={story.source_count}
+                  status={story.status}
+                  sources={story.sources}
+                  categories={story.categories}
+                  storySlug={story.slug}
+                  variant="standard"
+                />
+              ))}
+            </div>
+          </section>
 
           {/* Cursor Pagination */}
           {data.next_cursor && (
             <div className="flex justify-center pt-8 border-t border-[var(--border)] mt-8">
               <a
-                href={`/?cursor=${data.next_cursor}${q ? `&q=${encodeURIComponent(q)}` : ''}`}
+                href={`/developing?cursor=${data.next_cursor}${q ? `&q=${encodeURIComponent(q)}` : ''}`}
                 className="inline-flex items-center gap-2 px-6 py-3 font-data text-sm font-semibold text-[var(--foreground)] border border-[var(--border)] rounded-[var(--radius-card)] hover:bg-[var(--surface-elevated)] transition-colors duration-150"
               >
                 Load more stories

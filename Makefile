@@ -1,96 +1,73 @@
-.PHONY: help build up down restart logs logs-frontend logs-all migrate makemigrations shell seed ingest assign-categories test clean
+.DEFAULT_GOAL := help
+.PHONY: help setup up down logs build seed migrate test lint shell ingest clean
 
-# Default target
-help:
-	@echo "======================================================================"
-	@echo "                   ULTRA-NEWS V2 - Make Commands"
-	@echo "======================================================================"
-	@echo ""
-	@echo "  Development:"
-	@echo "    make setup           Full initialization (build, up, migrate, seeds)"
-	@echo "    make up              Build and start all services (detached)"
-	@echo "    make down            Stop and remove all containers"
-	@echo "    make restart         Restart backend service"
-	@echo "    make logs            Stream backend logs"
-	@echo "    make logs-frontend   Stream frontend logs"
-	@echo "    make logs-all        Stream all service logs"
-	@echo ""
-	@echo "  Database:"
-	@echo "    make migrate         Run Django migrations"
-	@echo "    make makemigrations  Create new migration files"
-	@echo "    make seed            Seed categories (Tech, Politics, etc.)"
-	@echo "    make seed-sources    Seed news sources (Wired, Verge, etc.)"
-	@echo "    make shell           Open Django shell"
-	@echo ""
-	@echo "  Content:"
-	@echo "    make ingest             Trigger news ingestion task"
-	@echo "    make assign-categories  Assign categories to existing articles"
-	@echo ""
-	@echo "  Maintenance:"
-	@echo "    make build           Rebuild all Docker images"
-	@echo "    make test            Run backend tests"
-	@echo "    make clean           Stop and remove everything (incl. volumes)"
-	@echo ""
-	@echo "======================================================================"
+# ============================================================================
+# ULTRA-NEWS V3 — Developer Commands
+# ============================================================================
 
-setup:
-	@echo "🚀 Starting Ultra News setup..."
+help: ## Show this help
+	@echo ""
+	@echo "  ULTRA-NEWS V3 — Developer Commands"
+	@echo "  ─────────────────────────────────────"
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
+	@echo ""
+
+# --- Setup & Lifecycle ---
+
+setup: build up migrate seed ## Full setup: build, start, migrate, seed
+	@echo "✅ ULTRA-NEWS V3 is ready!"
+	@echo "   Frontend: http://localhost:3000"
+	@echo "   API Docs: http://localhost:8000/api/v1/docs"
+
+build: ## Build all containers
 	docker compose build
+
+up: ## Start all services
 	docker compose up -d
-	@echo "⏳ Waiting for database..."
-	sleep 5
-	docker compose exec backend python manage.py migrate
-	docker compose exec -T backend python manage.py shell < backend/seed_categories.py
-	docker compose exec -T backend python seed_sources.py
-	docker compose exec backend python manage.py ingest_news
-	docker compose exec -T backend python manage.py shell < backend/assign_categories.py
-	@echo "✅ Setup complete! Frontend running at http://localhost:3000"
 
-build:
-	docker compose build
-
-up:
-	docker compose up -d --build
-
-down:
+down: ## Stop all services
 	docker compose down
 
-restart:
-	docker compose restart backend
+clean: ## Stop all services and remove volumes (⚠️ deletes data)
+	docker compose down -v
 
-logs:
-	docker compose logs -f backend
-
-logs-frontend:
-	docker compose logs -f frontend
-
-logs-all:
+logs: ## Tail logs for all services
 	docker compose logs -f
 
-migrate:
-	docker compose exec backend python manage.py migrate
+logs-backend: ## Tail backend logs only
+	docker compose logs -f backend
 
-makemigrations:
-	docker compose exec backend python manage.py makemigrations
+logs-worker: ## Tail worker logs only
+	docker compose logs -f worker
 
-shell:
+# --- Database ---
+
+migrate: ## Run Django migrations
+	docker compose exec backend python manage.py migrate --noinput
+
+seed: ## Seed the database with initial Categories and Sources
+	docker compose exec backend python seed_sources.py
+
+shell: ## Open Django shell
 	docker compose exec backend python manage.py shell
 
-seed:
-	docker compose exec -T backend python manage.py shell < backend/seed_categories.py
+# --- Development ---
 
-ingest:
+ingest: ## Trigger news ingestion via Celery
 	docker compose exec backend python manage.py ingest_news
 
-assign-categories:
-	docker compose exec -T backend python manage.py shell < backend/assign_categories.py
+lint: ## Run linters (ruff for Python, tsc for TypeScript)
+	docker compose exec backend ruff check .
+	cd frontend && npx tsc --noEmit
 
-seed-sources:
-	docker compose exec -T backend python seed_sources.py
+test: ## Run tests
+	docker compose exec backend pytest -v
+	cd frontend && npm test 2>/dev/null || echo "No frontend tests configured yet."
 
-test:
-	docker compose exec backend pytest
+# --- Frontend ---
 
-clean:
-	docker compose down -v
-	@echo "⚠️  All volumes removed. Run 'make migrate && make seed' after restart."
+frontend-dev: ## Run frontend dev server locally (outside Docker)
+	cd frontend && npm run dev
+
+frontend-build: ## Build frontend for production
+	cd frontend && npm run build

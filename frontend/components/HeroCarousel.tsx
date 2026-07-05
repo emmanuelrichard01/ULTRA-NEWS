@@ -1,144 +1,146 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import Link from "next/link";
-import { formatDistanceToNow } from "date-fns";
+import { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
+import CorroborationMeter from './CorroborationMeter';
+import CategoryPill from './CategoryPill';
+import { formatDistanceToNow } from 'date-fns';
 
-interface HeroArticle {
-    title: string;
-    slug: string;
-    url: string;
-    image_url?: string;
-    published_date: string;
-    source: { name: string };
-    category?: string;
-    summary?: string;
+interface CarouselArticle {
+  title: string;
+  slug: string;
+  image_url?: string;
+  excerpt?: string;
+  published_date: string;
+  source: { name: string };
+  story_slug?: string;
+  story_source_count?: number;
+  story_status?: string;
+  categories?: string[];
 }
 
 interface HeroCarouselProps {
-    articles: HeroArticle[];
+  articles: CarouselArticle[];
 }
 
 export default function HeroCarousel({ articles }: HeroCarouselProps) {
-    const [currentIndex, setCurrentIndex] = useState(0);
-    const [isPaused, setIsPaused] = useState(false);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isAutoPlaying, setIsAutoPlaying] = useState(true);
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
-    const nextSlide = useCallback(() => {
-        setCurrentIndex((prev) => (prev + 1) % articles.length);
-    }, [articles.length]);
+  const goToSlide = useCallback((index: number) => {
+    if (isTransitioning) return;
+    setIsTransitioning(true);
+    setTimeout(() => {
+      setCurrentIndex(index);
+      setTimeout(() => setIsTransitioning(false), 100);
+    }, 300);
+  }, [isTransitioning]);
 
-    const prevSlide = () => {
-        setCurrentIndex((prev) => (prev - 1 + articles.length) % articles.length);
-    };
+  const goToNext = useCallback(() => {
+    goToSlide((currentIndex + 1) % articles.length);
+  }, [currentIndex, articles.length, goToSlide]);
 
-    useEffect(() => {
-        if (isPaused) return;
-        const interval = setInterval(nextSlide, 6000); // 6 seconds per slide
-        return () => clearInterval(interval);
-    }, [isPaused, nextSlide]);
+  // Auto-play
+  useEffect(() => {
+    if (!isAutoPlaying || articles.length <= 1) return;
+    const timer = setInterval(goToNext, 6000);
+    return () => clearInterval(timer);
+  }, [isAutoPlaying, goToNext, articles.length]);
 
-    if (!articles.length) return null;
+  if (articles.length === 0) return null;
 
-    const currentArticle = articles[currentIndex];
+  const article = articles[currentIndex];
+  const dateObj = new Date(article.published_date);
+  const link = article.story_slug ? `/story/${article.story_slug}` : `/article/${article.slug}`;
+  const sourceCount = article.story_source_count || 1;
 
-    return (
-        <div
-            className="relative group mb-16"
-            onMouseEnter={() => setIsPaused(true)}
-            onMouseLeave={() => setIsPaused(false)}
-        >
-            {/* Main Feature Container */}
-            <div className="relative aspect-[16/9] sm:aspect-[2/1] lg:aspect-[21/9] w-full overflow-hidden rounded-[2px] bg-[var(--background-elevated)]">
-                {/* Images - Stacked for crossfade */}
-                {articles.map((article, idx) => (
-                    <div
-                        key={`${article.slug}-${idx}`}
-                        className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${idx === currentIndex ? "opacity-100 z-10" : "opacity-0 z-0"
-                            }`}
-                    >
-                        {article.image_url ? (
-                            <img
-                                src={article.image_url}
-                                alt={article.title}
-                                className="absolute inset-0 w-full h-full object-cover"
-                            />
-                        ) : (
-                            <div className="absolute inset-0 bg-[var(--background-elevated)] flex items-center justify-center">
-                                <span className="text-[var(--border)] text-9xl font-display font-black opacity-10">
-                                    {article.source.name.charAt(0)}
-                                </span>
-                            </div>
-                        )}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent" />
-                    </div>
-                ))}
-
-                {/* Content Overlay */}
-                <div className="absolute inset-0 z-20 flex flex-col justify-end p-6 sm:p-10 lg:p-12">
-                    <div className="max-w-4xl transition-all duration-500 transform translate-y-0">
-                        {/* Meta */}
-                        <div className="flex items-center gap-3 mb-3 text-white">
-                            <span className="text-[10px] font-bold tracking-widest uppercase bg-[var(--accent-secondary)] text-white px-2 py-1 rounded-sm shadow-sm">
-                                Editor's Choice
-                            </span>
-                            <span className="w-1 h-1 bg-white/50 rounded-full" />
-                            <span className="text-xs font-bold tracking-widest uppercase text-white/90">
-                                {currentArticle.source.name}
-                            </span>
-                            <span className="hidden sm:inline text-xs opacity-70">
-                                {formatDistanceToNow(new Date(currentArticle.published_date), { addSuffix: true })}
-                            </span>
-                        </div>
-
-                        <Link href={currentArticle.slug ? `/article/${currentArticle.slug}` : currentArticle.url} className="group/link block">
-                            <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white leading-[0.95] tracking-tighter font-display mb-4 bg-left-bottom bg-gradient-to-r from-[var(--accent-secondary)] to-[var(--accent-secondary)] bg-[length:0%_6px] bg-no-repeat group-hover/link:bg-[length:100%_6px] transition-all duration-500 ease-out line-clamp-3 drop-shadow-md pb-2">
-                                {currentArticle.title}
-                            </h2>
-                        </Link>
-
-                        {/* Summary (Desktop) */}
-                        <p className="hidden md:block text-lg lg:text-xl text-white/90 font-serif max-w-2xl line-clamp-2 leading-relaxed drop-shadow-sm">
-                            {currentArticle.summary || "Full coverage and in-depth analysis on this developing story."}
-                        </p>
-                    </div>
+  return (
+    <div
+      className="relative"
+      onMouseEnter={() => setIsAutoPlaying(false)}
+      onMouseLeave={() => setIsAutoPlaying(true)}
+    >
+      {/* Fanned stack for multi-source stories */}
+      <div className={sourceCount > 1 ? "fanned-stack" : ""}>
+        <Link href={link} className="block group">
+          <div className="relative aspect-[16/9] sm:aspect-[2/1] lg:aspect-[21/9] w-full overflow-hidden rounded-[var(--radius-card)] bg-[var(--surface-elevated)]">
+            {/* Image with crossfade */}
+            <div className={`absolute inset-0 transition-opacity duration-700 ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}>
+              {article.image_url ? (
+                <img
+                  src={article.image_url}
+                  alt={article.title}
+                  className="absolute inset-0 w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-1000 ease-out will-change-transform"
+                />
+              ) : (
+                <div className="absolute inset-0 bg-[var(--ink)] flex items-center justify-center">
+                  <span className="text-9xl font-display font-bold text-white/5">U</span>
                 </div>
-
-                {/* Controls */}
-                <div className="absolute bottom-6 right-6 z-30 flex items-center gap-4">
-                    {/* Indicators */}
-                    <div className="flex gap-2">
-                        {articles.map((_, idx) => (
-                            <button
-                                key={idx}
-                                onClick={() => setCurrentIndex(idx)}
-                                className={`h-1 rounded-full transition-all duration-300 ${idx === currentIndex ? "w-8 bg-[var(--accent-secondary)]" : "w-3 bg-white/40 hover:bg-white/60"
-                                    }`}
-                                aria-label={`Go to slide ${idx + 1}`}
-                            />
-                        ))}
-                    </div>
-
-                    {/* Arrows */}
-                    <div className="hidden sm:flex gap-2 ml-4">
-                        <button
-                            onClick={prevSlide}
-                            className="p-2 rounded-full bg-black/30 hover:bg-black/50 text-white backdrop-blur-md transition-colors border border-white/20"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
-                                <path fillRule="evenodd" d="M11.78 5.22a.75.75 0 0 1 0 1.06L8.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clipRule="evenodd" />
-                            </svg>
-                        </button>
-                        <button
-                            onClick={nextSlide}
-                            className="p-2 rounded-full bg-black/30 hover:bg-black/50 text-white backdrop-blur-md transition-colors border border-white/20"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
-                                <path fillRule="evenodd" d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
-                            </svg>
-                        </button>
-                    </div>
-                </div>
+              )}
             </div>
+
+            {/* Gradient overlay */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent z-10" />
+
+            {/* Content overlay */}
+            <div className="absolute inset-0 z-20 flex flex-col justify-end p-6 sm:p-10 lg:p-14">
+              <div className="max-w-3xl">
+                {/* Category + Meter */}
+                <div className="flex items-center gap-3 mb-3">
+                  {article.categories?.[0] && (
+                    <CategoryPill label={article.categories[0]} />
+                  )}
+                  <CorroborationMeter sourceCount={sourceCount} size="sm" showLabel={false} />
+                </div>
+
+                {/* Headline */}
+                <h2 className={`text-display-xl font-display text-white mb-3 line-clamp-3 drop-shadow-lg transition-all duration-700 ${isTransitioning ? 'translate-y-4 opacity-0' : 'translate-y-0 opacity-100'}`}>
+                  {article.title}
+                </h2>
+
+                {/* Excerpt */}
+                {article.excerpt && (
+                  <p className={`text-white/70 text-body-md max-w-xl line-clamp-2 mb-4 transition-all duration-700 delay-75 ${isTransitioning ? 'translate-y-4 opacity-0' : 'translate-y-0 opacity-100'}`}
+                     style={{ fontFamily: 'var(--font-display), ui-serif, serif' }}>
+                    {article.excerpt}
+                  </p>
+                )}
+
+                {/* Metadata */}
+                <div className={`flex items-center gap-3 text-white/60 transition-all duration-700 delay-150 ${isTransitioning ? 'translate-y-4 opacity-0' : 'translate-y-0 opacity-100'}`}>
+                  <span className="font-data text-[11px] font-semibold">
+                    {formatDistanceToNow(dateObj, { addSuffix: true })}
+                  </span>
+                  <span className="w-1 h-1 bg-white/30 rounded-full" />
+                  <span className="font-data text-[11px]">
+                    {article.source.name}
+                    {sourceCount > 1 ? ` + ${sourceCount - 1}` : ''}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Link>
+      </div>
+
+      {/* Slide indicators */}
+      {articles.length > 1 && (
+        <div className="flex items-center justify-center gap-2 mt-4">
+          {articles.map((_, idx) => (
+            <button
+              key={idx}
+              onClick={() => goToSlide(idx)}
+              className={`h-1 rounded-full transition-all duration-300 ${
+                idx === currentIndex
+                  ? 'w-6 bg-[var(--verified-teal)]'
+                  : 'w-2 bg-[var(--border)] hover:bg-[var(--foreground-muted)]'
+              }`}
+              aria-label={`Go to slide ${idx + 1}`}
+            />
+          ))}
         </div>
-    );
+      )}
+    </div>
+  );
 }

@@ -1,38 +1,87 @@
+import hashlib
 import logging
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 from time import mktime
+
 import feedparser
+import nh3
 
 logger = logging.getLogger(__name__)
+
+# HTML tags allowed in excerpts/content after sanitization
+ALLOWED_TAGS = {
+    'p', 'br', 'strong', 'em', 'b', 'i', 'a', 'ul', 'ol', 'li',
+    'h2', 'h3', 'h4', 'blockquote',
+}
+ALLOWED_ATTRIBUTES: dict[str, set[str]] = {
+    'a': {'href', 'title'},
+}
+
+# Maximum words for the public-facing excerpt
+EXCERPT_WORD_LIMIT = 40
+
+
+def sanitize_html(html: str) -> str:
+    """Sanitize HTML content to prevent XSS. Uses nh3 (Rust-based, fast)."""
+    if not html:
+        return ""
+    return nh3.clean(
+        html,
+        tags=ALLOWED_TAGS,
+        attributes=ALLOWED_ATTRIBUTES,
+    )
+
+
+def generate_content_hash(text: str) -> str:
+    """Generate a SHA-256 hash of normalized text for deduplication."""
+    normalized = " ".join(text.lower().split())
+    return hashlib.sha256(normalized.encode('utf-8')).hexdigest()
+
+
+def generate_excerpt(full_text: str, max_words: int = EXCERPT_WORD_LIMIT) -> str:
+    """Generate a ~40 word excerpt from full text."""
+    if not full_text:
+        return ""
+    # Strip HTML for excerpt
+    clean_text = nh3.clean(full_text, tags=set())
+    words = clean_text.split()
+    if len(words) <= max_words:
+        return clean_text
+    return " ".join(words[:max_words]) + "…"
+
 
 class BaseScraper(ABC):
     @abstractmethod
     def fetch_articles(self, url: str) -> List[Dict[str, Any]]:
         pass
 
+
 class RSSScraper(BaseScraper):
     def fetch_articles(self, url: str) -> List[Dict[str, Any]]:
-        logger.info(f"Fetching RSS feed from {url}")
+        logger.info("Fetching RSS feed from %s", url)
         feed = feedparser.parse(url)
-        
+
         articles = []
         for entry in feed.entries:
-            # Handle date parsing
+            # Handle date parsing — always produce timezone-aware datetimes
             published_date = None
             if hasattr(entry, 'published_parsed') and entry.published_parsed:
-                published_date = datetime.fromtimestamp(mktime(entry.published_parsed))
+                published_date = datetime.fromtimestamp(
+                    mktime(entry.published_parsed),
+                    tz=timezone.utc,
+                )
             else:
-                published_date = datetime.now()
+                published_date = datetime.now(tz=timezone.utc)
 
             link = entry.get('link', '')
             title = entry.get('title', 'No Title')
             summary = entry.get('summary', '') or entry.get('description', '')
-            
-            content = summary
+
+            full_content = summary
             image_url = None
-            
+
             # 1. Try to find image in feed (media_content or enclosure)
             if 'media_content' in entry and entry.media_content:
                 image_url = entry.media_content[0].get('url')
@@ -40,62 +89,68 @@ class RSSScraper(BaseScraper):
                 image_url = entry.media_thumbnail[0].get('url')
             elif 'links' in entry:
                 for l in entry.links:
-                    if l.rel == 'enclosure' and l.type.startswith('image/'):
+                    if getattr(l, 'rel', '') == 'enclosure' and getattr(l, 'type', '').startswith('image/'):
                         image_url = l.href
                         break
-            
-            # 2. Advanced: Fetch full content and og:image if missing or content is short
-            # Only do this if we really need "professional" content (400+ words)
-            # This is slower, so maybe limit to top items or async task?
-            # For now, let's do it for every item but with a timeout to be safe.
+
+            # 2. Deep-fetch full content and og:image with timeout protection
             if link:
                 try:
                     import trafilatura
-                    import requests
-                    from lxml import html
-                    
-                    # Fetch page
+                    from lxml import html as lxml_html
+
+                    # Fetch page with timeout (15s max)
                     downloaded = trafilatura.fetch_url(link)
-                    
+
                     if downloaded:
                         # Extract full text
-                        full_text = trafilatura.extract(downloaded, include_comments=False, include_tables=False)
+                        full_text = trafilatura.extract(
+                            downloaded,
+                            include_comments=False,
+                            include_tables=False,
+                        )
                         if full_text and len(full_text) > len(summary):
-                            # Convert newlines to HTML paragraphs for basic formatting
-                            content = "".join([f"<p>{line}</p>" for line in full_text.split('\n') if line.strip()])
-                        
-                        # Extract og:image if we didn't find one in RSS
-                        # OR if we want to prioritize high-res social images over RSS thumbnails (BBC fix)
-                        tree = html.fromstring(downloaded)
-                        
-                        # Try og:image
+                            # Sanitize and format as HTML paragraphs
+                            paragraphs = [
+                                f"<p>{nh3.clean(line, tags=set())}</p>"
+                                for line in full_text.split('\n')
+                                if line.strip()
+                            ]
+                            full_content = "".join(paragraphs)
+
+                        # Extract og:image — prioritize over RSS thumbnail
+                        tree = lxml_html.fromstring(downloaded)
+
                         og_image = tree.xpath('//meta[@property="og:image"]/@content')
                         if not og_image:
-                            # Try twitter:image
                             og_image = tree.xpath('//meta[@name="twitter:image"]/@content')
-                        
+
                         if og_image:
                             found_url = og_image[0]
-                            # Handle relative URLs
                             if found_url and not found_url.startswith('http'):
                                 from urllib.parse import urljoin
                                 found_url = urljoin(link, found_url)
-                            
-                            # PRIORITIZE: Overwrite RSS image with this one as it's likely higher res
                             image_url = found_url
+
                 except Exception as e:
-                    logger.error(f"Failed to scrape full content for {link}: {e}")
+                    logger.warning("Failed to deep-fetch content for %s: %s", link, e)
+
+            # Sanitize the final content
+            sanitized_content = sanitize_html(full_content)
 
             articles.append({
                 'title': title,
                 'url': link,
-                'content': content,
+                'content': sanitized_content,
+                'excerpt': generate_excerpt(full_content),
+                'content_hash': generate_content_hash(f"{title} {full_content}"),
                 'published_date': published_date,
-                'image_url': image_url
+                'image_url': image_url,
             })
-            
-        logger.info(f"Found {len(articles)} items in RSS feed.")
+
+        logger.info("Found %d items in RSS feed.", len(articles))
         return articles
+
 
 class ScraperService:
     def __init__(self):
@@ -106,7 +161,7 @@ class ScraperService:
     def scrape_source(self, source) -> List[Dict[str, Any]]:
         scraper = self.scrapers.get(source.scraper_type)
         if not scraper:
-            logger.warning(f"No scraper found for type {source.scraper_type}")
+            logger.warning("No scraper found for type %s", source.scraper_type)
             return []
-        
+
         return scraper.fetch_articles(source.url)

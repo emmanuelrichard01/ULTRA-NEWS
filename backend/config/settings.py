@@ -21,12 +21,12 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    
+
     # Third party
     'ninja',
     'django_celery_beat',
-    'corsheaders',  # <--- Added
-    
+    'corsheaders',
+
     # Local
     'core',
     'api',
@@ -36,7 +36,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'corsheaders.middleware.CorsMiddleware', # <--- Added (Must be before CommonMiddleware)
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -45,10 +45,6 @@ MIDDLEWARE = [
 ]
 
 # CORS & CSRF Configuration
-# -------------------------
-# Read allowed origins from env var (comma separated)
-# Example: FRONTEND_URL=https://ultra-news.vercel.app,http://localhost:3000
-
 FRONTEND_URLS = os.environ.get('FRONTEND_URL', 'http://localhost:3000').split(',')
 
 CORS_ALLOWED_ORIGINS = FRONTEND_URLS
@@ -100,53 +96,71 @@ CELERY_RESULT_BACKEND = os.environ.get("CELERY_RESULT_BACKEND", "redis://redis:6
 CELERY_TIMEZONE = "UTC"
 
 AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
+    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
 LANGUAGE_CODE = 'en-us'
-
 TIME_ZONE = 'UTC'
-
 USE_I18N = True
-
 USE_TZ = True
 
 STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# Logging configuration - suppress verbose output in production
-# This prevents "output too large" errors from cron services
-if not DEBUG:
-    LOGGING = {
-        'version': 1,
-        'disable_existing_loggers': True,
-        'handlers': {
-            'null': {
-                'class': 'logging.NullHandler',
-            },
-        },
-        'root': {
-            'handlers': ['null'],
-            'level': 'CRITICAL',
-        },
-        'loggers': {
-            'django': {'handlers': ['null'], 'level': 'CRITICAL', 'propagate': False},
-            'django.request': {'handlers': ['null'], 'level': 'CRITICAL', 'propagate': False},
-            'core': {'handlers': ['null'], 'level': 'CRITICAL', 'propagate': False},
-            'trafilatura': {'handlers': ['null'], 'level': 'CRITICAL', 'propagate': False},
-            'feedparser': {'handlers': ['null'], 'level': 'CRITICAL', 'propagate': False},
-            'urllib3': {'handlers': ['null'], 'level': 'CRITICAL', 'propagate': False},
-        },
-    }
+# ==========================================================================
+# V3: Structured Logging (structlog + stdlib)
+# ==========================================================================
+# In production, emit JSON logs to stderr for log aggregation.
+# In dev, use human-readable console output.
+import structlog
 
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'json': {
+            '()': structlog.stdlib.ProcessorFormatter,
+            'processor': structlog.dev.ConsoleRenderer() if DEBUG else structlog.processors.JSONRenderer(),
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'json',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO' if not DEBUG else 'DEBUG',
+    },
+    'loggers': {
+        'django': {'handlers': ['console'], 'level': 'WARNING', 'propagate': False},
+        'django.request': {'handlers': ['console'], 'level': 'ERROR', 'propagate': False},
+        'core': {'handlers': ['console'], 'level': 'INFO', 'propagate': False},
+        'api': {'handlers': ['console'], 'level': 'INFO', 'propagate': False},
+        # Suppress noisy third-party loggers
+        'trafilatura': {'handlers': ['console'], 'level': 'WARNING', 'propagate': False},
+        'feedparser': {'handlers': ['console'], 'level': 'WARNING', 'propagate': False},
+        'urllib3': {'handlers': ['console'], 'level': 'WARNING', 'propagate': False},
+    },
+}
+
+structlog.configure(
+    processors=[
+        structlog.contextvars.merge_contextvars,
+        structlog.stdlib.filter_by_level,
+        structlog.stdlib.add_logger_name,
+        structlog.stdlib.add_log_level,
+        structlog.stdlib.PositionalArgumentsFormatter(),
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.processors.StackInfoRenderer(),
+        structlog.processors.UnicodeDecoder(),
+        structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
+    ],
+    logger_factory=structlog.stdlib.LoggerFactory(),
+    wrapper_class=structlog.stdlib.BoundLogger,
+    cache_logger_on_first_use=True,
+)
