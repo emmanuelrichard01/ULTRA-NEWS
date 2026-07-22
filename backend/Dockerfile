@@ -8,7 +8,8 @@ ENV PYTHONUNBUFFERED=1
 
 # Install dependencies first (cached layer)
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --upgrade pip
+RUN pip install --default-timeout=100 --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY . .

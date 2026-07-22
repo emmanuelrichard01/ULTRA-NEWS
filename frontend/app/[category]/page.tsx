@@ -2,43 +2,9 @@ import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import StoryCard from '@/components/StoryCard';
 import CategoryPill from '@/components/CategoryPill';
-
-interface StoryDetail {
-  id: number;
-  title: string;
-  slug: string;
-  summary: string;
-  first_seen_at: string;
-  last_updated_at: string;
-  source_count: number;
-  status: string;
-  image_url: string | null;
-  categories: string[];
-  sources: string[];
-}
-
-const CATEGORY_MAP: Record<string, { displayName: string; description: string }> = {
-  tech: { displayName: 'Tech', description: 'Technology, AI, and the digital frontier.' },
-  politics: { displayName: 'Politics', description: 'Government, policy, and global affairs.' },
-  business: { displayName: 'Business', description: 'Markets, finance, and entrepreneurship.' },
-  entertainment: { displayName: 'Culture', description: 'Film, music, media, and the cultural conversation.' },
-  science: { displayName: 'Science', description: 'Research, discovery, and the natural world.' },
-  art: { displayName: 'Art', description: 'Visual arts, exhibitions, and creative expression.' },
-};
-
-async function getCategoryStories(category: string, cursor?: string) {
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
-  const params = new URLSearchParams({ category, limit: '20' });
-  if (cursor) params.set('cursor', cursor);
-
-  try {
-    const res = await fetch(`${API_URL}/api/v1/stories?${params.toString()}`, { cache: 'no-store' });
-    if (!res.ok) return { items: [], count: 0 };
-    return res.json();
-  } catch {
-    return { items: [], count: 0 };
-  }
-}
+import { fetchStories } from '@/lib/api';
+import { CATEGORY_MAP } from '@/lib/types';
+import type { StoryDetail } from '@/lib/types';
 
 interface CategoryPageProps {
   params: Promise<{ category: string }>;
@@ -68,7 +34,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
   const info = CATEGORY_MAP[category];
   if (!info) notFound();
 
-  const data = await getCategoryStories(category, cursor);
+  const data = await fetchStories({ category, cursor });
   const stories: StoryDetail[] = data.items;
 
   const heroStory = !cursor && stories.length > 0 ? stories[0] : null;
@@ -120,6 +86,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
                 excerpt={heroStory.summary}
                 publishedDate={heroStory.first_seen_at}
                 sourceCount={heroStory.source_count}
+                independentCount={heroStory.independent_count}
                 status={heroStory.status}
                 sources={heroStory.sources}
                 storySlug={heroStory.slug}
@@ -146,6 +113,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
                     excerpt={story.summary}
                     publishedDate={story.first_seen_at}
                     sourceCount={story.source_count}
+                    independentCount={story.independent_count}
                     status={story.status}
                     sources={story.sources}
                     storySlug={story.slug}

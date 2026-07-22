@@ -26,9 +26,7 @@ services:
   backend:
     build:
       context: ./backend
-    command: >
-      sh -c "python manage.py migrate --noinput &&
-             python manage.py runserver 0.0.0.0:8000"
+    command: python manage.py runserver 0.0.0.0:8000
     volumes:
       - ./backend:/app
     ports:
@@ -49,10 +47,30 @@ services:
       - FRONTEND_URL=http://localhost:3000
       - ADMIN_API_KEY=dev-admin-key-change-in-prod
 
-  worker:
+  worker-fetch:
     build:
       context: ./backend
-    command: celery -A config worker -l info --concurrency=2
+    command: celery -A config worker -l info -Q fetch,celery --concurrency=4
+    volumes:
+      - ./backend:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - SECRET_KEY=insecure-dev-key-change-in-prod
+      - DEBUG=1
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/ultranews
+      - REDIS_URL=redis://redis:6379/1
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - ADMIN_API_KEY=dev-admin-key-change-in-prod
+
+  worker-cluster:
+    build:
+      context: ./backend
+    command: celery -A config worker -l info -Q cluster --concurrency=1
     volumes:
       - ./backend:/app
     depends_on:
@@ -100,7 +118,8 @@ services:
     depends_on:
       - backend
     environment:
-      - NEXT_PUBLIC_API_URL=http://backend:8000
+      - API_URL=http://backend:8000
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
       - NEXT_PUBLIC_APP_URL=http://localhost:3000
 
 volumes:

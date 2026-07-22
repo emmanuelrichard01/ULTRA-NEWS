@@ -5,6 +5,8 @@ import "./globals.css";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { ReactQueryProvider } from "@/components/ReactQueryProvider";
+import BreakingNewsTicker from "@/components/BreakingNewsTicker";
 
 // V3 Typography — three-role system, all self-hosted via next/font
 const fraunces = Fraunces({
@@ -82,11 +84,14 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <Navbar />
-          <main className="flex-grow w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-            {children}
-          </main>
-          <Footer />
+          <ReactQueryProvider>
+            <Navbar />
+            <BreakingNewsTicker />
+            <main className="flex-grow w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+              {children}
+            </main>
+            <Footer />
+          </ReactQueryProvider>
         </ThemeProvider>
         <Analytics />
       </body>

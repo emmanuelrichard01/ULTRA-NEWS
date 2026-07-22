@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { ThemeToggle } from './ThemeToggle';
+import SearchBar from './SearchBar';
 import { usePathname } from 'next/navigation';
 
 const primaryViews = [
@@ -16,6 +17,11 @@ const topics = [
   { name: 'Politics', href: '/politics' },
   { name: 'Business', href: '/business' },
   { name: 'Science', href: '/science' },
+  { name: 'Sports', href: '/sports' },
+  { name: 'World', href: '/world' },
+  { name: 'Health', href: '/health' },
+  { name: 'Culture', href: '/entertainment' },
+  { name: 'Art', href: '/art' },
 ];
 
 export default function Navbar() {
@@ -77,21 +83,38 @@ export default function Navbar() {
 
             {/* Topics Dropdown */}
             <div className="relative group py-4">
-              <button className="font-data text-[11px] font-semibold uppercase tracking-wider text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-colors duration-150 flex items-center gap-1">
+              <button className={`font-data text-[11px] font-semibold uppercase tracking-wider transition-colors duration-150 flex items-center gap-1 ${
+                topics.some(t => pathname === t.href)
+                  ? "text-[var(--foreground)]"
+                  : "text-[var(--foreground-muted)] hover:text-[var(--foreground)]"
+              }`}>
                 Topics
+                {topics.some(t => pathname === t.href) && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] ml-0.5" />
+                )}
                 <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
               </button>
-              <div className="absolute top-full left-0 w-40 pt-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
-                <div className="bg-[var(--surface-elevated)] border border-[var(--border)] rounded-[var(--radius-card)] p-2 shadow-xl flex flex-col gap-1">
-                  {topics.map((topic) => (
-                    <Link
-                      key={topic.name}
-                      href={topic.href}
-                      className="px-3 py-2 text-sm font-display text-[var(--foreground-muted)] hover:text-[var(--foreground)] hover:bg-[var(--background)] rounded-md transition-colors"
-                    >
-                      {topic.name}
-                    </Link>
-                  ))}
+              <div className="absolute top-full left-0 w-48 pt-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
+                <div className="bg-[var(--surface-elevated)] border border-[var(--border)] rounded-[var(--radius-card)] p-2 shadow-xl flex flex-col gap-0.5">
+                  {topics.map((topic) => {
+                    const isTopicActive = pathname === topic.href;
+                    return (
+                      <Link
+                        key={topic.name}
+                        href={topic.href}
+                        className={`px-3 py-2 text-sm font-display rounded-md transition-colors ${
+                          isTopicActive
+                            ? "text-[var(--foreground)] bg-[var(--background)] font-semibold"
+                            : "text-[var(--foreground-muted)] hover:text-[var(--foreground)] hover:bg-[var(--background)]"
+                        }`}
+                      >
+                        {topic.name}
+                        {isTopicActive && (
+                          <span className="inline-block w-1.5 h-1.5 rounded-full bg-[var(--accent)] ml-2" />
+                        )}
+                      </Link>
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -99,6 +122,11 @@ export default function Navbar() {
 
           {/* Right Actions */}
           <div className="flex items-center gap-3 z-50">
+            {/* Desktop Search */}
+            <div className="hidden md:block">
+              <SearchBar />
+            </div>
+
             <div className="hidden sm:block">
               <ThemeToggle />
             </div>
@@ -134,8 +162,9 @@ export default function Navbar() {
             <Link
               key={view.name}
               href={view.href}
-              className={`text-3xl font-display font-bold tracking-tight text-[var(--foreground)] hover:text-[var(--accent)] transition-all duration-300 transform ${isOpen ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'
-                }`}
+              className={`text-3xl font-display font-bold tracking-tight transition-all duration-300 transform ${
+                pathname === view.href ? "text-[var(--accent)]" : "text-[var(--foreground)] hover:text-[var(--accent)]"
+              } ${isOpen ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'}`}
               style={{ transitionDelay: `${idx * 50}ms` }}
             >
               {view.name}
@@ -144,13 +173,21 @@ export default function Navbar() {
 
           <div className="h-px bg-[var(--border)] my-2 w-full" />
           
-          <div className="grid grid-cols-2 gap-4">
+          {/* Mobile Search */}
+          <div className="md:hidden">
+            <SearchBar />
+          </div>
+
+          <div className="h-px bg-[var(--border)] my-2 w-full" />
+          
+          <div className="grid grid-cols-3 gap-3">
             {topics.map((topic, idx) => (
               <Link
                 key={topic.name}
                 href={topic.href}
-                className={`text-lg font-display text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-all duration-300 transform ${isOpen ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'
-                  }`}
+                className={`text-base font-display transition-all duration-300 transform ${
+                  pathname === topic.href ? "text-[var(--accent)] font-semibold" : "text-[var(--foreground-muted)] hover:text-[var(--foreground)]"
+                } ${isOpen ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'}`}
                 style={{ transitionDelay: `${(idx + primaryViews.length) * 50}ms` }}
               >
                 {topic.name}

@@ -1,8 +1,6 @@
-from django.db.models import Count, F
-from django.utils import timezone
 import logging
 
-from core.models import Source, Story, Article
+from core.models import Source, Story
 
 logger = logging.getLogger(__name__)
 

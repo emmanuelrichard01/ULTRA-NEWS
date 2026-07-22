@@ -1,7 +1,7 @@
 import re
 import logging
 import uuid
-from typing import Protocol, List
+from typing import Protocol
 from datetime import timedelta
 from django.db import transaction
 from django.utils import timezone
@@ -106,18 +106,27 @@ class EmbeddingScorer:
 
 def compute_tier(independent_count: int, velocity: float, has_primary_source: bool) -> str:
     """
-    Compute the Tier (Status) of a Story based on explicit rules.
-    Velocity can pull a story into Developing early, but can never alone push a story into Reporting.
+    Compute the Tier (Status) of a Story based on independent source count.
+
+    Rules (STRICT — independent_count is the ONLY promotion signal):
+      - 3+ independent domains → CORROBORATED (Reporting feed)
+      - 2 independent domains  → DEVELOPING (Developing feed)
+      - 1 source               → WIRE (The Wire feed)
+
+    Velocity is a *ranking* signal WITHIN a tier, never a tier-promotion
+    signal. A single-source story with high velocity is still Wire —
+    it's just a highly-active Wire story that ranks higher in the feed.
+
+    This prevents the inflation bug where every new story (1 source,
+    velocity=0.0) was incorrectly promoted to Developing.
     """
-    # Thresholds
-    VELOCITY_THRESHOLD = 0.5  # sources per hour
-    
     if independent_count >= 3:
-        return Story.Status.CORROBORATED # Reporting
-    
-    if independent_count == 2 or (independent_count == 1 and velocity > VELOCITY_THRESHOLD):
+        return Story.Status.CORROBORATED
+
+    if independent_count >= 2:
         return Story.Status.DEVELOPING
-        
+
+    # Single source — always Wire, regardless of velocity
     return Story.Status.WIRE
 
 def cluster_article(article: Article, scorer: ClusterScorer = None) -> Story:
@@ -156,33 +165,47 @@ def cluster_article(article: Article, scorer: ClusterScorer = None) -> Story:
                 best_match = story
                 
         if best_match:
+            logger.info(
+                "Cluster match: article='%.60s' → story='%.60s' (score=%.3f, scorer=%s)",
+                article.title, best_match.title, best_score, type(scorer).__name__,
+            )
             # Add to existing cluster
             if not best_match.articles.filter(id=article.id).exists():
                 article.story = best_match
                 article.save(update_fields=['story'])
                 
-                # Update independent domain count
-                domains = set()
+                # Update independent source count (unique RSS feed URLs)
+                source_urls = set()
                 primary_found = False
                 for art in best_match.articles.all():
-                    domains.add(art.source.url)
+                    source_urls.add(art.source.url)
                     if getattr(art.source, 'source_type', 'news') == 'primary':
                         primary_found = True
                         
-                best_match.independent_count = len(domains)
+                best_match.independent_count = len(source_urls)
                 
-                # Update velocity (sources per hour)
+                # Update velocity (independent sources per hour)
                 hours_alive = (timezone.now() - best_match.first_seen_at).total_seconds() / 3600.0
                 if hours_alive > 0:
                     best_match.velocity_score = best_match.independent_count / hours_alive
                 else:
-                    best_match.velocity_score = best_match.independent_count
+                    best_match.velocity_score = float(best_match.independent_count)
                 
-                # Compute Tier
-                best_match.status = compute_tier(best_match.independent_count, best_match.velocity_score, primary_found)
+                # Compute Tier (independent_count is the ONLY promotion signal)
+                best_match.status = compute_tier(
+                    best_match.independent_count, best_match.velocity_score, primary_found
+                )
                 
-                # Update source_count
+                # Update source_count (total articles, not unique sources)
                 best_match.source_count = best_match.articles.count()
+                
+                # Merge article categories into story categories
+                article_cats = set(article.categories.values_list('id', flat=True))
+                if article_cats:
+                    existing_cats = set(best_match.categories.values_list('id', flat=True))
+                    new_cats = article_cats - existing_cats
+                    if new_cats:
+                        best_match.categories.add(*new_cats)
                 
                 best_match.last_updated_at = timezone.now()
                 best_match.save()
@@ -197,7 +220,8 @@ def cluster_article(article: Article, scorer: ClusterScorer = None) -> Story:
                 counter += 1
 
             has_primary = getattr(article.source, 'source_type', 'news') == 'primary'
-            status = compute_tier(1, 1.0, has_primary) # brand new, 1 source, velocity 1.0 (assuming immediate)
+            # New story: 1 source, no velocity yet → always starts as WIRE
+            status = compute_tier(1, 0.0, has_primary)
 
             story = Story.objects.create(
                 title=article.title,
@@ -207,7 +231,7 @@ def cluster_article(article: Article, scorer: ClusterScorer = None) -> Story:
                 source_count=1,
                 independent_count=1,
                 status=status,
-                velocity_score=1.0,
+                velocity_score=0.0,
                 embedding=article.embedding,
             )
             story.categories.set(article.categories.all())

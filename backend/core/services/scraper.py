@@ -93,14 +93,22 @@ class RSSScraper(BaseScraper):
                         image_url = l.href
                         break
 
+            deep_fetch_success = False
+
             # 2. Deep-fetch full content and og:image with timeout protection
             if link:
                 try:
+                    import httpx
                     import trafilatura
                     from lxml import html as lxml_html
 
-                    # Fetch page with timeout (15s max)
-                    downloaded = trafilatura.fetch_url(link)
+                    # Fetch page with timeout (15s max) and explicit User-Agent
+                    headers = {
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                    }
+                    response = httpx.get(link, headers=headers, timeout=15.0, follow_redirects=True)
+                    response.raise_for_status()
+                    downloaded = response.text
 
                     if downloaded:
                         # Extract full text
@@ -117,6 +125,7 @@ class RSSScraper(BaseScraper):
                                 if line.strip()
                             ]
                             full_content = "".join(paragraphs)
+                            deep_fetch_success = True
 
                         # Extract og:image — prioritize over RSS thumbnail
                         tree = lxml_html.fromstring(downloaded)
@@ -133,9 +142,9 @@ class RSSScraper(BaseScraper):
                             image_url = found_url
 
                 except Exception as e:
-                    logger.warning("Failed to deep-fetch content for %s: %s", link, e)
+                    logger.warning("Failed to deep-fetch content for %s: %s", link, type(e).__name__)
 
-            # Sanitize the final content
+            # Sanitize the final content (either full_content or fallback summary)
             sanitized_content = sanitize_html(full_content)
 
             articles.append({
@@ -146,6 +155,7 @@ class RSSScraper(BaseScraper):
                 'content_hash': generate_content_hash(f"{title} {full_content}"),
                 'published_date': published_date,
                 'image_url': image_url,
+                'deep_fetch_success': deep_fetch_success,
             })
 
         logger.info("Found %d items in RSS feed.", len(articles))

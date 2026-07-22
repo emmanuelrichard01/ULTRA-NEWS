@@ -1,8 +1,4 @@
-import uuid
-from django.utils.text import slugify
 from django.core.management.base import BaseCommand
-from core.models import Source, Article
-from core.services.scraper import ScraperService
 
 class Command(BaseCommand):
     help = 'Ingests news from all configured sources'

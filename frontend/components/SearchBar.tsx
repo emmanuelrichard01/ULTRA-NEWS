@@ -3,7 +3,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
-export default function SearchBar() {
+import { Suspense } from 'react';
+
+function SearchBarContent() {
     const [query, setQuery] = useState('');
     const [isFocused, setIsFocused] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -87,5 +89,13 @@ export default function SearchBar() {
                 )}
             </div>
         </form>
+    );
+}
+
+export default function SearchBar() {
+    return (
+        <Suspense fallback={<div className="w-full max-w-sm h-[38px] border rounded-[var(--radius-card)] bg-[var(--surface-elevated)] border-[var(--border)]" />}>
+            <SearchBarContent />
+        </Suspense>
     );
 }

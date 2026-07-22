@@ -1,116 +1,138 @@
-# 📰 ULTRA-NEWS V3
+# ULTRA-NEWS V3 — The Wire Room
 
-> **The Wire Room.** A story-centric news aggregation platform that triangulates coverage from multiple sources — so you see the full picture, not just one outlet's take.
+> **Story-centric news intelligence.** Multiple outlets covering the same event, collapsed into one verified cluster — so you see the full picture, not just one outlet's take.
 
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.11-blue.svg)
 ![Django](https://img.shields.io/badge/django-5.x-green.svg)
 ![Next.js](https://img.shields.io/badge/next.js-16-black.svg)
-![PostgreSQL](https://img.shields.io/badge/postgres-16-blue.svg)
+![PostgreSQL](https://img.shields.io/badge/postgres-16+pgvector-blue.svg)
 
 ---
 
-## 🧠 What Makes V3 Different
+## What This Is
 
-V3 isn't just "we display articles" — it's "we know that 12 outlets are covering the same event, and we've collapsed that into one verified story."
+Ultra News is a news aggregation platform built around a single architectural bet: **stories, not articles, are the primary entity.** When Reuters, BBC, and The Guardian all cover the same event, their articles are semantically clustered into one `Story` object with an explicit source count, a verification lifecycle status, and a velocity score tracking how fast coverage is accumulating.
 
-| V2 | V3 |
-|---|---|
-| Flat article list | **Story Clusters** — multiple sources grouped into one event |
-| Full-text scraping + rendering | **Excerpt-only display** + outbound "Read at [Source]" links |
-| No deduplication | **Content hashing** (SHA-256) for dedup |
-| Offset pagination | **Cursor pagination** — stable under high insert rates |
-| `threading.Thread` for ingestion | **Celery `.delay()`** — proper task queue |
-| No HTML sanitization | **nh3** — Rust-based sanitization (XSS prevention) |
-| `print()` logging | **structlog** — structured JSON logging |
-| Stale architecture docs | **Accurate docs** matching the actual codebase |
+The result is a three-tier intelligence feed:
 
----
+| Feed | Filter | Purpose |
+|------|--------|---------|
+| **The Wire** | `status = wire` | Raw intercepts. Single-source, unverified first reports. |
+| **Developing** | `status = developing` | Gaining traction. 2 independent sources confirming. |
+| **Reporting** | `status = corroborated` | Verified. 3+ independent domains corroborating. |
+| **Topics** | `category = {slug}` | Analytical lens. 9 categories: Tech, Politics, Business, Science, Sports, Health, World, Entertainment, Africa. |
 
-## ✨ The Wire Room Design System
-
-The visual language borrows from the wire service — the AP/Reuters newsroom where multiple feeds converge into one verified report — because that convergence is literally what the ingestion pipeline does.
-
-### Signature Elements
-
-| Element | Purpose |
-|---------|---------|
-| **Corroboration Meter** | 5-segment signal bars: amber (1-2 sources, "Developing") → teal (3+, "Corroborated") |
-| **Fanned Stack** | Stacked card silhouettes showing multi-source coverage at a glance |
-| **Three-Role Typography** | Fraunces (editorial headlines), Geist (interface), IBM Plex Mono (data/telemetry) |
-
-### Color System
-
-| Token | Hex | Role |
-|---|---|---|
-| `ink` | `#12141C` | Primary text/surface — blue-black, not flat `#000` |
-| `paper` | `#F7F5F0` | Primary surface — warm off-white |
-| `signal-amber` | `#E8A33D` | Functional: "Developing" status (1-2 sources) |
-| `verified-teal` | `#1F7A6C` | Functional: "Corroborated" status (3+ sources) |
-| `wire-red` | `#C4432B` | Breaking/urgent — used sparingly |
+This lifecycle — Wire → Developing → Reporting — is the core product. Most aggregators don't attempt it.
 
 ---
 
-## 🏗 Architecture
+## Architecture at a Glance
 
+```text
+[35+ RSS Feeds] → Celery Worker → feedparser (parse)
+  → trafilatura (deep-fetch full text) → nh3 (sanitize HTML)
+  → fastembed (vectorize title+excerpt) → pgvector (semantic cluster)
+  → Story/Article persist → Category assignment → ISR webhook to Next.js
+
+[Next.js 16 App Router] ← Django Ninja REST API ← PostgreSQL 16 (stories, vectors)
+                                                 ← Redis 7 (cache, Celery broker)
 ```
-[RSS Feeds] → Celery Worker → trafilatura (extract) → nh3 (sanitize)
-  → SHA-256 (dedup) → Article + RawDocument (PostgreSQL)
-  → Category assignment → Source health tracking
 
-[Next.js 16] ← Django Ninja API ← PostgreSQL (stories, articles)
-                                 ← Redis (cache, Celery broker)
-```
+| Layer | Technology | Why |
+|-------|-----------|-----|
+| **API** | Django Ninja | Typed, fast, auto-documented. Better than DRF for this scope. |
+| **Clustering** | pgvector + fastembed (`bge-small-en-v1.5`, 384d) | Local ML inference. No API costs. Cosine similarity > exact title match. |
+| **Frontend** | Next.js 16 (RSC + App Router) | Server components for data; ISR for caching. |
+| **Processing** | Celery + Redis | Proper task queue. Retry, monitoring, no raw threading. |
+| **Sanitization** | nh3 (Rust-based) | Closes the stored XSS vector from `dangerouslySetInnerHTML`. |
+| **Search** | PostgreSQL `SearchVectorField` + GIN | Pragmatic. No ElasticSearch overhead at this scale. |
 
 ### Data Model
 
-- **`Story`** — a real-world event cluster with source count, velocity score, and corroboration status
-- **`Article`** — individual source coverage (excerpt + outbound link, tracking `is_primary_source`)
-- **`RawDocument`** — full extracted text (internal-only, for future AI processing)
-- **`Source`** — RSS feed config with health tracking
+```
+Source ──┐
+         ├── Article ──→ Story (cluster)
+         └── RawDocument (1:1 with Article, internal-only full text)
 
-### API Endpoints
+Story ──→ [wire | developing | corroborated]
+       ──→ velocity_score (sources/hour)
+       ──→ independent_count (unique domains)
+       ──→ embedding (384d vector, cluster centroid)
+```
+
+- **`Source`** — RSS feed config with tier/region metadata + health tracking (consecutive failures, last_fetched_at).
+- **`Story`** — The primary entity. A real-world event with source_count, independent_count, velocity, status.
+- **`Article`** — Individual piece from one source. Excerpt-only display (~40 words) + outbound link.
+- **`RawDocument`** — Full extracted text. Internal-only. Powers embeddings and future AI summarization.
+
+### Key Trade-offs
+
+| Decision | What we chose | What we rejected | Why |
+|----------|--------------|-----------------|-----|
+| Clustering | Semantic vectors (cosine similarity ≥ 0.80) | Exact title match | Three outlets write three different headlines for the same event. Exact match creates permanent single-source silos. |
+| Embedding model | `bge-small-en-v1.5` (384d, local) | OpenAI API embeddings | Zero API cost. Runs inside Docker. Slightly lower quality, but the 72h time window compensates. |
+| Pagination | Cursor (`published_date + id`) | Offset | Stable under high insert rates. No phantom rows. |
+| Display model | Excerpt-only (~40 words) | Full article rendering | We're an aggregator, not a publisher. Outbound links respect the source. |
+| Auth (ingest) | GitHub OIDC JWT | Static API key alone | Key rotation without redeployment. Verifiable identity chain. |
+
+---
+
+## API Endpoints
 
 All under `/api/v1/`:
 
-| Endpoint | Description |
-|----------|-------------|
-| `GET /stories` | List story clusters (cursor pagination) |
-| `GET /stories/{slug}` | Story detail with all contributing sources |
-| `GET /news` | List articles (search, filter, cursor/offset) |
-| `GET /articles/{slug}` | Article excerpt + outbound link |
-| `POST /admin/trigger-ingest` | Trigger ingestion (GitHub OIDC JWT required) |
-| `POST /admin/seed-db` | Seed categories + sources (API key required) |
-| `GET /health` | Deep health check (DB + Redis) |
+| Endpoint | Method | Auth | Description |
+|----------|--------|------|-------------|
+| `/stories` | GET | — | List story clusters. Cursor pagination, filter by `status`, `category`. |
+| `/stories/{slug}` | GET | — | Story detail: all contributing articles, timeline, framing, independent_count, velocity_score. |
+| `/stories/{slug}/related` | GET | — | Semantically related stories via pgvector similarity search. |
+| `/news` | GET | — | List articles. Full-text search via `q=`, category filter. |
+| `/articles/{slug}` | GET | — | Single article detail (excerpt + outbound link). |
+| `/sources` | GET | — | Source registry: all feeds with tier, region, health, article counts. |
+| `/ask` | POST | — | RAG endpoint. Semantic search over ingested corpus. |
+| `/health` | GET | — | Deep health check (DB + Redis + ingest recency). |
+| `/admin/trigger-ingest` | POST | OIDC JWT | Trigger Celery ingestion via GitHub Actions. |
+| `/admin/seed-db` | POST | API Key | Seed categories + sources from the source registry. |
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ```bash
-# 1. Clone & Setup
+# 1. Clone & build
 git clone https://github.com/emmanuelrichard01/ULTRA-NEWS.git
 cd ULTRA-NEWS
-make setup
+make setup    # builds, starts, migrates, seeds
 
 # 2. Access
-# Frontend: http://localhost:3000
-# API Docs: http://localhost:8000/api/v1/docs
+# Frontend:  http://localhost:3000
+# API Docs:  http://localhost:8000/api/v1/docs
+
+# 3. Trigger first ingestion
+make ingest
 ```
 
-### Other Commands
+### Developer Commands
 
 ```bash
-make ingest       # Trigger news ingestion
-make logs         # Tail all service logs
-make shell        # Open Django shell
-make lint         # Run linters
-make clean        # Stop services + delete data
+make help           # Show all commands
+make status         # Service health check
+make logs           # Tail all service logs
+make logs-backend   # Backend only
+make logs-worker    # Worker only
+make logs-frontend  # Frontend only
+make shell          # Django shell
+make db-shell       # PostgreSQL shell (psql)
+make lint           # Run linters (ruff + tsc)
+make test           # Run all tests
+make restart        # Restart all services
+make clean          # Stop services, remove containers
+make nuke           # ⚠️ Stop services + delete all data
 ```
 
 ---
 
-## 🔐 Environment Variables
+## Environment Variables
 
 Copy `.env.example` to `.env` and configure:
 
@@ -119,11 +141,13 @@ Copy `.env.example` to `.env` and configure:
 | Variable | Required | Description |
 |:---|:---:|:---|
 | `SECRET_KEY` | ✅ | Django security key |
-| `DEBUG` | ✅ | `0` for production |
+| `DEBUG` | ✅ | `1` for dev, `0` for production |
 | `ALLOWED_HOSTS` | ✅ | Comma-separated hostnames |
 | `ADMIN_API_KEY` | ✅ | API key for admin endpoints |
 | `DATABASE_URL` | ✅ | PostgreSQL connection string |
 | `REDIS_URL` | ✅ | Redis connection string |
+| `CELERY_BROKER_URL` | ✅ | Celery broker (same as REDIS_URL) |
+| `CELERY_RESULT_BACKEND` | ✅ | Celery results (same as REDIS_URL) |
 | `FRONTEND_URL` | ✅ | Frontend URL (for CORS) |
 
 ### Frontend
@@ -131,20 +155,41 @@ Copy `.env.example` to `.env` and configure:
 | Variable | Required | Description |
 |:---|:---:|:---|
 | `NEXT_PUBLIC_API_URL` | ✅ | Backend API URL (no trailing slash) |
+| `NEXT_PUBLIC_APP_URL` | — | Public app URL (for meta tags) |
 
 ---
 
-## 🗺️ Roadmap
+## Project Status
 
-- **Phase 1** ✅ — Foundation (Story model, excerpt-only display, Wire Room design system, security hardening)
-- **Phase 2** ✅ — Scale & Visibility (GitHub OIDC, Next.js Revalidation Webhooks, Timeline UI, Trending Velocity, Testing)
-- **Phase 3** — AI-Native (pgvector RAG, Trust Graphs, On-Device Personalization)
-- **Phase 4** — Platform (Observability, Terraform, Public API, SSE ticker, PWA)
+### What Works ✅
+
+- Story clustering via semantic vectors (pgvector + fastembed)
+- Three-tier verification lifecycle (Wire → Developing → Reporting)
+- 35+ sources across 4 tiers and 6 regions
+- 9 topic categories (Tech, Politics, Business, Science, Sports, Health, World, Entertainment, Africa)
+- Coverage Velocity Leaderboard (sources/hour ranking)
+- Interactive Story Timeline with time-deltas and cumulative counts
+- Side-by-Side Headline Framing comparison
+- Coverage Velocity step-chart visualization
+- Related Stories via pgvector semantic similarity
+- Source registry with tier/region metadata and health monitoring
+- RAG endpoint (`/api/v1/ask`) for semantic corpus queries
+- Independent domain tracking (Trust Graph foundations)
+- Full ingestion pipeline: RSS → trafilatura → nh3 → embedding → cluster
+- ISR caching with tag-based revalidation webhooks
+- Professional informational pages (About, Privacy, Terms, RSS/Sources)
+
+### What's Next 🔜
+
+- SSE real-time breaking news ticker
+- LLM-powered multi-source intelligence briefs
+- Public API documentation and developer portal
+- Observability (OpenTelemetry traces, Prometheus)
 
 See [ROADMAP.md](docs/ROADMAP.md) for the full breakdown.
 
 ---
 
-## 📄 License
+## License
 
 MIT License © 2025 Ultra News

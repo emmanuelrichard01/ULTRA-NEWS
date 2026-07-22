@@ -1,247 +1,229 @@
-# 🚀 Deployment Guide: Vercel + Render
+# Deployment Guide — ULTRA-NEWS V3
 
-This guide outlines the production setup for Ultra News, splitting the **Frontend** (Next.js) to **Vercel** and the **Backend** (Django/Redis/Postgres) to **Render**.
-
----
-
-## ✅ Prerequisites
-
-1.  **Accounts**:
-    *   [GitHub](https://github.com/) (Contains your repository)
-    *   [Vercel Account](https://vercel.com/) (For Frontend)
-    *   [Render Account](https://render.com/) (For Backend + DB)
-2.  **Repo**: Ensure your code is pushed to a GitHub repository.
+> Vercel (Frontend) + Render (Backend, Workers, DB, Redis)
 
 ---
 
-## Part 1: Backend Deployment (Render)
+## Prerequisites
 
-We will deploy the Django API, PostgreSQL Database, and Redis on Render.
+| Requirement | Notes |
+|-------------|-------|
+| GitHub repository | Code pushed to `main` |
+| [Vercel account](https://vercel.com/) | Frontend hosting |
+| [Render account](https://render.com/) | Backend + infrastructure |
 
-### 1. Create Database & Redis
+---
 
-1.  Go to **Render Dashboard** → **New +** → **PostgreSQL**.
-    *   Name: `ultra-news-db`
-    *   Plan: Free (or Standard for production)
-2.  Go to **New +** → **Redis**.
-    *   Name: `ultra-news-redis`
-    *   Plan: Free (or Starter)
+## Part 1: Infrastructure (Render)
 
-### 2. Deploy Django Web Service
+### 1.1 PostgreSQL Database
 
-1.  **New +** → **Web Service** → Connect your GitHub repo (`ultra-news`).
-2.  **Settings**:
-    *   **Root Directory**: `backend`
-    *   **Runtime**: Docker
-    *   **Instance Type**: Free/Starter
-3.  **Environment Variables**:
+1. Render Dashboard → **New +** → **PostgreSQL**
+   - Name: `ultra-news-db`
+   - PostgreSQL Version: 16
+   - Plan: Standard (≥1GB RAM recommended for vector operations)
+
+2. **After creation**, connect via the Shell tab or `psql` and enable pgvector:
+   ```sql
+   CREATE EXTENSION IF NOT EXISTS vector;
+   ```
+
+> [!IMPORTANT]
+> The `vector` extension is required for semantic clustering. Without it, the `VectorField` columns will fail on migration and all embedding-based features (clustering, RAG search, related stories) will be non-functional.
+
+3. Copy the **Internal Database URL** — you'll need it for environment variables.
+
+### 1.2 Redis
+
+1. Render Dashboard → **New +** → **Redis**
+   - Name: `ultra-news-redis`
+   - Plan: Starter or Standard
+
+2. Copy the **Internal Redis URL**.
+
+---
+
+## Part 2: Backend Services (Render)
+
+You need three Render services from the same codebase. They share environment variables but run different commands.
+
+### 2.1 Django API (Web Service)
+
+1. **New +** → **Web Service** → Connect GitHub repo
+2. Settings:
+   - **Root Directory**: `backend`
+   - **Runtime**: Docker
+   - **Instance Type**: Standard (≥1GB RAM — fastembed loads a 384d ML model into memory)
+3. Environment Variables:
 
 | Variable | Value | Notes |
 |:---|:---|:---|
-| `SECRET_KEY` | (Generate random string) | Use a password generator |
-| `DEBUG` | `0` | **Critical**: Must be `0` in production |
-| `ALLOWED_HOSTS` | `ultra-news.onrender.com` | Your Render domain |
-| `ADMIN_API_KEY` | (Generate random string) | For protected admin endpoints |
-| `DATABASE_URL` | (Copy from Postgres dashboard) | Use "Internal Database URL" |
-| `REDIS_URL` | (Copy from Redis dashboard) | Use "Internal Redis URL" |
-| `FRONTEND_URL` | `https://your-app.vercel.app` | Add after Vercel deploy |
-| `PORT` | `8000` | Optional, defaults to 8000 |
+| `SECRET_KEY` | `$(openssl rand -hex 32)` | Generate a strong random key |
+| `DEBUG` | `0` | **Must be 0 in production** |
+| `ALLOWED_HOSTS` | `your-app.onrender.com` | Your Render domain |
+| `ADMIN_API_KEY` | `$(openssl rand -hex 24)` | For protected admin endpoints |
+| `DATABASE_URL` | *(from step 1.1)* | Internal Database URL |
+| `REDIS_URL` | *(from step 1.2)* | Internal Redis URL |
+| `CELERY_BROKER_URL` | *(same as REDIS_URL)* | Celery message broker |
+| `CELERY_RESULT_BACKEND` | *(same as REDIS_URL)* | Celery task results |
+| `FRONTEND_URL` | *(set after Vercel deploy)* | For CORS headers |
 
-### 3. Post-Deployment: Initialize Data
+### 2.2 Celery Worker (Background Worker)
 
-After your backend service is deployed and "Live":
+1. **New +** → **Background Worker** → Connect same repo
+2. Settings:
+   - **Root Directory**: `backend`
+   - **Runtime**: Docker
+   - **Docker Command**: `celery -A config worker -l info --concurrency=2`
+   - **Instance Type**: Standard (≥1GB RAM for embedding generation)
+3. **Environment Variables**: Copy all variables from the Web Service.
+
+### 2.3 Celery Beat Scheduler (Background Worker)
+
+1. **New +** → **Background Worker** → Connect same repo
+2. Settings:
+   - **Root Directory**: `backend`
+   - **Runtime**: Docker
+   - **Docker Command**: `celery -A config beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler`
+3. **Environment Variables**: Copy all variables from the Web Service.
+
+---
+
+## Part 3: Initialize Data
+
+After the backend Web Service shows "Live":
 
 ```bash
-# Seed the database (requires API key now!)
-curl -X POST https://<YOUR-RENDER-URL>.onrender.com/api/admin/seed-db \
+# Seed categories and sources (requires API key)
+curl -X POST https://your-app.onrender.com/api/v1/admin/seed-db \
   -H "X-Admin-Key: YOUR_ADMIN_API_KEY"
 ```
 
-You should see a JSON response listing created categories and sources.
-
----
-
-## Part 2: Frontend Deployment (Vercel)
-
-### 1. Import Project
-1.  Go to **Vercel Dashboard** → **Add New...** → **Project**.
-2.  Select your `ultra-news` repository.
-
-### 2. Configure Build Settings
-*   **Framework Preset**: Next.js (Default)
-*   **Root Directory**: Click "Edit" and select `frontend`.
-
-### 3. Environment Variables
-
-| Variable | Value |
-|----------|-------|
-| `NEXT_PUBLIC_API_URL` | `https://ultra-news.onrender.com` |
-
-> **Note**: `NEXT_PUBLIC_API_URL` must **NOT** have a trailing slash.
-
-### 4. Deploy
-Click **Deploy**. Vercel will build the frontend.
-
----
-
-## Part 3: GitHub Actions (Automated Ingestion)
-
-GitHub Actions handles automatic news ingestion every 30 minutes.
-
-### 1. Add Repository Secrets
-
-Go to your GitHub repo → **Settings** → **Secrets and variables** → **Actions** → **New repository secret**:
-
-| Secret Name | Value |
-|:---|:---|
-| `INGEST_URL` | `https://ultra-news.onrender.com/api/admin/trigger-ingest` |
-| `ADMIN_API_KEY` | (Same value as Render) |
-
-### 2. Verify Workflow
-
-The workflow file `.github/workflows/ingest.yml` is already configured. It will:
-- Run every 30 minutes automatically
-- Send authenticated `POST` request with `X-Admin-Key` header
-- Trigger background news scraping
-
-### 3. Manual Trigger
-
-To test immediately:
-1. Go to **Actions** tab in GitHub
-2. Select "Trigger News Ingestion" workflow
-3. Click **Run workflow**
-
----
-
-## Part 4: Connecting the Dots (CORS)
-
-Once Vercel deploys, you will get a permanent URL (e.g., `https://ultra-news-alpha.vercel.app`).
-
-1.  Go back to **Render** → **Web Service** → **Environment**.
-2.  Update/Add `FRONTEND_URL` with your Vercel URL:
-    ```
-    https://ultra-news-alpha.vercel.app
-    ```
-3.  Render will redeploy.
-4.  **Done!** Your Vercel frontend can now securely fetch data from your Render backend.
-
----
-
-## 🔒 Security Checklist
-
-Before going live, verify these security measures:
-
-- [ ] `DEBUG` is set to `0` in Render environment
-- [ ] `ALLOWED_HOSTS` contains only your domain (not `*`)
-- [ ] `ADMIN_API_KEY` is a strong, random string (32+ characters)
-- [ ] GitHub secret `ADMIN_API_KEY` matches Render value
-- [ ] `/api/admin/*` endpoints return `401` without proper header
-
-### Test Security
-
-```bash
-# Should return 401 Unauthorized
-curl -X POST https://ultra-news.onrender.com/api/admin/trigger-ingest
-
-# Should return 200 OK  
-curl -X POST https://ultra-news.onrender.com/api/admin/trigger-ingest \
-  -H "X-Admin-Key: YOUR_ADMIN_API_KEY"
-```
-
----
-
-## 📊 Health Monitoring
-
-The `/api/health` endpoint provides deep health checks:
-
-```bash
-curl https://ultra-news.onrender.com/api/health
-```
-
-**Expected Response:**
+Expected response:
 ```json
 {
-  "status": "ok",
-  "db": "ok",
-  "cache": "ok"
+  "status": "completed",
+  "categories": ["Tech: Created", "Politics: Created", "Sports: Created", ...],
+  "sources": ["Reuters: Created", "AP News: Created", "The Guardian: Created", ...],
+  "deactivated": ["AllAfrica: Deactivated", ...]
 }
 ```
 
-If any component fails, status will be `"degraded"` with error details.
+> [!NOTE]
+> The seed endpoint reads from `core/source_registry.py`, which defines 35+ sources with tier and region metadata. Sources marked as inactive in the registry are auto-deactivated during seeding.
 
 ---
 
-## 🛠 Troubleshooting
+## Part 4: Frontend (Vercel)
 
-### Admin endpoints return 401
-- Verify `ADMIN_API_KEY` environment variable is set in Render
-- Ensure `X-Admin-Key` header is included in requests
-- Check that GitHub secret matches Render value exactly
+### 4.1 Import Project
 
-### Images not showing
-- Ensure `FRONTEND_URL` in Render variables exactly matches Vercel URL (no trailing slash)
-- Check that images are being extracted during ingestion
+1. Vercel Dashboard → **Add New...** → **Project**
+2. Select your `ultra-news` repository
 
-### CORS Errors
-- Verify `FRONTEND_URL` is set correctly in Render
-- Check Browser Console for specific origin errors
-- Ensure no trailing slash in URL
+### 4.2 Configure
 
-### Database connection fail
-- Verify `DATABASE_URL` variable in Render is linked to the Postgres service
-- Check Render Postgres dashboard for connection issues
+- **Framework Preset**: Next.js
+- **Root Directory**: `frontend`
+- **Environment Variables**:
 
-### Health check shows "degraded"
-- Check Render logs for specific error messages
-- Verify Redis connection if cache shows error
-- Restart the service if database connection is stale
+| Variable | Value |
+|----------|-------|
+| `NEXT_PUBLIC_API_URL` | `https://your-app.onrender.com` |
+| `NEXT_PUBLIC_APP_URL` | `https://ultra-news.vercel.app` |
+
+> [!WARNING]
+> `NEXT_PUBLIC_API_URL` must **not** have a trailing slash. `https://your-app.onrender.com` ✅ `https://your-app.onrender.com/` ❌
+
+### 4.3 Deploy
+
+Click **Deploy**. Vercel builds the frontend and assigns a URL.
 
 ---
 
-## 🔐 Environment Variables Reference
+## Part 5: Connect CORS
 
-### Backend (Render)
+1. Copy your Vercel URL (e.g., `https://ultra-news.vercel.app`)
+2. Go to Render → Web Service → Environment
+3. Set `FRONTEND_URL` to the Vercel URL
+4. Render auto-redeploys. Frontend can now fetch from backend.
 
-| Variable | Required | Description | Example |
-|:---|:---:|:---|:---|
-| `SECRET_KEY` | ✅ | Django security key | `dj-sk-abc123...` |
-| `DEBUG` | ✅ | Must be `0` for production | `0` |
-| `ALLOWED_HOSTS` | ✅ | Comma-separated hostnames | `ultra-news.onrender.com` |
-| `ADMIN_API_KEY` | ✅ | Admin endpoint authentication | `un-admin-key-2025-xyz` |
-| `DATABASE_URL` | ✅ | PostgreSQL connection | `postgres://...` |
-| `REDIS_URL` | ✅ | Redis connection | `redis://...` |
-| `FRONTEND_URL` | ✅ | Vercel URL for CORS | `https://app.vercel.app` |
+---
+
+## Verification Checklist
+
+After deployment, verify each layer:
+
+```bash
+# 1. Health check — should return {"status": "ok", "db": "ok", "cache": "ok"}
+curl https://your-app.onrender.com/api/v1/health
+
+# 2. Source registry — should return 35+ sources with tier/region data
+curl https://your-app.onrender.com/api/v1/sources | python -m json.tool | head -30
+
+# 3. Auth — should return 401 without key
+curl -X POST https://your-app.onrender.com/api/v1/admin/seed-db
+# Expected: 401 Unauthorized
+
+# 4. Auth — should return 200 with key
+curl -X POST https://your-app.onrender.com/api/v1/admin/seed-db \
+  -H "X-Admin-Key: YOUR_ADMIN_API_KEY"
+# Expected: 200 OK
+
+# 5. Frontend — open in browser
+open https://ultra-news.vercel.app
+```
+
+---
+
+## Environment Variables Reference
+
+### Backend (Render — all three services)
+
+| Variable | Required | Description |
+|:---|:---:|:---|
+| `SECRET_KEY` | ✅ | Django security key (random, 64+ chars) |
+| `DEBUG` | ✅ | `0` for production |
+| `ALLOWED_HOSTS` | ✅ | Comma-separated hostnames |
+| `ADMIN_API_KEY` | ✅ | Admin endpoint authentication (random, 48+ chars) |
+| `DATABASE_URL` | ✅ | PostgreSQL connection (internal URL) |
+| `REDIS_URL` | ✅ | Redis connection (internal URL) |
+| `CELERY_BROKER_URL` | ✅ | Same as `REDIS_URL` |
+| `CELERY_RESULT_BACKEND` | ✅ | Same as `REDIS_URL` |
+| `FRONTEND_URL` | ✅ | Vercel URL for CORS |
 
 ### Frontend (Vercel)
 
 | Variable | Required | Description |
 |:---|:---:|:---|
 | `NEXT_PUBLIC_API_URL` | ✅ | Backend API URL (no trailing slash) |
-
-### GitHub Actions
-
-| Secret | Description |
-|:---|:---|
-| `INGEST_URL` | Full URL to trigger-ingest endpoint |
-| `ADMIN_API_KEY` | Same value as Render environment |
+| `NEXT_PUBLIC_APP_URL` | — | Public app URL (for meta tags, OG) |
 
 ---
 
-## 📈 Optional: Scalable Production (Celery)
+## Operational Notes
 
-For high-traffic deployments, you can add Celery workers instead of GitHub Actions:
+### Resource Requirements
 
-### Deploy Celery Worker
-1.  **New +** → **Background Worker** → Connect repo.
-2.  **Settings**:
-    *   **Root Directory**: `backend`
-    *   **Runtime**: Docker
-    *   **Docker Command**: `celery -A config worker -l info`
-3.  Copy all environment variables from the Web Service.
+The Celery Worker loads the `bge-small-en-v1.5` embedding model (~100MB) into memory at startup. On Render's Free tier (512MB RAM), this will OOM. **Standard tier (1GB+) is the minimum for the worker.**
 
-### Deploy Celery Beat (Scheduler)
-1.  **New +** → **Background Worker** → Connect repo.
-2.  **Docker Command**: `celery -A config beat -l info`
-3.  Copy all environment variables.
+### Scaling
 
-> **Note**: Background Workers are a paid feature on Render. The GitHub Actions approach works on the free tier.
+| Bottleneck | Solution |
+|-----------|----------|
+| Ingestion throughput | Increase `--concurrency` on the Celery Worker |
+| API response latency | Redis cache TTL (currently 300s on detail endpoints) |
+| Database query speed | pgvector HNSW index (not yet configured — IVFFlat default) |
+| Frontend TTFB | Vercel Edge caching via ISR (currently 60s revalidation) |
+| Source pool diversity | Add sources to `core/source_registry.py` and re-seed |
+
+### Troubleshooting
+
+| Symptom | Likely Cause | Fix |
+|---------|-------------|-----|
+| CORS errors in browser | `FRONTEND_URL` not set or has trailing slash | Set exact Vercel URL in Render env |
+| Health check shows `degraded` | Database or Redis connection lost | Check Render dashboard for service status |
+| No new articles after deployment | Celery Beat not running or Worker OOM'd | Check Background Worker logs in Render |
+| Images not loading | `og:image` extraction failed during ingestion | Check worker logs for `trafilatura` errors |
+| All stories stuck on Wire | Source pool too narrow for cross-outlet overlap | Add wire service sources (Reuters, AP) and re-seed |
+| Seed returns empty sources | `source_registry.py` not found or import error | Check backend logs for Python import errors |

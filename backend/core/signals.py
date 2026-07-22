@@ -20,7 +20,7 @@ def trigger_nextjs_revalidate(sender, instance, **kwargs):
     nextjs_url = getattr(settings, 'NEXTJS_URL', 'http://frontend:3000')
     webhook_secret = getattr(settings, 'REVALIDATE_SECRET', 'dev_secret')
     
-    url = f"{nextjs_url}/api/revalidate?tag=story:{instance.id}&secret={webhook_secret}"
+    url = f"{nextjs_url}/api/revalidate?tag=story:{instance.slug}&secret={webhook_secret}"
     try:
         # Fire and forget (timeout=1 to prevent blocking)
         requests.get(url, timeout=1)

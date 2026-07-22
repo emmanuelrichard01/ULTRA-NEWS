@@ -10,7 +10,7 @@ class Source(models.Model):
         PRIMARY = 'primary', 'Primary Source (Gov/Corporate)'
 
     name = models.CharField(max_length=255)
-    url = models.URLField(unique=True)
+    url = models.URLField(max_length=1000, unique=True)
     scraper_type = models.CharField(max_length=50, default='rss')
     source_type = models.CharField(
         max_length=20,
@@ -54,9 +54,9 @@ class Story(models.Model):
     collapsed into one verified story."
     """
     class Status(models.TextChoices):
-        WIRE = 'wire', 'The Wire'            # 1 source, low velocity
-        DEVELOPING = 'developing', 'Developing'      # 2 sources, or 1 source + high velocity
-        CORROBORATED = 'corroborated', 'Reporting' # 3+ independent domains
+        WIRE = 'wire', 'The Wire'                    # 1 source, unverified
+        DEVELOPING = 'developing', 'Developing'      # 2 independent sources confirming
+        CORROBORATED = 'corroborated', 'Reporting'   # 3+ independent domains
 
     title = models.CharField(max_length=500)
     slug = models.SlugField(max_length=500, unique=True)
@@ -87,17 +87,11 @@ class Story(models.Model):
         indexes = [
             models.Index(fields=['-first_seen_at'], name='story_first_seen_idx'),
             models.Index(fields=['status', '-first_seen_at'], name='story_status_idx'),
+            models.Index(fields=['-velocity_score', '-first_seen_at', '-id'], name='story_cursor_idx'),
         ]
 
     def __str__(self):
         return self.title
-
-    def update_status(self):
-        """Recalculate status based on source count."""
-        if self.source_count >= 3:
-            self.status = self.Status.CORROBORATED
-        else:
-            self.status = self.Status.DEVELOPING
 
     def update_primary_source(self):
         """Flag the chronologically first article as the primary source."""
@@ -114,7 +108,7 @@ class Article(models.Model):
     title = models.CharField(max_length=500)
     slug = models.SlugField(max_length=500, unique=True, blank=True)
     source = models.ForeignKey(Source, on_delete=models.CASCADE, related_name='articles')
-    url = models.URLField(unique=True)
+    url = models.URLField(max_length=1000, unique=True)
     image_url = models.URLField(max_length=1000, blank=True, null=True)
     # V3: excerpt-only model — short excerpt for display, full text in RawDocument
     excerpt = models.TextField(
@@ -151,6 +145,11 @@ class Article(models.Model):
         indexes = [
             models.Index(fields=['-published_date'], name='article_pub_date_idx'),
             models.Index(fields=['source', '-published_date'], name='article_source_pub_idx'),
+            models.Index(
+                fields=['story'],
+                name='article_no_story_idx',
+                condition=models.Q(story__isnull=True),
+            ),
             GinIndex(fields=['search_vector'], name='article_search_gin_idx'),
         ]
 
@@ -170,7 +169,7 @@ class RawDocument(models.Model):
         related_name='raw_document',
         null=True, blank=True,
     )
-    url = models.URLField(unique=True)
+    url = models.URLField(max_length=1000, unique=True)
     raw_content = models.TextField(
         help_text="Full extracted text. Internal use only — AI processing, embeddings.",
     )

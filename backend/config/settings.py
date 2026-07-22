@@ -35,6 +35,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'django.middleware.gzip.GZipMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -50,6 +51,11 @@ FRONTEND_URLS = os.environ.get('FRONTEND_URL', 'http://localhost:3000').split(',
 CORS_ALLOWED_ORIGINS = FRONTEND_URLS
 CSRF_TRUSTED_ORIGINS = FRONTEND_URLS
 CORS_ALLOW_CREDENTIALS = True
+
+# Security & Proxy Settings
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
 
 ROOT_URLCONF = 'config.urls'
 
@@ -94,6 +100,28 @@ CACHES = {
 CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "redis://redis:6379/1")
 CELERY_RESULT_BACKEND = os.environ.get("CELERY_RESULT_BACKEND", "redis://redis:6379/1")
 CELERY_TIMEZONE = "UTC"
+
+# Celery Beat — Automated task scheduling
+# Decoupled: scraping and clustering run independently so a failed scrape never blocks clustering.
+from celery.schedules import crontab
+
+CELERY_BEAT_SCHEDULE = {
+    'scrape-all-sources-every-30-min': {
+        'task': 'core.tasks.scrape_all_sources',
+        'schedule': 30 * 60,  # Every 30 minutes
+        'options': {'queue': 'celery'},
+    },
+    'cluster-pending-articles-every-5-min': {
+        'task': 'core.tasks.cluster_pending_articles',
+        'schedule': 5 * 60,  # Every 5 minutes
+        'options': {'queue': 'cluster'},
+    },
+    'compute-trust-metrics-daily': {
+        'task': 'core.tasks.compute_trust_metrics',
+        'schedule': crontab(hour=3, minute=0),  # Daily at 03:00 UTC
+        'options': {'queue': 'celery'},
+    },
+}
 
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},

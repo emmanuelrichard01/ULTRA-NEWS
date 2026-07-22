@@ -2,9 +2,7 @@ import pytest
 from unittest.mock import patch, MagicMock
 from django.utils import timezone
 from core.models import Source, Article, RawDocument
-from core.services.scraper import ScraperService, RSSScraper
 from core.tasks import scrape_all_sources
-import feedparser
 
 @pytest.fixture
 def test_source(db):
