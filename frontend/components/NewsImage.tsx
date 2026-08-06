@@ -53,42 +53,46 @@ export default function NewsImage({
   const imgRef = useRef<HTMLImageElement>(null);
 
   /**
-   * Give up on a slow image.
+   * Catch images the browser already had cached.
    *
-   * `onError` covers a host that refuses or 404s, but not one that accepts the
-   * connection and never finishes — hotlink protection that stalls, a CDN that
-   * is simply far away, a publisher having a bad day. In those cases the
-   * element neither loads nor errors, so the placeholder sits there
-   * indefinitely. On a lead card that is several hundred pixels of empty box at
-   * the top of the front page, which reads as a broken layout rather than a
-   * slow one.
+   * A cached image can finish decoding before React attaches `onLoad`, so the
+   * event never fires and the element would sit at `opacity-0` behind a
+   * skeleton forever. Reading `complete` once on the next tick covers it.
    *
-   * After the timeout the informative fallback below takes over, which on this
-   * product is a reasonable thing to be looking at anyway.
+   * There is deliberately NO timeout here.
    *
-   * The `complete` check covers images the browser already had cached: those
-   * can finish before React attaches its handlers, so `onLoad` never fires and
-   * a picture that was ready instantly would otherwise be timed out.
+   * A previous version gave up on an image after 6s (priority) or 10s (lazy)
+   * and swapped in the fallback, reasoning that a host which stalls without
+   * erroring would otherwise leave a placeholder up indefinitely. That shipped
+   * and broke images across the whole site.
+   *
+   * The reason: feed images are `loading="lazy"`, so the browser defers the
+   * request until they approach the viewport — but the timer started on MOUNT,
+   * for every card on the page at once. The fifteenth card began a ten-second
+   * countdown immediately, was never requested because the reader had not
+   * scrolled to it, and was marked failed on a request that had not been made.
+   * `failed` then unmounts the <img> entirely, so it could never recover. Above
+   * the fold the same thing happened to anyone on a connection slower than a
+   * local dev server.
+   *
+   * `onError` is the only correct signal for a broken image, and unlike a
+   * timer it cannot be wrong. A genuinely stalled host now shows the skeleton,
+   * which is honest: the image is still coming.
    */
   useEffect(() => {
     if (!src || loaded || failed) return;
 
-    // Both checks are deferred rather than run in the effect body: setting
-    // state synchronously there costs an extra render pass before paint, on a
-    // component that appears once per feed row.
+    // Deferred rather than run in the effect body: setting state synchronously
+    // there costs an extra render pass before paint, on a component that
+    // appears once per feed row.
     const cachedCheck = setTimeout(() => {
       if (imgRef.current?.complete && imgRef.current.naturalWidth > 0) {
         setLoaded(true);
       }
     }, 0);
 
-    const giveUp = setTimeout(() => setFailed(true), priority ? 6000 : 10000);
-
-    return () => {
-      clearTimeout(cachedCheck);
-      clearTimeout(giveUp);
-    };
-  }, [src, loaded, failed, priority]);
+    return () => clearTimeout(cachedCheck);
+  }, [src, loaded, failed]);
 
   /**
    * Fallback.
