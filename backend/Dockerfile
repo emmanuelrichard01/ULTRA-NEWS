@@ -55,7 +55,22 @@ print('embedding model cached')"
 # So the default is the one that fits the smallest documented target, and larger
 # hosts opt in. Baking in 2 also silently doubled the dev container, because
 # uvicorn honours the same variable.
-CMD ["gunicorn", "config.asgi:application", \
-     "-k", "uvicorn.workers.UvicornWorker", \
-     "--bind", "0.0.0.0:8000", \
-     "--timeout", "120"]
+# Bind to $PORT when the platform provides one.
+#
+# The port was hardcoded to 8000, which cost a deploy: Koyeb health-checks the
+# port it assigns (8080 by default), found nothing listening, and killed the
+# container roughly 90 seconds into every boot — while the logs said
+# "Application startup complete" each time. The app was never the problem, and
+# nothing in the failure pointed at the port.
+#
+# Koyeb, Render, Railway, Heroku and Cloud Run all inject PORT. Honouring it
+# makes the image correct on all of them with no configuration, and the default
+# keeps docker-compose and local runs on 8000.
+#
+# `sh -c` is needed for ${PORT} to expand at all — an exec-form CMD does no
+# variable substitution — and `exec` hands PID 1 to gunicorn so it still
+# receives SIGTERM directly and shuts down gracefully.
+CMD ["sh", "-c", "exec gunicorn config.asgi:application \
+     -k uvicorn.workers.UvicornWorker \
+     --bind 0.0.0.0:${PORT:-8000} \
+     --timeout 120"]

@@ -110,7 +110,7 @@ than the whole feature.
 | Dockerfile location | `Dockerfile` |
 | Instance | **Free** (512 MB, 0.1 vCPU) |
 | Region | Washington DC *or* Frankfurt (free tier allows one) |
-| Port | `8000` |
+| Port | `8000` — **and check the health-check port matches** |
 | Health check path | `/api/v1/health` |
 
 **Leave the run command empty.** The Dockerfile's default already reads
@@ -337,6 +337,7 @@ REDIS_URL=rediss://default:<password>@<host>.upstash.io:6379
 | --- | --- | --- |
 | Site loads, no stories | `FRONTEND_URL` unset or mismatched | Step 7. Check the browser console for CORS. |
 | Container OOM-killed | `WEB_CONCURRENCY` > 1 | Set it to `1`. Two workers need 587 MiB. |
+| Boot loop: `TCP health check failed on port 8080`, logs otherwise clean | Platform health-checks a different port than the app binds | The image now honours `$PORT`, so this resolves itself on a rebuild. On an older image, set the exposed port to `8000` in the platform settings. Note the logs say `Application startup complete` every time — the app is fine; nothing is listening where the checker is looking. |
 | App refuses to start | `SECRET_KEY` unset with `DEBUG=0` | By design. Set it. |
 | `relation "core_story" does not exist` | Migrations never ran | Run the Pipeline workflow — its first step is `migrate`. |
 | Pipeline succeeds, ingests 0 | Sources not seeded | Step 4, then re-run. |
