@@ -1,0 +1,72 @@
+name: Pipeline — ingest, cluster, momentum
+
+# The compute tier for the $0 deployment.
+#
+# This replaces a workflow that POSTed to an admin endpoint and let the API do
+# the work. That inverts the resource picture: on the free path the API host has
+# 512 MB and a fraction of a core, while this runner has 7 GB and four cores for
+# nothing. Embedding and clustering are batch work — they belong here, and the
+# API stays a small read-mostly server that also answers /ask.
+
+on:
+  schedule:
+    # Every 30 minutes. GitHub's scheduler is best-effort and lags under load,
+    # so treat this as a floor rather than a guarantee.
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+# A run that overruns its slot must not race the next one: two clusterers
+# embedding the same pending articles would create duplicate stories.
+concurrency:
+  group: pipeline
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: backend
+
+    env:
+      DEBUG: '0'
+      SECRET_KEY: ${{ secrets.SECRET_KEY }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      ALLOWED_HOSTS: localhost
+      # No Redis on the free path, and this process serves no requests.
+      CACHE_BACKEND: locmem
+      # Briefs are synthesised here rather than on the API host, so the key is
+      # needed. Omit the secret and synthesis falls back to extraction — the
+      # pipeline still succeeds.
+      LLM_PROVIDER: ${{ secrets.LLM_API_KEY && 'groq' || 'none' }}
+      LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      # Without this every run re-downloads the embedding model.
+      - name: Cache embedding model
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: fastembed-bge-small-en-v1.5
+
+      - run: pip install -r requirements.txt
+
+      # Idempotent and cheap. On the free path there is no release phase to hang
+      # migrations off, so they run here — the concurrency group above keeps two
+      # runs from attempting it at once.
+      - name: Apply migrations
+        run: python manage.py migrate --noinput
+
+      # One process, one model load. Three separate manage.py calls would pay
+      # the ~11s load three times.
+      - name: Ingest, cluster, refresh momentum
+        run: python manage.py run_pipeline --workers 8

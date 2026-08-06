@@ -85,9 +85,20 @@ export default function RootLayout({
       >
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <ReactQueryProvider>
+            {/* Skip link — the nav carries editions, topics and search, which is
+                a lot to tab past on every page. */}
+            <a
+              href="#main"
+              className="text-body-sm sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[60] focus:rounded-[var(--radius-chip)] focus:bg-[var(--foreground)] focus:px-4 focus:py-2 focus:text-[var(--background)]"
+            >
+              Skip to content
+            </a>
             <Navbar />
             <BreakingNewsTicker />
-            <main className="flex-grow w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+            {/* Pages set their own max-width — the feed reads at 6xl, articles
+                and the story page at 3xl for a comfortable measure. A single
+                7xl wrapper here forced every page to the widest one. */}
+            <main id="main" className="w-full flex-grow px-4 py-10 sm:px-6 sm:py-12">
               {children}
             </main>
             <Footer />

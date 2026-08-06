@@ -1,7 +1,9 @@
 import pytest
 from django.core.cache import cache
 from ninja.testing import TestClient
+
 from api.api import api
+
 
 @pytest.fixture(autouse=True)
 def clear_cache():

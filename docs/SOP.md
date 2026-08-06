@@ -1,6 +1,6 @@
 # Standard Operating Procedures
 
-> Engineering standards and conventions for ULTRA-NEWS V3.
+> Engineering standards and conventions for Ultra News.
 
 ---
 
@@ -35,10 +35,15 @@
 ### Single Source of Truth
 
 | Data | Authoritative Location | Not Here |
-|------|----------------------|----------|
-| Category definitions | `core/categorization.py` → `CATEGORY_REGISTRY` | Not in seed scripts, not in API endpoints |
+| ------ | ---------------------- | ---------- |
+| Topic taxonomy | `core/topics.py` → `TOPICS` | Not in `categorization.py`, not in seed scripts. `lib/types.ts → CATEGORY_MAP` mirrors it and a test fails on drift. |
 | Source definitions | `core/source_registry.py` → `SOURCES` | Not duplicated in `api.py seed_db()` — it reads from the registry |
 | Tier classification | `core/clustering.py` → `compute_tier()` | Not in model methods — `compute_tier()` is the sole authority |
+| Publisher identity | `core/models.py` → `derive_publisher_domain()` | Never the raw feed URL. Two feeds from one newsroom must not count twice. |
+| Velocity | `core/clustering.py` → `compute_velocity()` | Was computed two different ways; the feed ranking disagreed with the story page. |
+| Editions | `frontend/lib/editions.ts` → `EDITIONS` | Not hardcoded per route. |
+| LLM provider | `core/services/llm.py` → `get_provider()` | Never a hardcoded vendor or model id. |
+| Calibrated constants | `EMBEDDING_MATCH_THRESHOLD`, `TOPIC_DISTINCTIVENESS_MIN` | Changed only with a re-run of the matching `manage.py calibrate_*` command. |
 | Frontend types | `lib/types.ts` → `StoryDetail`, `CATEGORY_MAP`, etc. | Not redefined locally in page components |
 | Frontend API calls | `lib/api.ts` → `fetchStories()`, `fetchStory()`, etc. | Not raw `fetch()` calls in page components |
 
@@ -46,7 +51,10 @@
 
 - Articles are deduped by URL (`Article.url` unique constraint).
 - Content hash (`SHA-256 of normalized title+content`) provides secondary dedup.
-- Stories are deduped by semantic similarity (cosine ≥ 0.80 within 72h window).
+- Stories are deduped by semantic similarity (cosine ≥ 0.80 within a 72h window).
+- **Corroboration counts PUBLISHERS, not articles.** One newsroom filing five
+  updates is one source. This is the product's central claim; any code that
+  counts articles where it means publishers is a bug.
 
 ### Sanitization
 
@@ -141,3 +149,39 @@ The Makefile is the canonical developer interface. All common operations should 
 - **User feedback**: Print success/failure messages and next-step hints. `make seed` should tell the user what happened.
 - **Destructive operations**: Separate `clean` (safe — removes containers) from `nuke` (destructive — removes volumes and data). Warn the user.
 - **`help` as default**: `make` with no arguments shows all available commands.
+
+---
+
+## Calibrated constants
+
+Some numbers in this codebase were chosen by measurement against real data, not
+by judgement. They carry the command that produced them:
+
+| Constant | Command | Records |
+| --- | --- | --- |
+| `EMBEDDING_MATCH_THRESHOLD` | `manage.py calibrate_threshold` | Cluster-size distribution per threshold |
+| `TOPIC_DISTINCTIVENESS_MIN` | `manage.py calibrate_topics` | Coverage and dual-tag rate |
+| Embedding model choice | `manage.py benchmark_embeddings` | Class separation per model |
+
+**Do not adjust one because output "looks wrong".** Re-run the command, read the
+distribution, and change the constant only if the data supports it. Each is
+guarded by a test that asserts the *property* — that the value separates the
+labelled classes — so retuning past what the data supports fails CI.
+
+## Failure handling
+
+- **Degrade, don't dead-end.** If the model is unavailable, answer from the
+  sources. Retrieval has already succeeded by then.
+- **A failure must be recorded as a failure.** Returning an empty list from a
+  broken fetch is how four dead feeds reported healthy for months.
+- **Never return provider errors to a client.** SDK exceptions embed request
+  URLs, headers and key fragments. Log the detail; return something opaque.
+- **Keyless must work.** No AI provider is a supported configuration, not a
+  degraded one.
+
+## Instrumentation
+
+- Metric labels must be **low-cardinality** — route patterns, never raw paths.
+  A label per story slug will take the metrics endpoint down.
+- Instrumentation must never break the app: `prometheus_client` is optional and
+  degrades to no-ops.

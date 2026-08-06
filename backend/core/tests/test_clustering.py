@@ -1,8 +1,15 @@
 from datetime import timedelta
-from django.utils import timezone
+
 import pytest
-from core.models import Source, Category, Article, Story
-from core.clustering import TokenOverlapScorer, cluster_article
+from django.utils import timezone
+
+from core.clustering import (
+    TOKEN_MATCH_THRESHOLD,
+    TokenOverlapScorer,
+    cluster_article,
+)
+from core.models import Article, Category, Source, Story
+
 
 @pytest.fixture
 def base_source():
@@ -25,14 +32,14 @@ def test_token_overlap_scorer_similarity(base_source, category):
         first_seen_at=now,
     )
     
-    article1 = Article.objects.create(
+    Article.objects.create(
         source=base_source,
         title="Policymakers Maintain Interest Rate for Third Straight Meeting",
         url="http://test.com/1",
         published_date=now,
     )
     
-    article2 = Article.objects.create(
+    Article.objects.create(
         source=base_source,
         title="CBN Keeps Benchmark Rate Unchanged",
         url="http://test.com/2",
@@ -47,12 +54,31 @@ def test_token_overlap_scorer_similarity(base_source, category):
     )
 
     scorer = TokenOverlapScorer()
-    
-    # "Central Bank Keeps Rates Unchanged" should match "Central Bank Holds Rates Steady Amid Inflation Concerns"
-    # Overlap: "central", "bank", "rate" vs "central", "bank", "rate", "steady", "amid", "inflation", "concern"
-    # Jaccard index: 3 / 7 > 0.35
+
+    # "Central Bank Keeps Rates Unchanged" vs
+    # "Central Bank Holds Rates Steady Amid Inflation Concerns"
+    #   article tokens: {central, bank, keep, rate, unchanged}          -> 5
+    #   story tokens:   {central, bank, hold, rate, steady, amid,
+    #                    inflation, concern}                            -> 8
+    #   shared:         {central, bank, rate}                           -> 3
+    #
+    # Overlap coefficient: 3 / min(5, 8) = 0.60, comfortably over the threshold.
+    # Under the old Jaccard metric this was 3 / 10 = 0.30 — beneath the 0.35
+    # threshold the code used, so a plainly matching pair was rejected. (The
+    # comment here previously claimed 3/7, having overlooked the article's own
+    # unique tokens in the union.)
     score3 = scorer.similarity(article3, story)
-    assert score3 > 0.35
+    assert score3 == pytest.approx(0.6), score3
+    assert score3 >= TOKEN_MATCH_THRESHOLD
+
+    # A headline sharing only one incidental content word must not match.
+    unrelated = Article.objects.create(
+        source=base_source,
+        title="Bank Holiday Traffic Snarls Motorways",
+        url="http://test.com/4",
+        published_date=now,
+    )
+    assert scorer.similarity(unrelated, story) == 0.0
 
 @pytest.mark.django_db
 def test_cluster_article_merges_on_similarity(base_source, secondary_source, category):

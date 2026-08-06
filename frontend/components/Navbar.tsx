@@ -1,212 +1,187 @@
 "use client";
 
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
-import { ThemeToggle } from './ThemeToggle';
-import SearchBar from './SearchBar';
+import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 
-const primaryViews = [
-  { name: 'The Wire', href: '/' },
-  { name: 'Developing', href: '/developing' },
-  { name: 'Reporting', href: '/reporting' },
-];
+import { ThemeToggle } from './ThemeToggle';
+import { CATEGORY_MAP } from '@/lib/types';
 
-const topics = [
-  { name: 'Tech', href: '/tech' },
-  { name: 'Politics', href: '/politics' },
-  { name: 'Business', href: '/business' },
-  { name: 'Science', href: '/science' },
-  { name: 'Sports', href: '/sports' },
-  { name: 'World', href: '/world' },
-  { name: 'Health', href: '/health' },
-  { name: 'Culture', href: '/entertainment' },
-  { name: 'Art', href: '/art' },
+/**
+ * Navbar.
+ *
+ * The primary nav used to be three pipeline tiers — The Wire / Developing /
+ * Reporting — which put 95% of content behind one link and left the other two
+ * near-empty. Editions now live in their own masthead rule inside the feed, so
+ * this carries only what sits outside them.
+ *
+ * The keyword search box is gone too. It duplicated Ask the Wire Room while
+ * being strictly worse at the same job: keyword search matches article text,
+ * whereas Ask retrieves whole story clusters and answers with the corroboration
+ * attached. Two search affordances in one header, one of them weaker, is a
+ * choice the reader shouldn't have to make.
+ *
+ * And the "Subscribe" CTA. It was the most prominent element in the header —
+ * bordered, right-aligned, styled as the primary action — pointing at a page
+ * that now says email digests don't exist. A label promising signup should not
+ * lead somewhere that opens by declining. RSS remains discoverable from Sources
+ * (which lists the same feeds) and from the footer, which is proportionate to
+ * what it is.
+ */
+
+const TOPICS = Object.entries(CATEGORY_MAP).map(([slug, info]) => ({
+  slug,
+  name: info.displayName,
+  href: `/${slug}`,
+}));
+
+// Editions live in their own masthead rule inside the feed, so the global nav
+// carries only what sits outside them.
+const PRIMARY = [
+  { name: 'Sources', href: '/rss' },
+  { name: 'About', href: '/about' },
 ];
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
 
-  // Close menu when route changes
-  useEffect(() => {
+  // Close the menu on navigation. Adjusting state during render rather than in
+  // an effect avoids painting the new route with the menu still open.
+  const [lastPathname, setLastPathname] = useState(pathname);
+  if (pathname !== lastPathname) {
+    setLastPathname(pathname);
     setIsOpen(false);
-  }, [pathname]);
+  }
 
-  // Lock body scroll when menu is open
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = 'unset';
-    }
-    return () => { document.body.style.overflow = 'unset'; };
-  }, [isOpen]);
+  const isTopicActive = TOPICS.some((t) => t.href === pathname);
 
   return (
-    <nav className={`sticky top-0 z-50 border-b border-[var(--border)] transition-colors duration-300 ${isOpen
-      ? "bg-[var(--background)]"
-      : "bg-[var(--background)]/90 backdrop-blur-xl supports-[backdrop-filter]:bg-[var(--background)]/70"
-      }`}>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-14 items-center">
-          {/* V3 Mono Wordmark */}
-          <Link href="/" className="flex items-center gap-2 group z-50 relative">
-            <div className="w-7 h-7 relative flex items-center justify-center">
-              <img src="/images/logo-light-mode.png" alt="Logo" className="absolute inset-0 w-full h-full object-contain dark:hidden" />
-              <img src="/images/logo-dark-mode.png" alt="Logo" className="absolute inset-0 w-full h-full object-contain hidden dark:block" />
-            </div>
-            <span className="font-data text-lg font-bold tracking-tight text-[var(--foreground)] uppercase">
-              ULTRA<span className="text-[var(--foreground-muted)]">·</span><span className="text-[var(--foreground-muted)]">NEWS</span>
-            </span>
-          </Link>
+    <header className="sticky top-0 z-50 border-b border-[var(--border)] bg-[var(--background)]/95 backdrop-blur supports-[backdrop-filter]:bg-[var(--background)]/80">
+      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
+        {/* Wordmark */}
+        <Link href="/" className="flex shrink-0 items-center gap-2">
+          <span className="font-display text-[17px] font-semibold tracking-tight text-[var(--foreground)]">
+            Ultra
+            <span className="text-[var(--foreground-subtle)]">News</span>
+          </span>
+        </Link>
 
-          {/* Desktop Navigation */}
-          <div className="hidden lg:flex items-center gap-7">
-            {primaryViews.map((view) => {
-              const isActive = pathname === view.href;
-              return (
+        {/* Desktop nav */}
+        <nav aria-label="Primary" className="hidden items-center gap-6 lg:flex">
+          {PRIMARY.map((item) => {
+            const active = pathname === item.href;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                aria-current={active ? 'page' : undefined}
+                className={`text-body-sm transition-colors ${
+                  active
+                    ? 'text-[var(--foreground)]'
+                    : 'text-[var(--foreground-muted)] hover:text-[var(--foreground)]'
+                }`}
+              >
+                {item.name}
+              </Link>
+            );
+          })}
+
+          {/* Topics — a details/summary disclosure so it works without hover,
+              which the old CSS-hover dropdown did not on touch devices. */}
+          <details className="group relative">
+            <summary
+              className={`text-body-sm flex cursor-pointer list-none items-center gap-1 transition-colors marker:content-[''] ${
+                isTopicActive
+                  ? 'text-[var(--foreground)]'
+                  : 'text-[var(--foreground-muted)] hover:text-[var(--foreground)]'
+              }`}
+            >
+              Topics
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="transition-transform group-open:rotate-180" aria-hidden="true">
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </summary>
+            <div className="absolute left-0 top-full z-50 mt-3 w-52 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface-elevated)] p-1.5 shadow-[var(--shadow-lg)]">
+              {TOPICS.map((topic) => (
                 <Link
-                  key={view.name}
-                  href={view.href}
-                  className={`font-data text-[11px] font-semibold uppercase tracking-wider transition-colors duration-150 relative ${
-                    isActive
-                      ? "text-[var(--foreground)]"
-                      : "text-[var(--foreground-muted)] hover:text-[var(--foreground)]"
+                  key={topic.slug}
+                  href={topic.href}
+                  className={`block rounded-[var(--radius-chip)] px-3 py-2 text-body-sm transition-colors ${
+                    pathname === topic.href
+                      ? 'bg-[var(--surface)] text-[var(--foreground)]'
+                      : 'text-[var(--foreground-muted)] hover:bg-[var(--surface)] hover:text-[var(--foreground)]'
                   }`}
                 >
-                  {view.name}
-                  {isActive && <span className="absolute -bottom-4 left-0 w-full h-[2px] bg-[var(--foreground)]" />}
+                  {topic.name}
                 </Link>
-              );
-            })}
-
-            {/* Topics Dropdown */}
-            <div className="relative group py-4">
-              <button className={`font-data text-[11px] font-semibold uppercase tracking-wider transition-colors duration-150 flex items-center gap-1 ${
-                topics.some(t => pathname === t.href)
-                  ? "text-[var(--foreground)]"
-                  : "text-[var(--foreground-muted)] hover:text-[var(--foreground)]"
-              }`}>
-                Topics
-                {topics.some(t => pathname === t.href) && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] ml-0.5" />
-                )}
-                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
-              </button>
-              <div className="absolute top-full left-0 w-48 pt-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
-                <div className="bg-[var(--surface-elevated)] border border-[var(--border)] rounded-[var(--radius-card)] p-2 shadow-xl flex flex-col gap-0.5">
-                  {topics.map((topic) => {
-                    const isTopicActive = pathname === topic.href;
-                    return (
-                      <Link
-                        key={topic.name}
-                        href={topic.href}
-                        className={`px-3 py-2 text-sm font-display rounded-md transition-colors ${
-                          isTopicActive
-                            ? "text-[var(--foreground)] bg-[var(--background)] font-semibold"
-                            : "text-[var(--foreground-muted)] hover:text-[var(--foreground)] hover:bg-[var(--background)]"
-                        }`}
-                      >
-                        {topic.name}
-                        {isTopicActive && (
-                          <span className="inline-block w-1.5 h-1.5 rounded-full bg-[var(--accent)] ml-2" />
-                        )}
-                      </Link>
-                    );
-                  })}
-                </div>
-              </div>
+              ))}
             </div>
-          </div>
+          </details>
+        </nav>
 
-          {/* Right Actions */}
-          <div className="flex items-center gap-3 z-50">
-            {/* Desktop Search */}
-            <div className="hidden md:block">
-              <SearchBar />
+        {/* Actions */}
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+
+          <button
+            type="button"
+            onClick={() => setIsOpen(!isOpen)}
+            aria-expanded={isOpen}
+            aria-controls="mobile-menu"
+            aria-label={isOpen ? 'Close menu' : 'Open menu'}
+            className="-mr-2 p-2 text-[var(--foreground)] lg:hidden"
+          >
+            <div className="flex h-4 w-5 flex-col justify-between">
+              <span className={`h-[1.5px] w-full origin-left bg-current transition-transform duration-300 ${isOpen ? 'translate-x-px rotate-45' : ''}`} />
+              <span className={`h-[1.5px] w-full bg-current transition-opacity duration-200 ${isOpen ? 'opacity-0' : ''}`} />
+              <span className={`h-[1.5px] w-full origin-left bg-current transition-transform duration-300 ${isOpen ? 'translate-x-px -rotate-45' : ''}`} />
             </div>
-
-            <div className="hidden sm:block">
-              <ThemeToggle />
-            </div>
-
-            <Link
-              href="/subscribe"
-              className="hidden sm:block font-data text-[10px] font-bold uppercase tracking-widest text-[var(--foreground)] border border-[var(--foreground)] px-4 py-1.5 rounded-[var(--radius-chip)] hover:bg-[var(--foreground)] hover:text-[var(--background)] transition-colors duration-150"
-            >
-              Subscribe
-            </Link>
-
-            {/* Mobile Burger */}
-            <button
-              onClick={() => setIsOpen(!isOpen)}
-              className="lg:hidden p-2 -mr-2 text-[var(--foreground)] hover:bg-[var(--surface-elevated)] rounded-[var(--radius-chip)] transition-colors"
-              aria-label="Toggle Menu"
-            >
-              <div className="w-5 h-4 flex flex-col justify-between">
-                <span className={`h-0.5 bg-current w-full transition-all duration-300 origin-left ${isOpen ? 'rotate-45 translate-x-px' : ''}`} />
-                <span className={`h-0.5 bg-current w-full transition-all duration-300 ${isOpen ? 'opacity-0' : 'opacity-100'}`} />
-                <span className={`h-0.5 bg-current w-full transition-all duration-300 origin-left ${isOpen ? '-rotate-45 translate-x-px' : ''}`} />
-              </div>
-            </button>
-          </div>
+          </button>
         </div>
       </div>
 
-      {/* Mobile Menu */}
-      <div className={`fixed inset-0 bg-[var(--background)] z-40 transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] lg:hidden flex flex-col pt-24 px-6 ${isOpen ? 'opacity-100 translate-y-0 visible' : 'opacity-0 -translate-y-4 invisible pointer-events-none'
-        }`}>
-        <div className="flex flex-col gap-6">
-          {primaryViews.map((view, idx) => (
+      {/* Mobile menu */}
+      <div
+        id="mobile-menu"
+        hidden={!isOpen}
+        className="border-t border-[var(--border)] bg-[var(--background)] px-4 py-6 sm:px-6 lg:hidden"
+      >
+        <nav aria-label="Mobile" className="space-y-1">
+          {PRIMARY.map((item) => (
             <Link
-              key={view.name}
-              href={view.href}
-              className={`text-3xl font-display font-bold tracking-tight transition-all duration-300 transform ${
-                pathname === view.href ? "text-[var(--accent)]" : "text-[var(--foreground)] hover:text-[var(--accent)]"
-              } ${isOpen ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'}`}
-              style={{ transitionDelay: `${idx * 50}ms` }}
+              key={item.href}
+              href={item.href}
+              className={`block py-2 text-display-md font-display transition-colors ${
+                pathname === item.href
+                  ? 'text-[var(--accent)]'
+                  : 'text-[var(--foreground)]'
+              }`}
             >
-              {view.name}
+              {item.name}
             </Link>
           ))}
+        </nav>
 
-          <div className="h-px bg-[var(--border)] my-2 w-full" />
-          
-          {/* Mobile Search */}
-          <div className="md:hidden">
-            <SearchBar />
-          </div>
-
-          <div className="h-px bg-[var(--border)] my-2 w-full" />
-          
-          <div className="grid grid-cols-3 gap-3">
-            {topics.map((topic, idx) => (
+        <div className="mt-6 border-t border-[var(--border)] pt-5">
+          <p className="text-label mb-3 text-[var(--foreground-subtle)]">Topics</p>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-3">
+            {TOPICS.map((topic) => (
               <Link
-                key={topic.name}
+                key={topic.slug}
                 href={topic.href}
-                className={`text-base font-display transition-all duration-300 transform ${
-                  pathname === topic.href ? "text-[var(--accent)] font-semibold" : "text-[var(--foreground-muted)] hover:text-[var(--foreground)]"
-                } ${isOpen ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'}`}
-                style={{ transitionDelay: `${(idx + primaryViews.length) * 50}ms` }}
+                className={`py-1.5 text-body-sm transition-colors ${
+                  pathname === topic.href
+                    ? 'text-[var(--accent)]'
+                    : 'text-[var(--foreground-muted)]'
+                }`}
               >
                 {topic.name}
               </Link>
             ))}
           </div>
-
-          <div className="h-px bg-[var(--border)] my-4 w-full" />
-
-          <div className="flex items-center justify-between">
-            <span className="font-data text-[11px] font-bold uppercase tracking-widest text-[var(--foreground-muted)]">Theme</span>
-            <ThemeToggle />
-          </div>
-
-          <Link href="/subscribe" className="mt-4 text-center w-full py-4 bg-[var(--foreground)] text-[var(--background)] font-data font-bold uppercase tracking-widest text-sm rounded-[var(--radius-card)]">
-            Subscribe
-          </Link>
         </div>
       </div>
-    </nav>
+    </header>
   );
 }

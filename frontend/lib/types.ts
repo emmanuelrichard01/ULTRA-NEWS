@@ -24,6 +24,11 @@ export interface StoryDetail {
   categories: string[];
   sources: string[];
   framing_preview?: { source: string; title: string; url: string }[];
+  /**
+   * Independent outlets that picked the story up inside the momentum window.
+   * Present only for the Developing edition (`sort=momentum`).
+   */
+  recent_outlets?: number | null;
 }
 
 export interface StoryArticle {
@@ -37,8 +42,22 @@ export interface StoryArticle {
   source: { name: string };
 }
 
+export interface AISummary {
+  consensus_lead: string;
+  outlet_claims: { source: string; claim: string }[];
+  discrepancies: string[];
+  primary_alignment?: string;
+  model?: string;
+  synthesized_at?: string;
+  articles_count?: number;
+  synthesis_type?: string;
+}
+
 export interface StoryDetailFull extends Omit<StoryDetail, 'sources' | 'image_url'> {
   articles: StoryArticle[];
+  ai_summary?: AISummary | null;
+  synthesis_status?: 'idle' | 'pending' | 'completed' | 'failed';
+  synthesized_at?: string | null;
 }
 
 // ==========================================================================
@@ -68,6 +87,12 @@ export interface SourceInfo {
   name: string;
   url: string;
   source_type: string;
+  /**
+   * Ingestion health, classified by the API from failure count and how long
+   * since the last SUCCESSFUL fetch. `pending` means registered but not yet
+   * fetched — distinct from failing, which a freshly-seeded registry is not.
+   */
+  health: 'active' | 'stale' | 'failing' | 'pending';
   tier: number;
   tier_label: string;
   region: string;
@@ -100,14 +125,24 @@ export interface CategoryInfo {
   description: string;
 }
 
+/**
+ * Topic taxonomy — must mirror TOPICS in backend/core/topics.py, which is where
+ * the classifier's prototypes live and where Category rows are seeded from.
+ *
+ * Changes from the previous list, driven by measurement on the live corpus:
+ *   - `art` is gone. It held 2 articles out of 619; visual art now sits inside
+ *     Culture, which also absorbs the old `entertainment` slug.
+ *   - `climate` is new. Environment and energy coverage was previously split
+ *     between Science and World, which buried a whole beat.
+ */
 export const CATEGORY_MAP: Record<string, CategoryInfo> = {
-  tech: { slug: 'tech', displayName: 'Tech', description: 'Technology, AI, and the digital frontier.' },
-  politics: { slug: 'politics', displayName: 'Politics', description: 'Government, policy, and global affairs.' },
-  business: { slug: 'business', displayName: 'Business', description: 'Markets, finance, and entrepreneurship.' },
-  entertainment: { slug: 'entertainment', displayName: 'Culture', description: 'Film, music, media, and the cultural conversation.' },
-  science: { slug: 'science', displayName: 'Science', description: 'Research, discovery, and the natural world.' },
-  art: { slug: 'art', displayName: 'Art', description: 'Visual arts, exhibitions, and creative expression.' },
-  sports: { slug: 'sports', displayName: 'Sports', description: 'Football, Olympics, and the global arena.' },
-  health: { slug: 'health', displayName: 'Health', description: 'Medicine, public health, and wellness.' },
   world: { slug: 'world', displayName: 'World', description: 'Diplomacy, conflict, and international affairs.' },
+  politics: { slug: 'politics', displayName: 'Politics', description: 'Elections, government, policy and power.' },
+  business: { slug: 'business', displayName: 'Business', description: 'Markets, companies, and the economy.' },
+  tech: { slug: 'tech', displayName: 'Technology', description: 'Software, hardware, AI and the digital world.' },
+  science: { slug: 'science', displayName: 'Science', description: 'Research, discovery and the natural world.' },
+  climate: { slug: 'climate', displayName: 'Climate', description: 'Environment, energy and the changing planet.' },
+  health: { slug: 'health', displayName: 'Health', description: 'Medicine, public health and wellbeing.' },
+  culture: { slug: 'culture', displayName: 'Culture', description: 'Film, music, art and the cultural conversation.' },
+  sports: { slug: 'sports', displayName: 'Sports', description: 'Competition, athletes and the global arena.' },
 };

@@ -81,22 +81,25 @@ ingest: ## Trigger a news ingestion cycle (queues Celery task)
 	$(BACKEND_EXEC) python manage.py ingest_news
 	@echo "  ℹ️  Ingestion queued. Watch progress: make logs-worker"
 
-lint: ## Run all linters (ruff + tsc)
+lint: ## Run all linters (ruff + tsc + eslint)
 	@echo "── Python (ruff) ──"
 	$(BACKEND_EXEC) ruff check .
 	@echo ""
 	@echo "── TypeScript (tsc) ──"
 	cd $(FRONTEND_DIR) && npx tsc --noEmit
+	@echo ""
+	@echo "── ESLint ──"
+	cd $(FRONTEND_DIR) && npm run lint
 
-frontend-lint: ## Run TypeScript type-check only
-	cd $(FRONTEND_DIR) && npx tsc --noEmit
+frontend-lint: ## Run TypeScript type-check + ESLint
+	cd $(FRONTEND_DIR) && npx tsc --noEmit && npm run lint
 
 test: ## Run all tests (backend + frontend)
 	@echo "── Backend (pytest) ──"
-	$(BACKEND_EXEC) pytest -v
+	$(BACKEND_EXEC) python -m pytest -q
 	@echo ""
-	@echo "── Frontend ──"
-	@cd $(FRONTEND_DIR) && npm test 2>/dev/null || echo "  ℹ️  No frontend tests configured yet."
+	@echo "── Frontend (tsc + eslint) ──"
+	cd $(FRONTEND_DIR) && npx tsc --noEmit && npm run lint
 
 # ─── Frontend (local, outside Docker) ────────────────────────────────────────
 

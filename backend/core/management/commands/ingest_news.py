@@ -1,5 +1,6 @@
 from django.core.management.base import BaseCommand
 
+
 class Command(BaseCommand):
     help = 'Ingests news from all configured sources'
 

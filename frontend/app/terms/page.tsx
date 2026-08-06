@@ -1,252 +1,111 @@
-import { Metadata } from 'next';
+import type { Metadata } from 'next';
+import Link from 'next/link';
+
+/**
+ * Terms.
+ *
+ * Deliberately short and specific. The clauses that matter here are the ones
+ * about what a corroboration count is *not*, because that is the claim a reader
+ * might otherwise over-rely on.
+ */
 
 export const metadata: Metadata = {
-  title: "Terms of Service | Ultra News",
-  description: "Terms and conditions governing use of the Ultra News intelligence platform.",
+  title: 'Terms',
+  description: 'The terms of use for Ultra News, and the limits of what it tells you.',
 };
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="border-t border-[var(--border)] py-9">
+      <h2 className="text-display-md font-display mb-4 text-[var(--foreground)]">{title}</h2>
+      <div className="text-body-md measure space-y-4 text-[var(--foreground-muted)]">{children}</div>
+    </section>
+  );
+}
 
 export default function TermsPage() {
   return (
-    <div className="max-w-3xl mx-auto pt-8 pb-20 px-4">
-      <header className="mb-12 border-b-2 border-[var(--foreground)] pb-8">
-        <span className="text-xs font-bold tracking-widest uppercase text-[var(--accent)] mb-4 block">Ultra News</span>
-        <h1 className="text-4xl md:text-5xl font-display font-[900] tracking-tighter leading-none text-[var(--foreground)] mb-6">
-          Terms of Service
-        </h1>
-        <p className="font-data text-[11px] text-[var(--foreground-muted)] uppercase tracking-widest">
-          Last Updated: July 2026
+    <div className="mx-auto max-w-3xl">
+      <header className="border-b-2 border-[var(--foreground)] pb-7">
+        <h1 className="text-display-2xl font-display text-[var(--foreground)]">Terms</h1>
+        <p className="text-body-lg measure mt-3 text-[var(--foreground-muted)]">
+          Ultra News is an open-source news aggregator, provided free and without
+          warranty. Using it means accepting the terms below.
         </p>
       </header>
 
-      {/* Quick nav */}
-      <nav className="mb-12 p-4 bg-[var(--surface-elevated)] border border-[var(--border)] rounded-[var(--radius-card)]">
-        <span className="font-data text-[10px] font-bold uppercase tracking-widest text-[var(--accent)] block mb-3">Sections</span>
-        <div className="flex flex-wrap gap-2">
-          {[
-            'Information Aggregation',
-            'AI-Generated Summaries',
-            'Trust Graph & Clustering',
-            'Fair Use & Outbound Linking',
-            'API Usage',
-            'Content Licensing',
-            'Prohibited Uses',
-            'Disclaimer of Warranties',
-            'Limitation of Liability',
-            'Modifications to Terms',
-            'Governing Law',
-            'Contact',
-          ].map((section, i) => (
-            <a
-              key={section}
-              href={`#section-${i + 1}`}
-              className="font-data text-[11px] text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-colors px-2 py-1 bg-[var(--background)] border border-[var(--border)] rounded-sm"
-            >
-              §{i + 1}
-            </a>
-          ))}
-        </div>
-      </nav>
+      <Section title="What this service is">
+        <p>
+          Ultra News groups reporting from independent newsrooms and shows how
+          many of them covered the same event. It displays short excerpts and
+          links to the original article. It does not republish, host, or claim
+          ownership of anyone&rsquo;s journalism.
+        </p>
+        <p>
+          All articles remain the property of the newsrooms that produced them.
+          If you publish here and want your feed removed, open an issue on the
+          repository and it will be taken out of the registry.
+        </p>
+      </Section>
 
-      <div className="space-y-12">
+      <Section title="What a corroboration count is not">
+        <p>
+          The number of outlets on a story measures how many independent
+          publishers reported it. It is{' '}
+          <strong className="text-[var(--foreground)]">not</strong> a truth score,
+          a fact check, or an editorial endorsement. Multiple outlets can and do
+          repeat the same mistaken report — that is exactly what a corroboration
+          count looks like when it is wrong.
+        </p>
+        <p>
+          Don&rsquo;t rely on Ultra News as the sole basis for any decision that
+          matters. Follow the links, read the reporting, and judge for yourself.
+          The{' '}
+          <Link href="/about" className="text-[var(--accent)] underline underline-offset-2">
+            method and its limits
+          </Link>{' '}
+          are documented in full.
+        </p>
+      </Section>
 
-        {/* §1 Information Aggregation */}
-        <section id="section-1">
-          <h2 className="font-display text-2xl font-bold text-[var(--foreground)] mb-4 flex items-center gap-2">
-            <span className="font-data text-[12px] text-[var(--accent)]">§1</span>
-            Information Aggregation
-          </h2>
-          <div className="font-serif text-[var(--foreground-muted)] space-y-4 leading-relaxed">
-            <p>
-              Ultra News (&ldquo;The Wire Room&rdquo;) is an automated news aggregator and intelligence terminal. We do not employ journalists, nor do we write the articles featured on the platform. All headlines, excerpts, and images belong to their respective original publishers.
-            </p>
-            <p>
-              The platform ingests publicly available RSS feeds from {35}+ news sources, extracts structured metadata (title, excerpt, publication date, image URL), and organizes this information into clustered story views for end-user consumption.
-            </p>
-          </div>
-        </section>
+      <Section title="AI-generated summaries">
+        <p>
+          Story briefs and Ask the Wire Room answers are generated by a language
+          model from the retrieved reporting. They are not written or reviewed by
+          a person, and they can be wrong, incomplete or misleading even when the
+          underlying sources are sound. Every brief is labelled as
+          machine-written; check it against the sources listed beneath it.
+        </p>
+      </Section>
 
-        {/* §2 AI-Generated Summaries */}
-        <section id="section-2">
-          <h2 className="font-display text-2xl font-bold text-[var(--foreground)] mb-4 flex items-center gap-2">
-            <span className="font-data text-[12px] text-[var(--accent)]">§2</span>
-            AI-Generated Summaries
-          </h2>
-          <div className="font-serif text-[var(--foreground-muted)] space-y-4 leading-relaxed">
-            <p>
-              The &ldquo;AI Summary&rdquo; blocks displayed on story pages are automatically generated by analyzing the semantic content of underlying articles. <strong>These summaries are not editorial content and should not be treated as factual reporting.</strong>
-            </p>
-            <p>
-              AI-generated text is clearly labeled in the interface with the disclaimer &ldquo;AI Summary — Not editorial content.&rdquo; Large Language Models (LLMs) can produce inaccurate, incomplete, or misleading summaries. Users must verify claims by reading the original source articles linked within each story.
-            </p>
-            <p>
-              Ultra News makes no warranty regarding the accuracy, completeness, or reliability of AI-generated summaries.
-            </p>
-          </div>
-        </section>
+      <Section title="Acceptable use">
+        <p>
+          Don&rsquo;t attempt to overwhelm the service, circumvent its rate
+          limits, or scrape it in bulk — the{' '}
+          <Link href="/subscribe" className="text-[var(--accent)] underline underline-offset-2">
+            RSS feeds
+          </Link>{' '}
+          exist so you don&rsquo;t have to. Don&rsquo;t use it to build anything
+          that misrepresents what a source actually reported.
+        </p>
+      </Section>
 
-        {/* §3 Trust Graph & Clustering */}
-        <section id="section-3">
-          <h2 className="font-display text-2xl font-bold text-[var(--foreground)] mb-4 flex items-center gap-2">
-            <span className="font-data text-[12px] text-[var(--accent)]">§3</span>
-            Trust Graph &amp; Algorithmic Clustering
-          </h2>
-          <div className="font-serif text-[var(--foreground-muted)] space-y-4 leading-relaxed">
-            <p>
-              Our platform automatically calculates &ldquo;Coverage Velocity,&rdquo; &ldquo;Corroboration Rates,&rdquo; and &ldquo;Independent Domain Counts&rdquo; based on mathematical models and Semantic Vector Clustering (pgvector with 384-dimensional embeddings).
-            </p>
-            <p>
-              These metrics are quantitative measurements of how news propagates across the internet. They do not constitute an endorsement, a definitive statement of truth, or a judgment on the veracity of any particular story. The tier system (Wire → Developing → Reporting) reflects the <em>breadth of independent coverage</em>, not factual verification.
-            </p>
-            <p>
-              A &ldquo;Corroborated&rdquo; label means 3 or more independent outlets have published coverage of the same event. It does not mean the underlying claims have been fact-checked.
-            </p>
-          </div>
-        </section>
+      <Section title="No warranty">
+        <p>
+          The service is provided &ldquo;as is&rdquo;, without warranty of any
+          kind. Feeds go down, clustering makes mistakes, and summaries can be
+          wrong. Nobody running this accepts liability for decisions taken on the
+          basis of it.
+        </p>
+      </Section>
 
-        {/* §4 Fair Use & Outbound Linking */}
-        <section id="section-4">
-          <h2 className="font-display text-2xl font-bold text-[var(--foreground)] mb-4 flex items-center gap-2">
-            <span className="font-data text-[12px] text-[var(--accent)]">§4</span>
-            Fair Use &amp; Outbound Linking
-          </h2>
-          <div className="font-serif text-[var(--foreground-muted)] space-y-4 leading-relaxed">
-            <p>
-              We operate under the principles of Fair Use. We extract only what is necessary — the title, a brief excerpt (~40 words), and a thumbnail image — to establish the factual context of a breaking story.
-            </p>
-            <p>
-              Our platform is designed to act as a <em>funnel</em> to the original publishers. Every article card, timeline entry, and headline framing view includes a prominent &ldquo;Read original source&rdquo; outbound link directing traffic to the original publisher.
-            </p>
-          </div>
-        </section>
-
-        {/* §5 API Usage */}
-        <section id="section-5">
-          <h2 className="font-display text-2xl font-bold text-[var(--foreground)] mb-4 flex items-center gap-2">
-            <span className="font-data text-[12px] text-[var(--accent)]">§5</span>
-            API Usage
-          </h2>
-          <div className="font-serif text-[var(--foreground-muted)] space-y-4 leading-relaxed">
-            <p>
-              The Ultra News API (<code className="font-mono text-[var(--foreground)] text-sm">/api/v1/</code>) is provided for integration with authorized clients. Public endpoints (stories, articles, sources) are rate-limited and intended for reasonable personal use.
-            </p>
-            <p>
-              Administrative endpoints require authentication via GitHub Actions OIDC tokens or API keys. Unauthorized use of administrative endpoints is prohibited.
-            </p>
-          </div>
-        </section>
-
-        {/* §6 Content Licensing */}
-        <section id="section-6">
-          <h2 className="font-display text-2xl font-bold text-[var(--foreground)] mb-4 flex items-center gap-2">
-            <span className="font-data text-[12px] text-[var(--accent)]">§6</span>
-            Content Licensing
-          </h2>
-          <div className="font-serif text-[var(--foreground-muted)] space-y-4 leading-relaxed">
-            <p>
-              All original article content (full text, images, multimedia) remains the intellectual property of the respective publishers. Ultra News displays only excerpts in accordance with Fair Use principles.
-            </p>
-            <p>
-              The Ultra News platform code, UI design, and clustering algorithms are the property of Ultra News. The platform is open-source under the terms specified in the project repository.
-            </p>
-          </div>
-        </section>
-
-        {/* §7 Prohibited Uses */}
-        <section id="section-7">
-          <h2 className="font-display text-2xl font-bold text-[var(--foreground)] mb-4 flex items-center gap-2">
-            <span className="font-data text-[12px] text-[var(--accent)]">§7</span>
-            Prohibited Uses
-          </h2>
-          <div className="font-serif text-[var(--foreground-muted)] space-y-4 leading-relaxed">
-            <p>You may not:</p>
-            <ul className="list-disc pl-6 space-y-2">
-              <li>Scrape, crawl, or systematically download content from the platform beyond normal browsing</li>
-              <li>Reverse engineer the vector database, embedding pipeline, or clustering algorithms</li>
-              <li>Bulk download articles, embeddings, or story cluster data</li>
-              <li>Use the platform to train machine learning models without explicit permission</li>
-              <li>Redistribute aggregated content as if it were original reporting</li>
-              <li>Attempt to bypass rate limits, authentication, or access controls</li>
-              <li>Use the platform for any unlawful purpose</li>
-            </ul>
-          </div>
-        </section>
-
-        {/* §8 Disclaimer of Warranties */}
-        <section id="section-8">
-          <h2 className="font-display text-2xl font-bold text-[var(--foreground)] mb-4 flex items-center gap-2">
-            <span className="font-data text-[12px] text-[var(--accent)]">§8</span>
-            Disclaimer of Warranties
-          </h2>
-          <div className="bg-[var(--surface-elevated)] p-6 rounded-[var(--radius-card)] border border-[var(--border)]">
-            <p className="font-serif text-[var(--foreground-muted)] leading-relaxed">
-              THE PLATFORM IS PROVIDED &ldquo;AS IS&rdquo; AND &ldquo;AS AVAILABLE&rdquo; WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT. WE DO NOT WARRANT THAT THE SERVICE WILL BE UNINTERRUPTED, TIMELY, SECURE, OR ERROR-FREE.
-            </p>
-          </div>
-        </section>
-
-        {/* §9 Limitation of Liability */}
-        <section id="section-9">
-          <h2 className="font-display text-2xl font-bold text-[var(--foreground)] mb-4 flex items-center gap-2">
-            <span className="font-data text-[12px] text-[var(--accent)]">§9</span>
-            Limitation of Liability
-          </h2>
-          <div className="font-serif text-[var(--foreground-muted)] space-y-4 leading-relaxed">
-            <p>
-              IN NO EVENT SHALL ULTRA NEWS, ITS CREATOR, OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, INCLUDING WITHOUT LIMITATION LOSS OF PROFITS, DATA, USE, GOODWILL, OR OTHER INTANGIBLE LOSSES, RESULTING FROM YOUR ACCESS TO OR USE OF (OR INABILITY TO ACCESS OR USE) THE SERVICE.
-            </p>
-            <p>
-              Our aggregate liability for all claims related to the service shall not exceed the amount you have paid to Ultra News in the twelve (12) months preceding the claim, or $0 (zero dollars) if no fees have been paid.
-            </p>
-          </div>
-        </section>
-
-        {/* §10 Modifications to Terms */}
-        <section id="section-10">
-          <h2 className="font-display text-2xl font-bold text-[var(--foreground)] mb-4 flex items-center gap-2">
-            <span className="font-data text-[12px] text-[var(--accent)]">§10</span>
-            Modifications to Terms
-          </h2>
-          <div className="font-serif text-[var(--foreground-muted)] space-y-4 leading-relaxed">
-            <p>
-              We reserve the right to modify these Terms at any time. Material changes will be communicated via a notice on the platform homepage or through a commit to the open-source repository. Continued use of the platform after changes constitutes acceptance of the updated Terms.
-            </p>
-            <p>
-              The &ldquo;Last Updated&rdquo; date at the top of this page reflects the most recent revision.
-            </p>
-          </div>
-        </section>
-
-        {/* §11 Governing Law */}
-        <section id="section-11">
-          <h2 className="font-display text-2xl font-bold text-[var(--foreground)] mb-4 flex items-center gap-2">
-            <span className="font-data text-[12px] text-[var(--accent)]">§11</span>
-            Governing Law
-          </h2>
-          <div className="font-serif text-[var(--foreground-muted)] space-y-4 leading-relaxed">
-            <p>
-              These Terms shall be governed by and construed in accordance with applicable law, without regard to conflict of law principles. Any disputes arising from these Terms shall be resolved through good-faith negotiation before any formal proceedings.
-            </p>
-          </div>
-        </section>
-
-        {/* §12 Contact */}
-        <section id="section-12">
-          <div className="bg-[var(--surface-elevated)] p-6 rounded-[var(--radius-card)] border border-[var(--border)]">
-            <h3 className="font-data text-[10px] font-bold uppercase tracking-widest text-[var(--accent)] mb-2 mt-0 flex items-center gap-2">
-              <span className="font-data text-[12px]">§12</span>
-              Contact
-            </h3>
-            <p className="text-sm font-serif text-[var(--foreground-muted)] m-0">
-              For questions regarding these Terms, please{' '}
-              <a href="https://github.com/emmanuelrichard01/ULTRA-NEWS/issues" className="text-[var(--foreground)] font-semibold hover:underline">
-                open an issue on GitHub
-              </a>{' '}
-              or contact the maintainer through the repository.
-            </p>
-          </div>
-        </section>
-
-      </div>
+      <Section title="The code">
+        <p>
+          Ultra News is MIT licensed — you are free to run, modify and deploy it.
+          These terms cover this deployment; anyone hosting their own sets their
+          own.
+        </p>
+      </Section>
     </div>
   );
 }

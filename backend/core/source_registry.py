@@ -41,21 +41,41 @@ SOURCES = [
     # for story clustering. When Reuters reports something, 10 other
     # outlets will publish versions within hours.
     # =========================================================================
+    # Reuters retired its public RSS endpoints (reutersagency.com/feed/ now
+    # 404s) and the AP feed here ran through rsshub.app, a third-party proxy
+    # that returns 403. Both were dead for the entire life of the registry while
+    # reporting as healthy, which meant the two sources the clustering strategy
+    # leans on hardest contributed nothing.
+    #
+    # Deliberately NOT replaced with Google News or similar aggregators: those
+    # serve every outlet from one host, so `publisher_domain` would collapse to
+    # news.google.com and unrelated outlets would appear to corroborate each
+    # other. Where a feed must come from a different host than the newsroom,
+    # `publisher_domain` is declared explicitly below.
     {
-        "name": "Reuters",
-        "url": "https://www.reutersagency.com/feed/",
+        "name": "AP News",
+        "url": "https://feedx.net/rss/ap.xml",
+        "publisher_domain": "apnews.com",
         "scraper_type": "rss",
         "source_type": "news",
         "tier": 1,
         "region": "global",
     },
     {
-        "name": "AP News",
-        "url": "https://rsshub.app/apnews/topics/apf-topnews",
+        "name": "CBS News",
+        "url": "https://www.cbsnews.com/latest/rss/world",
         "scraper_type": "rss",
         "source_type": "news",
         "tier": 1,
-        "region": "global",
+        "region": "americas",
+    },
+    {
+        "name": "NBC News",
+        "url": "https://feeds.nbcnews.com/nbcnews/public/world",
+        "scraper_type": "rss",
+        "source_type": "news",
+        "tier": 1,
+        "region": "americas",
     },
     {
         "name": "AFP (France)",
@@ -323,9 +343,11 @@ SOURCES = [
         "tier": 4,
         "region": "africa",
     },
+    # feeds.news24.com no longer resolves; replaced with African/Asian outlets
+    # that were verified reachable via `manage.py validate_sources`.
     {
-        "name": "News24",
-        "url": "https://feeds.news24.com/articles/news24/TopStories/rss",
+        "name": "Vanguard Nigeria",
+        "url": "https://www.vanguardngr.com/feed/",
         "scraper_type": "rss",
         "source_type": "news",
         "tier": 4,
@@ -339,13 +361,55 @@ SOURCES = [
         "tier": 4,
         "region": "africa",
     },
+    # theeastafrican.co.ke returns 403 to automated clients. Replaced with
+    # verified-reachable regional outlets that widen geographic diversity.
     {
-        "name": "The EastAfrican",
-        "url": "https://www.theeastafrican.co.ke/tea/news/rss",
+        "name": "The Straits Times",
+        "url": "https://www.straitstimes.com/news/world/rss.xml",
         "scraper_type": "rss",
         "source_type": "news",
         "tier": 4,
-        "region": "africa",
+        "region": "asia",
+    },
+    {
+        "name": "Times of India",
+        "url": "https://timesofindia.indiatimes.com/rssfeedstopstories.cms",
+        "scraper_type": "rss",
+        "source_type": "news",
+        "tier": 4,
+        "region": "asia",
+    },
+    {
+        "name": "ABC News (Australia)",
+        "url": "https://www.abc.net.au/news/feed/51120/rss.xml",
+        "scraper_type": "rss",
+        "source_type": "news",
+        "tier": 4,
+        "region": "oceania",
+    },
+    {
+        "name": "Le Monde English",
+        "url": "https://www.lemonde.fr/en/rss/une.xml",
+        "scraper_type": "rss",
+        "source_type": "news",
+        "tier": 3,
+        "region": "europe",
+    },
+    {
+        "name": "Politico",
+        "url": "https://rss.politico.com/politics-news.xml",
+        "scraper_type": "rss",
+        "source_type": "news",
+        "tier": 3,
+        "region": "americas",
+    },
+    {
+        "name": "Axios",
+        "url": "https://api.axios.com/feed/",
+        "scraper_type": "rss",
+        "source_type": "news",
+        "tier": 3,
+        "region": "americas",
     },
 ]
 

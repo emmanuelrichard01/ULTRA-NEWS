@@ -1,0 +1,51 @@
+[tool.ruff]
+# The rule set is pinned deliberately.
+#
+# CI ran a bare `ruff check .` with no configuration, which means "whatever the
+# installed ruff version happens to enable by default" — and CI installs the
+# latest. When ruff widened its defaults, ~180 findings appeared across
+# untouched files and the lint job went red with no code change behind it. Lint
+# that moves on someone else's release schedule is not a signal.
+#
+# So: state the rules here, and pin the version in CI.
+target-version = "py311"
+line-length = 100
+exclude = ["migrations"]
+
+[tool.ruff.lint]
+select = [
+    "E4", "E7", "E9",  # pycodestyle — real errors only, not layout opinions
+    "F",               # pyflakes: undefined names, unused imports and variables
+    "I",               # import sorting
+    "B",               # bugbear: mutable defaults, shadowed loop vars, gotchas
+    "SIM",             # simplifications that genuinely read better
+    "S",               # bandit: this project takes untrusted feed input
+]
+ignore = [
+    # Broad excepts are load-bearing here and always deliberate: provider SDKs
+    # and feed parsers raise anything, and the design contract is that one bad
+    # publisher or a failing model degrades the feature rather than taking down
+    # ingestion. Sites that do this carry an explanatory comment.
+    "BLE001",
+    # assert is how pytest works.
+    "S101",
+    # try/except/pass without logging. Used deliberately at a handful of sites
+    # that parse UNTRUSTED input — pagination cursors, malformed dates. Logging
+    # each one would turn a crafted request loop into log-volume amplification,
+    # and the correct behaviour (ignore it, fall back to the unfiltered result)
+    # is already what the code does.
+    "S110",
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["api", "config", "core"]
+
+[tool.ruff.lint.per-file-ignores]
+# Django settings and the Ninja router both legitimately import after
+# module-level setup runs — settings reads env to decide what to configure, and
+# the router must exist before the modules that register routes on it.
+"config/settings.py" = ["E402"]
+"api/api.py" = ["E402"]
+# Test fixtures legitimately use hardcoded dummy credentials and http:// URLs.
+"core/tests/*" = ["S105", "S106", "S107", "S113"]
+"conftest.py" = ["S104"]

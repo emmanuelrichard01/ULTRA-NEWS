@@ -26,7 +26,7 @@ services:
   backend:
     build:
       context: ./backend
-    command: python manage.py runserver 0.0.0.0:8000
+    command: uvicorn config.asgi:application --host 0.0.0.0 --port 8000
     volumes:
       - ./backend:/app
     ports:
@@ -46,6 +46,19 @@ services:
       - CELERY_RESULT_BACKEND=redis://redis:6379/1
       - FRONTEND_URL=http://localhost:3000
       - ADMIN_API_KEY=dev-admin-key-change-in-prod
+      - NEXTJS_URL=http://frontend:3000
+      - SITE_URL=http://localhost:3000
+      - REVALIDATE_SECRET=dev-revalidate-secret-change-in-prod
+      - LLM_API_KEY=${LLM_API_KEY:-}
+      # Local dev talks to the app directly, so X-Forwarded-For must not be
+      # trusted. Enable only behind a proxy that overwrites the header.
+      - TRUST_PROXY_HEADERS=0
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health').status == 200 else 1)\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 45s
 
   worker-fetch:
     build:
@@ -66,6 +79,10 @@ services:
       - CELERY_BROKER_URL=redis://redis:6379/1
       - CELERY_RESULT_BACKEND=redis://redis:6379/1
       - ADMIN_API_KEY=dev-admin-key-change-in-prod
+      - NEXTJS_URL=http://frontend:3000
+      - SITE_URL=http://localhost:3000
+      - REVALIDATE_SECRET=dev-revalidate-secret-change-in-prod
+      - LLM_API_KEY=${LLM_API_KEY:-}
 
   worker-cluster:
     build:
@@ -86,6 +103,10 @@ services:
       - CELERY_BROKER_URL=redis://redis:6379/1
       - CELERY_RESULT_BACKEND=redis://redis:6379/1
       - ADMIN_API_KEY=dev-admin-key-change-in-prod
+      - NEXTJS_URL=http://frontend:3000
+      - SITE_URL=http://localhost:3000
+      - REVALIDATE_SECRET=dev-revalidate-secret-change-in-prod
+      - LLM_API_KEY=${LLM_API_KEY:-}
 
   beat:
     build:
@@ -106,13 +127,21 @@ services:
       - CELERY_BROKER_URL=redis://redis:6379/1
       - CELERY_RESULT_BACKEND=redis://redis:6379/1
       - ADMIN_API_KEY=dev-admin-key-change-in-prod
+      - NEXTJS_URL=http://frontend:3000
+      - SITE_URL=http://localhost:3000
+      - REVALIDATE_SECRET=dev-revalidate-secret-change-in-prod
+      - LLM_API_KEY=${LLM_API_KEY:-}
 
   frontend:
     build:
       context: ./frontend
+      # The Dockerfile is multi-stage; compose runs the dev target with hot
+      # reload. Production builds target `runner`.
+      target: dev
     volumes:
       - ./frontend:/app
       - /app/node_modules
+      - /app/.next
     ports:
       - "3000:3000"
     depends_on:
@@ -121,6 +150,8 @@ services:
       - API_URL=http://backend:8000
       - NEXT_PUBLIC_API_URL=http://localhost:8000
       - NEXT_PUBLIC_APP_URL=http://localhost:3000
+      # Must match the backend's REVALIDATE_SECRET for on-demand purges to work.
+      - REVALIDATE_SECRET=dev-revalidate-secret-change-in-prod
 
 volumes:
   postgres_data:

@@ -1,22 +1,14 @@
-import FeedPage from '@/components/FeedPage';
+import { permanentRedirect } from 'next/navigation';
 
-interface PageProps {
-  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
-}
-
-export default async function ReportingPage({ searchParams }: PageProps) {
-  return (
-    <FeedPage
-      title="Reporting"
-      subtitle="Verified intelligence corroborated by 3 or more independent sources."
-      status="corroborated"
-      accentColor="--verified-teal"
-      pingColor="--verified-teal"
-      showVelocityLeaderboard={false}
-      showHero={false}
-      emptyMessage="No corroborated stories currently. Stories reach this tier when 3+ independent outlets confirm coverage."
-      basePath="/reporting"
-      searchParams={searchParams}
-    />
-  );
+/**
+ * Retired destination.
+ *
+ * "Reporting" meant "corroborated by 3+ independent outlets" — a meaning almost
+ * nobody would guess from the word, and one that read as a synonym of the
+ * "Developing" tier beside it. That edition is now The Record.
+ *
+ * Kept as a permanent redirect so existing links keep working.
+ */
+export default function ReportingPage(): never {
+  permanentRedirect('/record');
 }

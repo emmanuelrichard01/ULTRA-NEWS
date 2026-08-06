@@ -1,70 +1,67 @@
+"""
+Re-assign topics across the corpus using the semantic classifier.
+
+Replaces a keyword-matching pass that left 47% of articles untagged and named
+slugs (`art`, `entertainment`) that no longer exist. Classification needs an
+embedding, so articles without one are skipped — clustering computes them.
+
+    python manage.py recategorize_all            # report only
+    python manage.py recategorize_all --apply
+"""
+from collections import Counter
+
 from django.core.management.base import BaseCommand
-from core.models import Article, Story
-from core.categorization import assign_categories_to_article
+
+from core.models import Article
 
 
 class Command(BaseCommand):
-    help = 'Re-categorize all existing articles with the improved categorization system'
+    help = "Re-assign article topics with the semantic classifier."
 
     def add_arguments(self, parser):
-        parser.add_argument(
-            '--dry-run',
-            action='store_true',
-            help='Preview category changes without applying them.',
+        parser.add_argument("--apply", action="store_true", help="Persist changes.")
+        parser.add_argument("--batch", type=int, default=500)
+
+    def handle(self, *args, **opts):
+        from core.clustering import _assign_topics
+        from core.topics import classify
+
+        queryset = Article.objects.filter(embedding__isnull=False)
+        total = queryset.count()
+        if not total:
+            self.stderr.write(
+                "No embedded articles. Topics are assigned during clustering, "
+                "so run ingestion and clustering first."
+            )
+            return
+
+        self.stdout.write(f"Classifying {total} embedded articles…\n")
+
+        counts = Counter()
+        untagged = 0
+        processed = 0
+
+        for article in queryset.iterator(chunk_size=opts["batch"]):
+            chosen = classify(article.embedding)
+            if chosen:
+                for slug, _score in chosen:
+                    counts[slug] += 1
+            else:
+                untagged += 1
+
+            if opts["apply"]:
+                _assign_topics(article)
+            processed += 1
+
+        self.stdout.write("")
+        for slug, count in counts.most_common():
+            self.stdout.write(f"  {count:5}  {slug}")
+
+        coverage = (processed - untagged) / processed * 100 if processed else 0
+        self.stdout.write("")
+        self.stdout.write(
+            f"{'Applied to' if opts['apply'] else 'Would tag'} {processed} articles · "
+            f"coverage {coverage:.1f}% · {untagged} untagged"
         )
-
-    def handle(self, *args, **options):
-        dry_run = options['dry_run']
-        articles = Article.objects.all().order_by('id')
-        total = articles.count()
-
-        self.stdout.write(f"Re-categorizing {total} articles...")
-        if dry_run:
-            self.stdout.write(self.style.WARNING("DRY RUN — no changes will be saved."))
-
-        stats = {
-            'recategorized': 0,
-            'no_match': 0,
-        }
-        category_counts: dict[str, int] = {}
-
-        for i, article in enumerate(articles.iterator(), 1):
-            if dry_run:
-                from core.categorization import match_category_slugs
-                scored = match_category_slugs(article.title, article.content)
-                slugs = [s[0] for s in scored]
-            else:
-                slugs = assign_categories_to_article(
-                    article, article.title, article.content
-                )
-
-            if slugs:
-                stats['recategorized'] += 1
-                for s in slugs:
-                    category_counts[s] = category_counts.get(s, 0) + 1
-            else:
-                stats['no_match'] += 1
-
-            if i % 100 == 0:
-                self.stdout.write(f"  Processed {i}/{total}...")
-
-        # Now update story categories based on their articles
-        if not dry_run:
-            stories = Story.objects.all()
-            story_count = stories.count()
-            self.stdout.write(f"\nUpdating categories for {story_count} stories...")
-            for story in stories:
-                # Collect all unique category IDs from the story's articles
-                cat_ids = set()
-                for art in story.articles.prefetch_related('categories').all():
-                    cat_ids.update(art.categories.values_list('id', flat=True))
-                story.categories.set(cat_ids)
-
-        self.stdout.write("")
-        self.stdout.write(self.style.SUCCESS(f"Done! Recategorized: {stats['recategorized']}, No match: {stats['no_match']}"))
-        self.stdout.write("")
-        self.stdout.write("Category distribution:")
-        for slug, count in sorted(category_counts.items(), key=lambda x: -x[1]):
-            pct = (count / total) * 100
-            bar = '█' * int(pct / 2)
-            self.stdout.write(f"  {slug:15s} {count:5d} ({pct:5.1f}%) {bar}")
+        if not opts["apply"]:
+            self.stdout.write(self.style.WARNING("Dry run — pass --apply to write."))

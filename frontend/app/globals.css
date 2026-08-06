@@ -2,64 +2,114 @@
 @plugin "@tailwindcss/typography";
 
 /* ============================================
-   ULTRA-NEWS V3 — THE WIRE ROOM
+   ULTRA-NEWS — THE WIRE ROOM
    Design System & Token Layer
 
-   Visual language: wire service convergence.
-   Signature: corroboration system (fanned stacks + signal meters).
-   Typography: 3-role system (display / body / data).
+   Visual language: the printed broadsheet, rendered for a screen.
+   Ink on paper, hairline rules, generous measure, one accent colour.
+   Colour is functional — it encodes corroboration state, nothing else.
    ============================================ */
 
-/* --- V3 Design Tokens --- */
+/* --------------------------------------------
+   1. Palette
+   -------------------------------------------- */
 :root {
-  /* Colors — Light Mode */
-  --ink: #12141c; /* Blue-black primary text — not flat #000 */
-  --paper: #f7f5f0; /* Warm off-white — easier on eyes than stark white */
-  --signal-amber: #e8a33d; /* Functional: "developing" (1-2 sources) */
-  --verified-teal: #173b8a; /* Functional: "corroborated" (3+ sources) */
-  --wire-red: #c4432b; /* Breaking/urgent — spend sparingly */
-  --slate: #5b6472; /* Secondary text, metadata, dividers */
+  /* Core surfaces — warm, paper-like, never stark white */
+  --ink: #14161d; /* Blue-black primary text, not flat #000 */
+  --paper: #faf8f4; /* Warm off-white newsprint */
+  --slate: #5a6371; /* Secondary text, metadata */
 
-  /* Derived */
+  /* Functional signal colours — corroboration state only */
+  --signal-amber: #b47318; /* "Developing" — 2 independent publishers */
+  --verified-teal: #15507a; /* "Corroborated" — 3+ independent publishers */
+  --wire-red: #a83422; /* Breaking / urgent — spend sparingly */
+
+  /* Derived semantic tokens */
   --background: var(--paper);
   --foreground: var(--ink);
   --foreground-muted: var(--slate);
+  --foreground-subtle: #858d9a; /* Tertiary — timestamps, captions */
+
   --accent: var(--verified-teal);
   --accent-secondary: var(--signal-amber);
-  --border: #e0ddd7;
-  --border-hover: #c8c4bc;
-  --surface-elevated: #efece6;
 
-  /* Radius — deliberate, not bubbly */
-  --radius-card: 6px;
-  --radius-chip: 4px;
+  /* Surfaces: three levels, deliberately close together.
+     --surface and --primary were referenced across the app but never defined,
+     so every `bg-[var(--surface)]` silently resolved to nothing. */
+  --surface: #f3f0ea; /* Cards, panels, inset controls */
+  --surface-elevated: #ffffff; /* Raised above the page */
+  --surface-sunken: #ece8e0; /* Wells, track backgrounds */
 
-  /* Animation */
+  --border: #ddd8ce; /* Hairline rules */
+  --border-strong: #c3bcae; /* Emphasis rules, active states */
+  --border-hover: #a9a294;
+
+  /* --------------------------------------------
+     2. Typography scale — a fifth-based modular scale
+     -------------------------------------------- */
+  --measure: 68ch; /* Optimal reading width for body copy */
+
+  /* --------------------------------------------
+     3. Shape
+     -------------------------------------------- */
+  --radius-card: 4px;
+  --radius-chip: 3px;
+  --radius-pill: 999px;
+
+  /* --------------------------------------------
+     4. Elevation — light and restrained
+     -------------------------------------------- */
+  --shadow-sm: 0 1px 2px rgb(20 22 29 / 0.04);
+  --shadow-md: 0 2px 8px rgb(20 22 29 / 0.06), 0 1px 2px rgb(20 22 29 / 0.04);
+  --shadow-lg: 0 8px 28px rgb(20 22 29 / 0.10), 0 2px 6px rgb(20 22 29 / 0.05);
+
+  /* --------------------------------------------
+     5. Motion
+     -------------------------------------------- */
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-  --duration-fast: 150ms;
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --duration-fast: 120ms;
   --duration-normal: 200ms;
+  --duration-slow: 400ms;
 }
 
-/* --- Dark Mode (ink/paper swap) --- */
+/* --- Dark mode: not an inversion, a separate composition --- */
 .dark {
-  --ink: #f0ede7;
-  --paper: #0e1015;
-  --signal-amber: #f0b955;
-  --verified-teal: #2e6ecf;
-  --wire-red: #e05a42;
-  --slate: #8b95a5;
+  --ink: #e8e6e1;
+  --paper: #0f1115;
+  --slate: #9aa2b0;
+
+  /* Signal colours lifted for contrast against a dark ground */
+  --signal-amber: #e5a54b;
+  --verified-teal: #5b9dd9;
+  --wire-red: #e2705c;
 
   --background: var(--paper);
   --foreground: var(--ink);
   --foreground-muted: var(--slate);
+  --foreground-subtle: #6b7280;
+
   --accent: var(--verified-teal);
   --accent-secondary: var(--signal-amber);
-  --border: #1e2028;
-  --border-hover: #2e3040;
-  --surface-elevated: #161820;
+
+  --surface: #171a21;
+  --surface-elevated: #1d212a;
+  --surface-sunken: #12151b;
+
+  /* Borders were #1e2028 on a #0e1015 ground — effectively invisible.
+     These clear 3:1 against the background at every level. */
+  --border: #2b3039;
+  --border-strong: #3d434f;
+  --border-hover: #4d5462;
+
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
+  --shadow-md: 0 2px 8px rgb(0 0 0 / 0.35), 0 1px 2px rgb(0 0 0 / 0.25);
+  --shadow-lg: 0 8px 28px rgb(0 0 0 / 0.45), 0 2px 6px rgb(0 0 0 / 0.3);
 }
 
-/* --- Tailwind v4 Theme Integration --- */
+/* --------------------------------------------
+   Tailwind v4 theme integration
+   -------------------------------------------- */
 @theme inline {
   --color-ink: var(--ink);
   --color-paper: var(--paper);
@@ -70,97 +120,162 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-foreground-muted: var(--foreground-muted);
+  --color-foreground-subtle: var(--foreground-subtle);
   --color-accent: var(--accent);
   --color-accent-secondary: var(--accent-secondary);
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-surface: var(--surface);
   --color-surface-elevated: var(--surface-elevated);
+  --color-surface-sunken: var(--surface-sunken);
 
   --font-display: var(--font-fraunces);
   --font-body: var(--font-geist);
   --font-mono: var(--font-ibm-plex-mono);
+  /* `font-serif` was used throughout the app but never mapped, so it fell back
+     to browser Times next to Fraunces headings — two serifs on one card. */
+  --font-serif: var(--font-fraunces);
+  --font-sans: var(--font-geist);
 
-  --radius-card: 6px;
-  --radius-chip: 4px;
+  --radius-card: 4px;
+  --radius-chip: 3px;
 }
 
-/* --- Base Styles --- */
+/* --------------------------------------------
+   Base
+   -------------------------------------------- */
 html {
   scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-body), system-ui, sans-serif;
-  letter-spacing: -0.01em;
+  font-synthesis-weight: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* --- V3 Typography Roles --- */
+/* --------------------------------------------
+   Typography roles
+   -------------------------------------------- */
 
-/* Display: Fraunces — editorial headlines, warm serif voice */
+/* Display: Fraunces — editorial headlines */
 .font-display {
-  font-family: var(--font-display), ui-serif, serif;
-  font-weight: 700;
-  letter-spacing: -0.03em;
-}
-
-/* Mono: IBM Plex Mono — timestamps, source counts, "machine-verified fact" */
-.font-data {
-  font-family: var(--font-mono), ui-monospace, monospace;
-  font-size: 0.8125rem;
-  letter-spacing: 0.01em;
-}
-
-/* --- Fluid Type Scale --- */
-.text-display-xl {
-  font-size: clamp(2.25rem, 4vw + 1rem, 3.5rem);
-  line-height: 1;
-  letter-spacing: -0.03em;
-}
-
-.text-display-md {
-  font-size: clamp(1.5rem, 2vw + 1rem, 2.25rem);
-  line-height: 1.15;
+  font-family: var(--font-display), ui-serif, Georgia, serif;
+  font-weight: 600;
   letter-spacing: -0.02em;
 }
 
+/* Data: IBM Plex Mono — timestamps, counts, machine-verified facts.
+   Deliberately restrained: this is an accent voice, not the body voice. */
+.font-data {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+
+/* --- Fluid editorial type scale --- */
+.text-display-2xl {
+  font-size: clamp(2.75rem, 5vw + 1rem, 4.5rem);
+  line-height: 1.02;
+  letter-spacing: -0.035em;
+}
+
+.text-display-xl {
+  font-size: clamp(2rem, 3.5vw + 0.75rem, 3rem);
+  line-height: 1.06;
+  letter-spacing: -0.03em;
+}
+
+.text-display-lg {
+  font-size: clamp(1.5rem, 2vw + 0.75rem, 2rem);
+  line-height: 1.12;
+  letter-spacing: -0.022em;
+}
+
+.text-display-md {
+  font-size: clamp(1.25rem, 1.2vw + 0.75rem, 1.5rem);
+  line-height: 1.2;
+  letter-spacing: -0.018em;
+}
+
+.text-display-sm {
+  font-size: 1.0625rem;
+  line-height: 1.3;
+  letter-spacing: -0.012em;
+}
+
 .text-body-lg {
-  font-size: 1.125rem;
-  line-height: 1.7;
+  font-size: 1.0625rem;
+  line-height: 1.65;
 }
 
 .text-body-md {
-  font-size: 1rem;
+  font-size: 0.9375rem;
   line-height: 1.6;
+}
+
+.text-body-sm {
+  font-size: 0.875rem;
+  line-height: 1.55;
+}
+
+/* Metadata label: the one place small-caps mono is appropriate.
+   Floor of 11px — the old 8-9px `tracking-widest` labels were unreadable. */
+.text-label {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.6875rem;
+  line-height: 1.3;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
 .text-caption {
   font-family: var(--font-mono), ui-monospace, monospace;
-  font-size: 0.8125rem;
-  line-height: 1.4;
+  font-size: 0.75rem;
+  line-height: 1.45;
   letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
 }
 
-/* --- Selection Color --- */
+/* Constrain body copy to a readable measure */
+.measure {
+  max-width: var(--measure);
+}
+
+/* --------------------------------------------
+   Selection & focus
+   -------------------------------------------- */
 ::selection {
-  background: var(--verified-teal);
-  color: var(--paper);
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  color: var(--foreground);
 }
 
-/* --- Focus Ring (Accessibility — V3 spec §9) --- */
 :focus-visible {
-  outline: 2px solid var(--verified-teal);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
+  border-radius: 2px;
 }
 
-/* --- Corroboration Meter Segments --- */
+/* Cards are a link wrapping content; the ring belongs on the card, not the text */
+.focus-ring-card:has(:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/* --------------------------------------------
+   Corroboration meter
+   -------------------------------------------- */
 .meter-segment {
-  width: 4px;
-  height: 14px;
+  width: 3px;
+  height: 12px;
   border-radius: 1px;
-  transition:
-    background-color var(--duration-normal) var(--ease-out),
-    transform var(--duration-fast) var(--ease-out);
+  transition: background-color var(--duration-normal) var(--ease-out);
 }
 
 .meter-segment.filled.developing {
@@ -175,139 +290,175 @@ body {
   background-color: var(--border);
 }
 
-/* Meter pulse animation — only on corroboration increment */
-@keyframes meter-pulse {
-  0%,
-  100% {
-    transform: scaleY(1);
+/* --------------------------------------------
+   Animation utilities
+   -------------------------------------------- */
+/* `animate-fade-in` was used in several components but never defined anywhere,
+   and is not a Tailwind built-in — those elements simply had no animation. */
+@keyframes fade-in {
+  from {
+    opacity: 0;
   }
-  50% {
-    transform: scaleY(1.3);
+  to {
+    opacity: 1;
   }
 }
 
-/* --- Fanned Stack Shadows --- */
-.fanned-stack {
-  position: relative;
-}
-
-.fanned-stack::before,
-.fanned-stack::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: var(--radius-card);
-  border: 1px solid var(--border);
-  background: var(--background);
-  z-index: -1;
-  transition: transform var(--duration-normal) var(--ease-out);
-}
-
-.fanned-stack::before {
-  transform: rotate(1.5deg) translateY(4px) translateX(3px);
-  opacity: 0.5;
-}
-
-.fanned-stack::after {
-  transform: rotate(0.75deg) translateY(2px) translateX(1.5px);
-  opacity: 0.7;
-}
-
-/* --- Breaking Ticker --- */
-.ticker-bar {
-  border-left: 4px solid var(--wire-red);
-  background: color-mix(in srgb, var(--wire-red) 8%, var(--background));
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 @keyframes marquee {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in var(--duration-slow) var(--ease-out) both;
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up var(--duration-slow) var(--ease-out) both;
 }
 
 .animate-marquee {
-  animation: marquee 30s linear infinite;
+  animation: marquee 45s linear infinite;
 }
 
-.animate-marquee:hover {
+.animate-marquee:hover,
+.animate-marquee:focus-within {
   animation-play-state: paused;
 }
 
-/* --- Prose Overrides (Article Excerpts) --- */
-.prose p,
-.prose div p,
-.prose li,
-.prose span,
-.prose strong,
-.prose h1,
-.prose h2,
-.prose h3,
-.prose h4,
-.prose h5,
-.prose h6 {
-  color: var(--foreground) !important;
+/* Skeleton shimmer */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface);
 }
 
-.prose a {
-  color: var(--verified-teal) !important;
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--foreground) 5%, transparent),
+    transparent
+  );
+  animation: shimmer 1.6s infinite;
 }
 
-.dark .prose p,
-.dark .prose div p,
-.dark .prose li,
-.dark .prose span {
-  color: var(--foreground-muted) !important;
+/* --------------------------------------------
+   Editorial rules
+   -------------------------------------------- */
+.rule-hairline {
+  border-top: 1px solid var(--border);
 }
 
-.dark .prose strong,
-.dark .prose h1,
-.dark .prose h2,
-.dark .prose h3,
-.dark .prose h4,
-.dark .prose h5,
-.dark .prose h6 {
-  color: var(--foreground) !important;
+.rule-heavy {
+  border-top: 2px solid var(--foreground);
 }
 
-.dark .prose a {
-  color: var(--verified-teal) !important;
+/* Section label with a trailing rule — a broadsheet convention */
+.section-rule {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
 }
 
-/* --- Motion: prefers-reduced-motion --- */
-@media (prefers-reduced-motion: reduce) {
-  .fanned-stack::before,
-  .fanned-stack::after {
-    transform: none;
-    opacity: 0;
-  }
-
-  .meter-segment {
-    transition: none;
-  }
-
-  /* Layout Utility: Custom Scrollbar Hiding */
-  .pb-scrollbar::-webkit-scrollbar {
-    display: none;
-  }
-  .pb-scrollbar {
-    -ms-overflow-style: none; /* IE and Edge */
-    scrollbar-width: none; /* Firefox */
-  }
-
-  .ticker-bar {
-    animation: none;
-  }
-
-  * {
-    animation-duration: 0.01ms !important;
-    transition-duration: 0.01ms !important;
-  }
+.section-rule::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
 }
 
-/* --- Layout Utility: Custom Scrollbar Hiding --- */
+/* --------------------------------------------
+   Breaking ticker
+   -------------------------------------------- */
+.ticker-bar {
+  border-left: 3px solid var(--wire-red);
+  background: color-mix(in srgb, var(--wire-red) 6%, var(--background));
+}
+
+/* --------------------------------------------
+   Prose (article excerpts)
+   -------------------------------------------- */
+.prose {
+  --tw-prose-body: var(--foreground-muted);
+  --tw-prose-headings: var(--foreground);
+  --tw-prose-bold: var(--foreground);
+  --tw-prose-links: var(--accent);
+  --tw-prose-quotes: var(--foreground);
+  --tw-prose-bullets: var(--border-strong);
+  --tw-prose-hr: var(--border);
+  --tw-prose-counters: var(--foreground-subtle);
+}
+
+/* --------------------------------------------
+   Scrollbars
+   -------------------------------------------- */
 .pb-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
 .pb-scrollbar {
-  -ms-overflow-style: none; /* IE and Edge */
-  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scroll-slim::-webkit-scrollbar {
+  height: 6px;
+  width: 6px;
+}
+
+.scroll-slim::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 3px;
+}
+
+.scroll-slim::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* --------------------------------------------
+   Reduced motion
+   -------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .animate-marquee,
+  .skeleton::after {
+    animation: none;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

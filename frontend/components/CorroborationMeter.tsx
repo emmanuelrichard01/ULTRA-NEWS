@@ -1,75 +1,87 @@
-"use client";
+import { describeCorroboration, outletPhrase } from '@/lib/corroboration';
 
 /**
- * CorroborationMeter — V3 Signature Component
+ * CorroborationMeter — the product's signature trust signal.
  *
- * 5-segment signal-bar indicator showing how many independent sources
- * are covering a story. This is the design's core trust signal.
+ * Shows how many INDEPENDENT PUBLISHERS carry a story. Publishers, not articles:
+ * two feeds from one newsroom are one source, because a newsroom corroborating
+ * itself is not corroboration.
  *
- * 1-2 filled = amber ("Developing")
- * 3+  filled = teal  ("Corroborated")
+ * Three rules this follows that the previous version didn't:
  *
- * Always paired with exact numeral + text label (accessibility: §9).
- * Color is never the only signal.
+ *   - Colour is never the only channel. The count and a text label are always
+ *     present, so the signal survives greyscale and colour-blindness.
+ *   - It shows evidence, not a verdict. "4 outlets" is checkable; "Reporting"
+ *     was a label the reader had to take on faith — and it named our pipeline
+ *     state rather than telling them anything.
+ *   - Segments cap at six and the exact number is always rendered, so a story
+ *     with 20 outlets doesn't look identical to one with six.
  */
 
 interface CorroborationMeterProps {
-  sourceCount: number;
+  /** Number of independent publishers. */
+  outlets: number;
   showLabel?: boolean;
-  size?: "sm" | "md" | "lg";
+  size?: 'sm' | 'md' | 'lg';
+  className?: string;
 }
 
+const SEGMENTS = 6;
+
+const SIZES = {
+  sm: { bar: 'w-[3px]', unit: 7, gap: 'gap-[2px]', text: 'text-[11px]' },
+  md: { bar: 'w-[3px]', unit: 9, gap: 'gap-[3px]', text: 'text-[12px]' },
+  lg: { bar: 'w-[4px]', unit: 12, gap: 'gap-[3px]', text: 'text-[13px]' },
+} as const;
+
 export default function CorroborationMeter({
-  sourceCount,
+  outlets,
   showLabel = true,
-  size = "md",
+  size = 'md',
+  className = '',
 }: CorroborationMeterProps) {
-  const segments = 5;
-  const filled = Math.min(sourceCount, segments);
-  const status = sourceCount >= 3 ? "corroborated" : "developing";
-
-  const sizeClasses = {
-    sm: { segment: "w-[3px] h-[10px]", text: "text-[10px]", gap: "gap-[2px]" },
-    md: { segment: "w-[4px] h-[14px]", text: "text-[11px]", gap: "gap-[3px]" },
-    lg: { segment: "w-[5px] h-[18px]", text: "text-xs", gap: "gap-1" },
-  };
-
-  const s = sizeClasses[size];
+  const descriptor = describeCorroboration(outlets);
+  const filled = Math.min(Math.max(outlets, 0), SEGMENTS);
+  const s = SIZES[size];
 
   return (
-    <div className="flex items-center gap-2" role="meter" aria-valuenow={sourceCount} aria-valuemin={0} aria-valuemax={5} aria-label={`${sourceCount} sources, ${status}`}>
-      {/* Signal bars */}
-      <div className={`flex items-end ${s.gap}`}>
-        {Array.from({ length: segments }).map((_, i) => (
-          <div
+    <div
+      className={`inline-flex items-center gap-2 ${className}`}
+      role="meter"
+      aria-valuenow={outlets}
+      aria-valuemin={0}
+      aria-valuemax={SEGMENTS}
+      aria-label={descriptor.description(outlets)}
+      title={descriptor.description(outlets)}
+    >
+      <div className={`flex items-end ${s.gap}`} aria-hidden="true">
+        {Array.from({ length: SEGMENTS }).map((_, i) => (
+          <span
             key={i}
-            className={`
-              ${s.segment} rounded-[1px] transition-all duration-200
-              ${i < filled
-                ? status === "corroborated"
-                  ? "bg-[var(--verified-teal)]"
-                  : "bg-[var(--signal-amber)]"
-                : "bg-[var(--border)]"
-              }
-            `}
-            style={{ height: `${10 + i * 2}px` }}
+            className={`${s.bar} rounded-[1px] transition-colors duration-200`}
+            style={{
+              // Rising heights read as a signal-strength meter rather than a
+              // progress bar, which is the right metaphor: more outlets is
+              // stronger evidence, not closer to done.
+              height: `${s.unit + i * 1.5}px`,
+              backgroundColor:
+                i < filled ? `var(${descriptor.colorVar})` : 'var(--border)',
+            }}
           />
         ))}
       </div>
 
-      {/* Numeral — always shown (mono = "machine-verified fact") */}
-      <span className={`font-data font-semibold ${s.text} ${
-        status === "corroborated"
-          ? "text-[var(--verified-teal)]"
-          : "text-[var(--signal-amber)]"
-      }`}>
-        {sourceCount}
+      {/* Exact count in tabular mono — the checkable fact. */}
+      <span
+        className={`font-data font-semibold tabular-nums ${s.text}`}
+        style={{ color: `var(${descriptor.colorVar})` }}
+      >
+        {outlets}
       </span>
 
-      {/* Text label — accessibility, never color-only */}
       {showLabel && (
-        <span className={`font-data ${s.text} text-[var(--foreground-muted)]`}>
-          {status === "corroborated" ? "Reporting" : "Developing"}
+        <span className={`font-data ${s.text} text-[var(--foreground-muted)] whitespace-nowrap`}>
+          {outletPhrase(outlets)}
         </span>
       )}
     </div>

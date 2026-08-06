@@ -1,91 +1,97 @@
 "use client";
 
 import { useEffect, useState } from "react";
+
 import CorroborationMeter from "./CorroborationMeter";
+import { describeCorroboration } from "@/lib/corroboration";
+
+/**
+ * Condensed story header that appears once the masthead scrolls away.
+ *
+ * Keeps the corroboration count on screen while reading, which is the point —
+ * the reader should never lose track of how well-supported the thing they're
+ * reading actually is.
+ */
 
 interface StickyStoryNavProps {
   title: string;
+  /** Independent publishers. */
   sourceCount: number;
   isVerified: boolean;
   isDeveloping: boolean;
-  shareUrl: string;
 }
 
-export default function StickyStoryNav({
-  title,
-  sourceCount,
-  isVerified,
-  isDeveloping,
-  shareUrl,
-}: StickyStoryNavProps) {
+export default function StickyStoryNav({ title, sourceCount }: StickyStoryNavProps) {
   const [isVisible, setIsVisible] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    const handleScroll = () => {
-      // Show sticky nav after scrolling past the main header (roughly 300px)
-      if (window.scrollY > 300) {
-        setIsVisible(true);
-      } else {
-        setIsVisible(false);
-      }
-    };
-
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
+    const onScroll = () => setIsVisible(window.scrollY > 320);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+    return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  const descriptor = describeCorroboration(sourceCount);
+
+  /**
+   * Share the page's actual URL.
+   *
+   * This used to receive a hardcoded `https://ultra-news.demo/story/...`, so
+   * every shared link pointed at a domain that doesn't exist. Reading
+   * window.location at click time is correct on any host, in any environment.
+   */
   const handleShare = async () => {
+    const url = window.location.href;
+
     if (navigator.share) {
       try {
-        await navigator.share({
-          title,
-          url: shareUrl,
-        });
-      } catch (err) {
-        console.error("Error sharing:", err);
+        await navigator.share({ title, url });
+        return;
+      } catch {
+        // User dismissed the sheet, or the gesture wasn't trusted — fall through
+        // to clipboard rather than leaving the click with no effect.
       }
-    } else {
-      navigator.clipboard.writeText(shareUrl);
-      alert("Link copied to clipboard!");
+    }
+
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard blocked (insecure origin or denied permission). Say nothing
+      // rather than firing an alert() that blocks the page.
     }
   };
 
   return (
     <div
-      className={`fixed top-0 left-0 right-0 z-40 transition-transform duration-500 ease-in-out ${
+      aria-hidden={!isVisible}
+      className={`fixed inset-x-0 top-0 z-40 transition-transform duration-300 ease-out ${
         isVisible ? "translate-y-0" : "-translate-y-full"
       }`}
     >
-      <div className="bg-[var(--surface-elevated)]/80 backdrop-blur-md border-b border-[var(--border)] shadow-sm">
-        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4 min-w-0 flex-1">
-            <h2 className="font-display text-[15px] font-bold text-[var(--foreground)] truncate">
-              {title}
-            </h2>
-            
-            <div className="hidden sm:flex items-center gap-2 flex-shrink-0">
-              <div className="h-4 w-px bg-[var(--border)] mx-1" />
-              <CorroborationMeter sourceCount={sourceCount} size="sm" showLabel={false} />
-              
-              {isVerified && (
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-sm bg-[var(--verified-teal)]/20 text-[8px] font-bold uppercase tracking-wider text-[var(--verified-teal)]">
-                  Verified
-                </span>
-              )}
-              {isDeveloping && (
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-sm bg-[var(--signal-amber)]/20 text-[8px] font-bold uppercase tracking-wider text-[var(--signal-amber)]">
-                  Developing
-                </span>
-              )}
-            </div>
+      <div className="border-b border-[var(--border)] bg-[var(--background)]/95 backdrop-blur supports-[backdrop-filter]:bg-[var(--background)]/85">
+        <div className="mx-auto flex max-w-3xl items-center gap-4 px-4 py-2.5 sm:px-6">
+          <h2 className="min-w-0 flex-1 truncate font-display text-[15px] text-[var(--foreground)]">
+            {title}
+          </h2>
+
+          <div
+            className="hidden shrink-0 items-center gap-2 sm:flex"
+            title={descriptor.description(sourceCount)}
+          >
+            <CorroborationMeter outlets={sourceCount} size="sm" showLabel={false} />
+            <span className="font-data text-[11px] text-[var(--foreground-muted)]">
+              {descriptor.label}
+            </span>
           </div>
-          
+
           <button
             onClick={handleShare}
-            className="flex-shrink-0 flex items-center gap-1.5 font-data text-[10px] font-bold uppercase tracking-wider text-[var(--foreground)] bg-[var(--background)] border border-[var(--border)] px-3 py-1.5 rounded-[var(--radius-chip)] hover:bg-[var(--surface-elevated)] transition-colors"
+            className="text-label shrink-0 rounded-[var(--radius-chip)] border border-[var(--border)] px-2.5 py-1.5 text-[var(--foreground-muted)] transition-colors hover:border-[var(--border-hover)] hover:text-[var(--foreground)]"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" x2="15.42" y1="13.51" y2="17.49"/><line x1="15.41" x2="8.59" y1="6.51" y2="10.49"/></svg>
-            Share
+            {copied ? "Copied" : "Share"}
           </button>
         </div>
       </div>

@@ -1,13 +1,25 @@
 """
-Centralized categorization logic for ULTRA-NEWS.
+Category seeding, and the retired keyword matcher.
 
-Single source of truth for keyword-based article categorization.
-Import this module wherever categorization is needed — never duplicate these mappings.
+Topic assignment moved to core/topics.py, which classifies semantically against
+the embedding every article already has. Measured on a 619-article corpus, the
+keyword matcher below left 47% untagged, placed 2 articles in "art", and filed
+"Hong Kong can look to San Francisco" under Technology — it matched tokens
+anywhere in the full article body, so one passing mention assigned a topic.
 
-V3.1: Word-boundary regex matching + scoring threshold to eliminate false positives.
+What remains here:
+
+  seed_all_categories()   Creates Category rows from core.topics.TOPICS and
+                          removes retired ones. The taxonomy lives THERE.
+
+  CATEGORY_KEYWORDS       Kept only as a reference for the shape of the old
+  match_category_slugs()  approach. Nothing in the ingest or clustering path
+  assign_categories...()  calls them any more, and the slugs they name
+                          ("art", "entertainment") no longer exist as
+                          Category rows.
 """
-import re
 import logging
+import re
 from typing import List, Tuple
 
 from core.models import Category
@@ -115,17 +127,10 @@ def _get_compiled_patterns() -> dict[str, list[re.Pattern]]:
 
 
 # All category names used during seeding, keyed by slug
-CATEGORY_REGISTRY: dict[str, str] = {
-    'tech': 'Tech',
-    'politics': 'Politics',
-    'business': 'Business',
-    'entertainment': 'Entertainment',
-    'science': 'Science',
-    'art': 'Art',
-    'sports': 'Sports',
-    'health': 'Health',
-    'world': 'World',
-}
+# The taxonomy lives in core/topics.py → TOPICS, which is where the
+# classifier's prototypes are defined and where Category rows are seeded
+# from. A separate CATEGORY_REGISTRY dict here was a second definition
+# that had to be kept in sync by hand.
 
 
 def match_category_slugs(title: str, content: str) -> List[Tuple[str, int]]:
@@ -175,11 +180,30 @@ def assign_categories_to_article(article, title: str, content: str) -> List[str]
 
 def seed_all_categories() -> list[tuple[str, bool]]:
     """
-    Ensure all categories exist in the database. Returns list of (name, created) tuples.
-    Idempotent — safe to call repeatedly.
+    Ensure all topics exist as Category rows. Idempotent.
+
+    Seeded from core.topics.TOPICS, which is the single definition of the
+    taxonomy. It previously came from a separate CATEGORY_REGISTRY dict that had
+    to be kept in sync by hand with the keyword table here AND with CATEGORY_MAP
+    in the frontend — three places, no enforcement.
     """
+    from core.topics import TOPICS
+
     results = []
-    for slug, name in CATEGORY_REGISTRY.items():
-        _, created = Category.objects.get_or_create(name=name, slug=slug)
-        results.append((name, created))
+    for topic in TOPICS:
+        _, created = Category.objects.update_or_create(
+            slug=topic.slug, defaults={"name": topic.name}
+        )
+        results.append((topic.name, created))
+
+    # Remove retired topics. Without this, seeding only ever adds: renaming
+    # `entertainment` to `culture` left the old row in place, still attached to
+    # articles and still rendering as a topic the classifier can no longer
+    # assign. Deleting drops the m2m rows; affected articles are reclassified on
+    # their next pass.
+    retired = Category.objects.exclude(slug__in=[t.slug for t in TOPICS])
+    for name in retired.values_list("name", flat=True):
+        results.append((f"{name} (retired)", False))
+    retired.delete()
+
     return results

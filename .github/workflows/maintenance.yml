@@ -1,0 +1,54 @@
+name: Maintenance — retention, source health
+
+# Daily housekeeping, kept out of the 30-minute pipeline because none of it
+# needs to run 48 times a day and all of it is comparatively expensive.
+#
+# Retention is what keeps the deployment inside a free database tier
+# indefinitely, so on the $0 path this workflow is not optional.
+
+on:
+  schedule:
+    - cron: '17 4 * * *'   # off the hour: :00 is the busiest slot on GitHub's scheduler
+  workflow_dispatch:
+
+concurrency:
+  group: maintenance
+  cancel-in-progress: false
+
+jobs:
+  maintain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: backend
+
+    env:
+      DEBUG: '0'
+      SECRET_KEY: ${{ secrets.SECRET_KEY }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      ALLOWED_HOSTS: localhost
+      CACHE_BACKEND: locmem
+      LLM_PROVIDER: none
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: pip install -r requirements.txt
+
+      # Tiered: raw documents go first, then article payloads, then
+      # uncorroborated stories. Story rows and counts survive, so the archive
+      # stays navigable after the bodies are gone.
+      - name: Apply retention
+        run: python manage.py retention --apply
+
+      # Reports feeds that no longer resolve. Deliberately does NOT fail the
+      # run — publishers break their feeds regularly and that is not an
+      # emergency. Read the log; the API's own health endpoint covers the
+      # case where it becomes one.
+      - name: Check source health
+        run: python manage.py validate_sources || true

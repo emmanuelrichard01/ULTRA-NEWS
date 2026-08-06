@@ -1,98 +1,112 @@
-"use client";
+import type { Metadata } from 'next';
+import Link from 'next/link';
 
-import { useState } from 'react';
-import { Metadata } from 'next';
+import { EDITIONS } from '@/lib/editions';
+
+/**
+ * Subscribe.
+ *
+ * This page previously showed an email form that set `status = 'success'` on
+ * submit and posted nowhere. It told people they had subscribed when nothing
+ * had happened and no address was stored — a UI that lies about the outcome of
+ * an action, which is worse than not offering the action at all.
+ *
+ * The honest version offers the thing that genuinely works: per-edition RSS,
+ * which now exists, and says plainly that email digests do not.
+ */
+
+export const metadata: Metadata = {
+  title: 'Subscribe',
+  description:
+    'Follow Ultra News by RSS — one feed per edition, each item carrying its corroboration level.',
+};
+
+const FEED_PATHS: Record<string, string> = {
+  '': '/api/v1/feeds/wire.xml',
+  developing: '/api/v1/feeds/developing.xml',
+  record: '/api/v1/feeds/record.xml',
+};
 
 export default function SubscribePage() {
-  const [email, setEmail] = useState('');
-  const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email || !email.includes('@')) return;
-
-    // In production, this would POST to a backend endpoint or Mailchimp/Buttondown API
-    setStatus('success');
-    setEmail('');
-  };
+  const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
   return (
-    <div className="max-w-2xl mx-auto py-16">
-      {/* Header */}
-      <header className="text-center mb-12">
-        <span className="inline-block font-data text-[10px] font-bold uppercase tracking-widest text-[var(--verified-teal)] mb-4">
-          Stay Informed
-        </span>
-        <h1 className="text-display-xl font-display text-[var(--foreground)] mb-4">
-          The Wire Brief
-        </h1>
-        <p className="text-body-lg text-[var(--foreground-muted)] max-w-md mx-auto">
-          A curated digest of the most corroborated stories, delivered when they matter — not on a schedule.
+    <div className="mx-auto max-w-3xl">
+      <header className="border-b-2 border-[var(--foreground)] pb-7">
+        <h1 className="text-display-2xl font-display text-[var(--foreground)]">Subscribe</h1>
+        <p className="text-body-lg measure mt-3 text-[var(--foreground-muted)]">
+          One feed per edition. Every item states how many independent outlets
+          stand behind the story, so the corroboration count travels with it into
+          your reader.
         </p>
       </header>
 
-      {/* Form */}
-      <div className="p-8 bg-[var(--surface-elevated)] rounded-[var(--radius-card)] border border-[var(--border)]">
-        {status === 'success' ? (
-          <div className="text-center py-8">
-            <div className="w-12 h-12 rounded-full bg-[var(--verified-teal)] flex items-center justify-center mx-auto mb-4">
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-            </div>
-            <h2 className="text-display-md font-display text-[var(--foreground)] mb-2">
-              You&apos;re on the wire.
-            </h2>
-            <p className="text-body-md text-[var(--foreground-muted)]">
-              We&apos;ll notify you when stories break — not before.
-            </p>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label htmlFor="email" className="block font-data text-[11px] font-semibold uppercase tracking-wider text-[var(--foreground-muted)] mb-2">
-                Email Address
-              </label>
-              <input
-                type="email"
-                id="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="reader@example.com"
-                required
-                className="w-full px-4 py-3 bg-[var(--background)] border border-[var(--border)] rounded-[var(--radius-card)] text-[var(--foreground)] text-body-md placeholder:text-[var(--foreground-muted)] focus:outline-none focus:border-[var(--verified-teal)] focus:ring-1 focus:ring-[var(--verified-teal)] transition-colors"
-              />
-            </div>
+      <section aria-labelledby="feeds-heading" className="py-9">
+        <h2 id="feeds-heading" className="sr-only">
+          Available feeds
+        </h2>
 
-            <button
-              type="submit"
-              className="w-full py-3.5 bg-[var(--foreground)] text-[var(--background)] font-data text-sm font-bold uppercase tracking-widest rounded-[var(--radius-card)] hover:opacity-90 transition-opacity duration-150"
-            >
-              Subscribe to The Wire Brief
-            </button>
+        <ul className="divide-y divide-[var(--border)] border-y border-[var(--border)]">
+          {EDITIONS.map((edition) => {
+            const path = FEED_PATHS[edition.slug];
+            if (!path) return null;
+            return (
+              <li
+                key={edition.slug || 'wire'}
+                className="flex flex-wrap items-start justify-between gap-4 py-5"
+              >
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-display-sm font-display text-[var(--foreground)]">
+                    {edition.name}
+                  </h3>
+                  <p className="text-body-sm measure mt-1 text-[var(--foreground-muted)]">
+                    {edition.tagline}
+                  </p>
+                </div>
 
-            <p className="text-center font-data text-[10px] text-[var(--foreground-muted)]">
-              No spam. Unsubscribe anytime. Your data stays yours.
-            </p>
-          </form>
-        )}
-      </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <a
+                    href={`${apiBase}${path}`}
+                    className="text-label rounded-[var(--radius-chip)] border border-[var(--border)] px-3 py-2 text-[var(--foreground)] transition-colors hover:border-[var(--border-hover)]"
+                  >
+                    RSS
+                  </a>
+                  <Link
+                    href={edition.slug ? `/${edition.slug}` : '/'}
+                    className="text-label rounded-[var(--radius-chip)] px-2 py-2 text-[var(--foreground-muted)] transition-colors hover:text-[var(--foreground)]"
+                  >
+                    Read
+                  </Link>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      </section>
 
-      {/* What you get */}
-      <div className="mt-12 grid grid-cols-1 sm:grid-cols-3 gap-6">
-        {[
-          { title: 'Corroborated', desc: 'Only stories verified by 3+ independent sources.' },
-          { title: 'Curated', desc: 'No firehose. Just the stories that matter.' },
-          { title: 'Transparent', desc: 'Every claim linked to its original source.' },
-        ].map((item) => (
-          <div key={item.title} className="text-center p-4">
-            <h3 className="font-data text-[11px] font-bold uppercase tracking-wider text-[var(--accent)] mb-2">
-              {item.title}
-            </h3>
-            <p className="text-body-md text-[var(--foreground-muted)]">
-              {item.desc}
-            </p>
-          </div>
-        ))}
-      </div>
+      <section className="border-t border-[var(--border)] py-9">
+        <h2 className="text-display-md font-display mb-3 text-[var(--foreground)]">
+          Email digests
+        </h2>
+        <p className="text-body-md measure text-[var(--foreground-muted)]">
+          There aren&rsquo;t any yet. Rather than collect addresses for something
+          that doesn&rsquo;t exist, we&rsquo;d point you at the feeds above —
+          they carry everything an email digest would, without us holding your
+          address.
+        </p>
+        <p className="text-body-md measure mt-4 text-[var(--foreground-muted)]">
+          If email is something you want,{' '}
+          <a
+            href="https://github.com/emmanuelrichard01/ULTRA-NEWS/issues"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[var(--accent)] underline underline-offset-2"
+          >
+            say so on the issue tracker
+          </a>
+          .
+        </p>
+      </section>
     </div>
   );
 }

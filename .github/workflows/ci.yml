@@ -1,4 +1,4 @@
-name: CI — Lint & Build
+name: CI — Lint, Test & Build
 
 on:
   push:
@@ -18,9 +18,73 @@ jobs:
         with:
           python-version: '3.11'
           cache: 'pip'
-      - run: pip install ruff
+      # Pinned. An unpinned `pip install ruff` means the lint gate moves on
+      # ruff's release schedule: when its default rule set widened, ~180
+      # findings appeared across files nobody had touched and CI went red with
+      # no code change behind it. The rule set now lives in backend/pyproject.toml.
+      - run: pip install ruff==0.16.1
       - run: ruff check .
-      - run: ruff format --check .
+
+  # The test suite existed but CI never ran it, so failures accumulated in
+  # silence: the ingestion tests asserted against an API that had been
+  # refactored away, and the suite could not even build its schema because
+  # --nomigrations skipped the migration installing pgvector.
+  backend-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: ultranews
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DEBUG: '1'
+      SECRET_KEY: ci-only-not-a-real-secret
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ultranews
+      REDIS_URL: redis://localhost:6379/1
+      CELERY_BROKER_URL: redis://localhost:6379/1
+      CELERY_RESULT_BACKEND: redis://localhost:6379/1
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      # The embedding model is a large download; cache it across runs.
+      - name: Cache fastembed model
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: fastembed-bge-small-en-v1.5
+
+      - run: pip install -r requirements.txt
+      - name: Check for model changes with no migration
+        run: python manage.py makemigrations --check --dry-run
+      - run: python -m pytest -q --create-db
 
   frontend-build:
     runs-on: ubuntu-latest
@@ -36,6 +100,7 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: npx tsc --noEmit
+      - run: npm run lint
       - run: npm run build
         env:
           NEXT_PUBLIC_API_URL: https://api.example.com

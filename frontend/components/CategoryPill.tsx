@@ -1,68 +1,66 @@
-/**
- * CategoryPill — V3.1 Component
- *
- * Per-category accent colors for visual differentiation.
- * Mono caption, low-emphasis background.
- * Used on story cards, feed headers, and navigation elements.
- */
-
 import Link from 'next/link';
 
-const CATEGORY_COLORS: Record<string, { bg: string; text: string; border: string }> = {
-  tech:          { bg: 'rgba(99, 102, 241, 0.12)',  text: '#6366f1', border: 'rgba(99, 102, 241, 0.25)' },
-  politics:      { bg: 'rgba(244, 63, 94, 0.10)',   text: '#f43f5e', border: 'rgba(244, 63, 94, 0.25)' },
-  business:      { bg: 'rgba(16, 185, 129, 0.10)',   text: '#10b981', border: 'rgba(16, 185, 129, 0.25)' },
-  entertainment: { bg: 'rgba(217, 70, 239, 0.10)',   text: '#d946ef', border: 'rgba(217, 70, 239, 0.25)' },
-  science:       { bg: 'rgba(6, 182, 212, 0.12)',    text: '#06b6d4', border: 'rgba(6, 182, 212, 0.25)' },
-  art:           { bg: 'rgba(251, 146, 60, 0.12)',   text: '#fb923c', border: 'rgba(251, 146, 60, 0.25)' },
-  sports:        { bg: 'rgba(34, 197, 94, 0.12)',    text: '#22c55e', border: 'rgba(34, 197, 94, 0.25)' },
-  health:        { bg: 'rgba(236, 72, 153, 0.10)',   text: '#ec4899', border: 'rgba(236, 72, 153, 0.25)' },
-  world:         { bg: 'rgba(59, 130, 246, 0.12)',   text: '#3b82f6', border: 'rgba(59, 130, 246, 0.25)' },
-};
+import { CATEGORY_MAP } from '@/lib/types';
 
-const DEFAULT_COLOR = { bg: 'var(--surface-elevated)', text: 'var(--foreground-muted)', border: 'var(--border)' };
+/**
+ * CategoryPill — topic chip.
+ *
+ * Renders the semantically correct element for its role: a link when it
+ * navigates, a button when it toggles, a span when it is only a label. The
+ * previous version was always a span, so the feed wrapped it in an outer
+ * <button> to make it clickable — which meant screen readers announced an
+ * unlabelled control and keyboard focus landed in an odd place.
+ */
 
 interface CategoryPillProps {
   label: string;
   href?: string;
+  onClick?: () => void;
   isActive?: boolean;
   size?: 'xs' | 'sm' | 'md';
 }
 
-export default function CategoryPill({ label, href, isActive = false, size = 'sm' }: CategoryPillProps) {
-  const slug = label.toLowerCase();
-  const colors = CATEGORY_COLORS[slug] || DEFAULT_COLOR;
+const SIZES = {
+  xs: 'px-1.5 py-[3px] text-[10px]',
+  sm: 'px-2.5 py-1.5 text-[11px]',
+  md: 'px-3 py-1.5 text-[12px]',
+} as const;
 
-  const sizeClasses = {
-    xs: 'px-1.5 py-0.5 text-[9px]',
-    sm: 'px-2.5 py-1 text-[11px]',
-    md: 'px-3 py-1.5 text-xs',
-  };
+export default function CategoryPill({
+  label,
+  href,
+  onClick,
+  isActive = false,
+  size = 'sm',
+}: CategoryPillProps) {
+  // Slugs arrive from the API; show the human name where we know one.
+  const display = CATEGORY_MAP[label]?.displayName ?? label;
 
-  const baseClasses = `
-    inline-flex items-center rounded-[var(--radius-chip)]
-    font-data font-semibold uppercase tracking-wider
-    transition-all duration-150
-    ${sizeClasses[size]}
-  `;
-
-  const style = isActive
-    ? { backgroundColor: colors.text, color: '#fff', borderColor: 'transparent' }
-    : { backgroundColor: colors.bg, color: colors.text, borderColor: colors.border };
-
-  const className = `${baseClasses} border ${isActive ? 'shadow-sm' : 'hover:brightness-110'}`;
+  const className = [
+    'inline-flex shrink-0 items-center rounded-[var(--radius-chip)] border',
+    'font-data font-medium uppercase tracking-[0.07em] whitespace-nowrap',
+    'transition-colors duration-150',
+    SIZES[size],
+    isActive
+      ? 'border-[var(--foreground)] bg-[var(--foreground)] text-[var(--background)]'
+      : 'border-[var(--border)] bg-transparent text-[var(--foreground-muted)] hover:border-[var(--border-hover)] hover:text-[var(--foreground)]',
+  ].join(' ');
 
   if (href) {
     return (
-      <Link href={href} className={className} style={style}>
-        {label}
+      <Link href={href} className={`relative z-10 ${className}`}>
+        {display}
       </Link>
     );
   }
 
-  return (
-    <span className={className} style={style}>
-      {label}
-    </span>
-  );
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} aria-pressed={isActive} className={`relative z-10 ${className}`}>
+        {display}
+      </button>
+    );
+  }
+
+  return <span className={className}>{display}</span>;
 }

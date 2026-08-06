@@ -1,22 +1,19 @@
+import type { Metadata } from 'next';
+
 import FeedPage from '@/components/FeedPage';
+import { EDITIONS_BY_SLUG } from '@/lib/editions';
+
+const edition = EDITIONS_BY_SLUG['developing'];
+
+export const metadata: Metadata = {
+  title: edition.name,
+  description: edition.tagline,
+};
 
 interface PageProps {
-  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
 export default async function DevelopingPage({ searchParams }: PageProps) {
-  return (
-    <FeedPage
-      title="Developing"
-      subtitle="Gaining traction. Stories confirmed by 2 independent sources."
-      status="developing"
-      accentColor="--signal-amber"
-      pingColor="--signal-amber"
-      showVelocityLeaderboard={false}
-      showHero={false}
-      emptyMessage="No developing stories currently."
-      basePath="/developing"
-      searchParams={searchParams}
-    />
-  );
+  return <FeedPage edition={edition} searchParams={searchParams} />;
 }
