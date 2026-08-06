@@ -89,11 +89,21 @@ def invalidate_story(slug: str) -> None:
 
 
 def _queue_frontend_revalidation(slug: str) -> None:
-    try:
-        from core.tasks import revalidate_frontend_story
-        revalidate_frontend_story.delay(slug)
-    except Exception as e:
-        logger.warning("Could not queue frontend revalidation for %s: %s", slug, e)
+    """
+    Ask a worker to purge the story's Next.js page.
+
+    This was the expensive one. Clustering invalidates every story it touches,
+    so on a worker-less deployment each article paid twenty Celery reconnect
+    attempts — one second apart — to queue a purge nothing would run. It was the
+    single largest cost in the pipeline and it bought nothing.
+    """
+    from core.dispatch import dispatch
+    from core.tasks import revalidate_frontend_story
+
+    dispatch(
+        revalidate_frontend_story, slug,
+        description=f"frontend revalidation for {slug}",
+    )
 
 
 def revalidate_frontend(slug: str) -> bool:

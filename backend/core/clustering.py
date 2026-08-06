@@ -371,20 +371,18 @@ def _dispatch_synthesis(story_id: int) -> None:
     Dispatching inline let a worker pick the task up before the cluster update was
     visible, so synthesis could read stale counts — or miss the story entirely.
     """
-    # Skip entirely when nothing can consume the queue. `.delay()` to an
-    # unreachable broker blocks on connection retries — 5.9s locally, ~39s on a
-    # CI runner — and clustering calls this once per promoted story. Catching
-    # the exception afterwards, as this did, makes the failure invisible but
-    # not free.
-    if not getattr(settings, "CELERY_DISPATCH_ENABLED", True):
+    from core.dispatch import dispatch, dispatch_enabled
+
+    # Cheap check before registering an on_commit callback that would do nothing.
+    if not dispatch_enabled():
         return
 
     def _send():
-        try:
-            from core.tasks import synthesize_story_brief
-            synthesize_story_brief.delay(story_id)
-        except Exception as e:
-            logger.warning("Failed to dispatch synthesis task for story %d: %s", story_id, e)
+        from core.tasks import synthesize_story_brief
+        dispatch(
+            synthesize_story_brief, story_id,
+            description=f"synthesis for story {story_id}",
+        )
 
     transaction.on_commit(_send)
 

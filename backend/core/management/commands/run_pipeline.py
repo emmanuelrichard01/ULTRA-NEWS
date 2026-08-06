@@ -36,6 +36,12 @@ class Command(BaseCommand):
             help='Cluster and refresh what is already stored, fetching nothing.',
         )
         parser.add_argument(
+            '--cluster-seconds', type=int, default=900, metavar='S',
+            help='Time budget for clustering. It stops cleanly at the deadline '
+                 'and the next run resumes — far better than being killed by a '
+                 'job timeout, which loses the run without keeping the progress.',
+        )
+        parser.add_argument(
             '--synthesize', type=int, default=10, metavar='N',
             help='Generate briefs for up to N stories, most-corroborated first. '
                  '0 disables. This is the real spend ceiling for a one-shot run '
@@ -87,7 +93,9 @@ class Command(BaseCommand):
         self.stdout.write("Clustering…")
         from core.tasks import cluster_pending_articles
         # Returns a human-readable summary string, not a count.
-        clustered = cluster_pending_articles()
+        clustered = cluster_pending_articles(
+            deadline_seconds=options['cluster_seconds']
+        )
 
         self.stdout.write("Refreshing momentum…")
         from core.momentum import refresh_momentum

@@ -1,5 +1,5 @@
 from datetime import timedelta
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from django.utils import timezone
@@ -151,3 +151,44 @@ def test_synthesis_is_dispatched_when_a_worker_is_expected():
         _dispatch_synthesis(1)
 
     delay.assert_called_once_with(1)
+
+
+@pytest.mark.django_db(transaction=True)
+def test_frontend_revalidation_is_not_queued_without_a_worker():
+    """
+    The regression guard for the pipeline timeout that actually mattered.
+
+    Clustering invalidates every story it touches, and invalidation queued a
+    Next.js purge. With no broker, Celery retried twenty times a second apart
+    before giving up — about twenty seconds per article, spent to schedule work
+    nothing would run. It was the single largest cost in a pipeline run, and it
+    was invisible because the call site caught and logged the failure.
+    """
+    from django.test import override_settings
+
+    from core.invalidation import _queue_frontend_revalidation
+
+    with override_settings(CELERY_DISPATCH_ENABLED=False), \
+            patch("core.tasks.revalidate_frontend_story.delay") as delay:
+        _queue_frontend_revalidation("some-slug")
+
+    assert not delay.called
+
+
+@pytest.mark.django_db(transaction=True)
+def test_dispatch_never_raises_into_the_caller():
+    """
+    A background task that cannot be queued must not fail the foreground work
+    that scheduled it — clustering an article has to succeed whether or not a
+    brief gets queued afterwards.
+    """
+    from django.test import override_settings
+
+    from core.dispatch import dispatch
+
+    task = MagicMock()
+    task.delay.side_effect = OSError("broker unreachable")
+    task.name = "core.tasks.example"
+
+    with override_settings(CELERY_DISPATCH_ENABLED=True):
+        assert dispatch(task, 1) is False

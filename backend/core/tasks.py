@@ -177,11 +177,22 @@ def _record_source_failure(source, reason: str) -> None:
 
 
 @shared_task(queue='cluster')
-def cluster_pending_articles(fetch_results=None):
+def cluster_pending_articles(fetch_results=None, deadline_seconds=None):
     """
-    CPU Bound task to cluster all articles that have story=None.
-    Sequentially processed to guarantee cluster deduplication (no race conditions).
+    Cluster articles with story=None, sequentially so cluster dedup has no races.
+
+    `deadline_seconds` bounds the run by TIME rather than only by count. A fixed
+    batch size assumes you know the per-article cost, and that assumption broke:
+    the cost moved from under a second to twenty when a queue the deployment did
+    not have started being retried, and a 500-article batch quietly became a
+    three-hour job that the scheduler killed at 25 minutes — losing the whole
+    run's uncommitted progress rather than keeping what it had done.
+
+    A deadline degrades instead: it stops cleanly, keeps everything already
+    committed, and the next cycle resumes from the same queue.
     """
+    import time as _time
+    started = _time.monotonic()
     lock_id = "clustering_lock"
     # Acquire lock for 5 minutes (300s) to prevent overlapping runs
     if not cache.add(lock_id, "locked", 300):
@@ -199,8 +210,17 @@ def cluster_pending_articles(fetch_results=None):
 
         processed = 0
         stories_touched = set()
+        stopped_early = False
 
         for article in pending_articles:
+            if deadline_seconds and (_time.monotonic() - started) > deadline_seconds:
+                stopped_early = True
+                logger.info(
+                    "Clustering hit its %ss budget after %d articles; "
+                    "the rest stay queued for the next run.",
+                    deadline_seconds, processed,
+                )
+                break
             try:
                 # Cluster assigns the story, computes and persists the embedding,
                 # and updates the cluster's counts, tier and velocity.
@@ -248,7 +268,9 @@ def cluster_pending_articles(fetch_results=None):
         cache.set("last_successful_ingest_at", timezone.now(), timeout=None)
 
         logger.info("Clustered %d pending articles across %d stories.", processed, len(stories_touched))
-        return f"Clustered {processed} articles"
+        remaining = Article.objects.filter(story__isnull=True).count()
+        suffix = f" ({remaining} still queued)" if stopped_early or remaining else ""
+        return f"Clustered {processed} articles{suffix}"
     finally:
         cache.delete(lock_id)
 

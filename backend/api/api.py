@@ -1123,10 +1123,21 @@ def trigger_ingest(request):
     V3: Uses Celery .delay() instead of raw threading — proper monitoring,
     retry support, and no stdout hijacking.
     """
+    from core.dispatch import dispatch
     from core.tasks import scrape_all_sources
-    result = scrape_all_sources.delay()
-    logger.info("Ingestion task triggered: %s", result.id)
-    return {"status": "triggered", "task_id": str(result.id)}
+
+    queued = dispatch(scrape_all_sources, description="ingestion sweep")
+    if not queued:
+        # Report it rather than claiming success. On a deployment with no worker
+        # the honest answer is that nothing was scheduled, and the operator
+        # should run `manage.py run_pipeline` instead.
+        logger.warning("Ingestion could not be queued; no worker is available.")
+        return 503, {
+            "status": "not_queued",
+            "detail": "No Celery worker is available. Run `manage.py run_pipeline`.",
+        }
+    logger.info("Ingestion task queued.")
+    return {"status": "triggered"}
 
 
 @api.post("/admin/stories/{story_slug}/synthesize", auth=AdminApiKey())
@@ -1136,13 +1147,22 @@ def trigger_story_synthesis(request, story_slug: str):
     Requires X-Admin-Key header.
     """
     story = get_object_or_404(Story, slug=story_slug)
+    from core.dispatch import dispatch
     from core.tasks import synthesize_story_brief
-    task_res = synthesize_story_brief.delay(story.id)
+
+    queued = dispatch(
+        synthesize_story_brief, story.id,
+        description=f"synthesis for story {story.id}",
+    )
+    if not queued:
+        return 503, {
+            "status": "not_queued",
+            "detail": "No Celery worker is available. Run `manage.py run_pipeline`.",
+        }
     return {
         "status": "triggered",
         "story_id": story.id,
         "story_slug": story.slug,
-        "task_id": str(task_res.id),
     }
 
 
