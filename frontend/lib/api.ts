@@ -144,7 +144,15 @@ export const fetchStory = cache(async function fetchStory(
   try {
     const res = await fetch(
       `${API_URL}/api/v1/stories/${encodeURIComponent(slug)}`,
-      { next: { tags: [`story:${slug}`, 'story'] } }
+      // `revalidate` is required alongside the tags, not implied by them.
+      // Next 15 changed the fetch default to `no-store`, so a tagged-but-
+      // otherwise-unconfigured request is uncached — which also forces the
+      // whole route to render on demand. This was the only fetch missing it,
+      // and it was the one whose page had precise tag invalidation available:
+      // the backend calls the revalidate webhook when a cluster changes, so
+      // `revalidateTag('story:<slug>')` drops exactly this entry. The interval
+      // is a backstop for a missed webhook.
+      { next: { tags: [`story:${slug}`, 'story'], revalidate: 300 } }
     );
     if (!res.ok) {
       if (res.status !== 404) {
