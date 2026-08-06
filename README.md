@@ -355,8 +355,10 @@ which turns an upstream release into a red build with no code change behind it.
 Verified on a live stack: **112 tests passing**, 41/41 feeds healthy, clean
 typecheck, zero lint errors, frontend builds.
 
-Runs at **$0** with every feature intact — see
-[the $0 path](DEPLOYMENT.md#the-0-path--full-features-nothing-given-up).
+Runs at **$0** with every feature intact.
+**[GO-LIVE.md](GO-LIVE.md)** is the step-by-step walkthrough;
+[DEPLOYMENT.md](DEPLOYMENT.md#the-0-path--full-features-nothing-given-up) is the
+reference behind it.
 
 ### Working
 

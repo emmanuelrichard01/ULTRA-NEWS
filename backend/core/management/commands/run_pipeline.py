@@ -35,6 +35,12 @@ class Command(BaseCommand):
             '--skip-ingest', action='store_true',
             help='Cluster and refresh what is already stored, fetching nothing.',
         )
+        parser.add_argument(
+            '--synthesize', type=int, default=10, metavar='N',
+            help='Generate briefs for up to N stories, most-corroborated first. '
+                 '0 disables. This is the real spend ceiling for a one-shot run '
+                 '— see the note in the source.',
+        )
 
     def handle(self, *args, **options):
         from core.models import Source
@@ -63,12 +69,15 @@ class Command(BaseCommand):
         from core.momentum import refresh_momentum
         momentum = refresh_momentum()
 
+        synthesized = self._synthesize(options['synthesize'])
+
         elapsed = time.monotonic() - started
         self.stdout.write(self.style.SUCCESS(
             f"Pipeline complete in {elapsed:.1f}s — "
             f"ingested {ingested} articles, {clustered.lower()}, "
             f"momentum updated on {momentum['updated']} stories "
-            f"({momentum['zeroed']} decayed to zero)"
+            f"({momentum['zeroed']} decayed to zero), "
+            f"{synthesized} briefs written"
         ))
 
         # Exit non-zero when *every* source failed. Without a metrics scraper on
@@ -81,6 +90,59 @@ class Command(BaseCommand):
                 "Check network egress and the source registry."
             ))
             raise SystemExit(1)
+
+    def _synthesize(self, limit):
+        """
+        Write story briefs in-process.
+
+        Without this, briefs never appear on a deployment with no Celery worker.
+        Clustering dispatches synthesis with `.delay()`, and that dispatch is
+        wrapped in a try/except that logs and moves on — so with no broker it
+        fails silently on every story, forever. The pipeline looks healthy and
+        the feature is simply absent.
+
+        **The limit is the spend ceiling here, not the daily budget.** The task's
+        `MAX_SYNTHESIS_DAILY_REQUESTS` counter lives in the cache, and a one-shot
+        process using locmem starts with an empty cache every run — so that
+        ceiling counts to zero each time and never trips. In this context the
+        only thing actually bounding inference spend is this argument.
+        """
+        if limit <= 0:
+            return 0
+
+        from core.clustering import _should_resynthesize
+        from core.models import Story
+        from core.services.llm import is_configured
+        from core.tasks import synthesize_story_brief
+
+        if not is_configured():
+            # Keyless still produces extractive briefs, which are worth having —
+            # but say so, because "0 briefs written" otherwise looks like a fault.
+            self.stdout.write("Synthesising (keyless — briefs will be extractive)…")
+        else:
+            self.stdout.write(f"Synthesising up to {limit} briefs…")
+
+        # Most-corroborated first: if the budget runs out, it should run out on
+        # the stories fewest people are reading.
+        candidates = (
+            Story.objects
+            .filter(status__in=[Story.Status.DEVELOPING, Story.Status.CORROBORATED])
+            .order_by('-independent_count', '-last_updated_at')[:limit * 4]
+        )
+
+        written = 0
+        for story in candidates:
+            if written >= limit:
+                break
+            if not _should_resynthesize(story):
+                continue
+            try:
+                synthesize_story_brief(story.id)
+                written += 1
+            except Exception as e:  # noqa: BLE001 - one bad story must not end the run
+                self.stderr.write(f"  story {story.slug}: {str(e)[:120]}")
+
+        return written
 
     def _ingest(self, source_ids, workers):
         from core.tasks import scrape_single_source

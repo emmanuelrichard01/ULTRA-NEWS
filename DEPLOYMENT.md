@@ -2,6 +2,8 @@
 
 > **Paid path:** Vercel (frontend) + Render (backend, workers, DB, Redis).
 > **[$0 path](#the-0-path--full-features-nothing-given-up):** Vercel, Koyeb, Neon and GitHub Actions — every feature, `/ask` included, at no cost.
+>
+> Following along rather than looking something up? Use **[GO-LIVE.md](GO-LIVE.md)**.
 
 ---
 
