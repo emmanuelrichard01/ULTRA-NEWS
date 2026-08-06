@@ -134,9 +134,8 @@ def test_synthesis_is_not_dispatched_when_dispatch_is_disabled():
 
     from core.clustering import _dispatch_synthesis
 
-    with override_settings(CELERY_DISPATCH_ENABLED=False):
-        with patch("core.tasks.synthesize_story_brief.delay") as delay:
-            _dispatch_synthesis(1)
+    with override_settings(CELERY_DISPATCH_ENABLED=False),             patch("core.tasks.synthesize_story_brief.delay") as delay:
+        _dispatch_synthesis(1)
 
     assert not delay.called, "dispatch must be skipped when no worker can consume it"
 
@@ -148,8 +147,7 @@ def test_synthesis_is_dispatched_when_a_worker_is_expected():
 
     from core.clustering import _dispatch_synthesis
 
-    with override_settings(CELERY_DISPATCH_ENABLED=True):
-        with patch("core.tasks.synthesize_story_brief.delay") as delay:
-            _dispatch_synthesis(1)
+    with override_settings(CELERY_DISPATCH_ENABLED=True),             patch("core.tasks.synthesize_story_brief.delay") as delay:
+        _dispatch_synthesis(1)
 
     delay.assert_called_once_with(1)
