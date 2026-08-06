@@ -110,11 +110,18 @@ than the whole feature.
 | Dockerfile location | `Dockerfile` |
 | Instance | **Free** (512 MB, 0.1 vCPU) |
 | Region | Washington DC *or* Frankfurt (free tier allows one) |
-| Port | `8000` — **and check the health-check port matches** |
+| Port | **leave Koyeb's default** — see below |
 | Health check path | `/api/v1/health` |
 
 **Leave the run command empty.** The Dockerfile's default already reads
 `WEB_CONCURRENCY` and needs no flags.
+
+**Leave the port alone too.** The image binds `$PORT` when the platform sets
+one, so Koyeb's default already lines up. Do not "fix" it to 8000 — that
+*creates* the mismatch. Koyeb keeps three port settings and they must agree:
+the exposed port, the public route's port, and the health-check port. A route
+pointing where the app is not listening returns Koyeb's own
+`404: No active service` page while the instance reports healthy.
 
 **Environment variables**
 
@@ -124,7 +131,7 @@ SECRET_KEY=<step 0>
 ADMIN_API_KEY=<step 0>
 METRICS_TOKEN=<step 0>
 DATABASE_URL=<step 1, pooled>
-ALLOWED_HOSTS=<your-app>.koyeb.app
+ALLOWED_HOSTS=<copy the exact hostname from the Koyeb dashboard>
 
 # No Redis on this path — verified: every endpoint serves without it.
 CACHE_BACKEND=locmem
@@ -152,24 +159,38 @@ Deploy. **The first build takes ~10 minutes** — it bakes the embedding model
 into the image so that containers start without downloading anything and do not
 depend on HuggingFace being reachable at boot.
 
-Wait for **Healthy**, then note your URL: `https://<your-app>.koyeb.app`.
+Wait for **Healthy**, then read the **Public URL** off the service overview.
+
+> ⚠️ **Koyeb generates a random subdomain** — something like
+> `chilly-adriena-emc-a65970db.koyeb.app`, not your service name. Copy it from
+> the dashboard rather than assuming, and put that exact string in
+> `ALLOWED_HOSTS`. Get it wrong and Django returns a bare **400 Bad Request**
+> with nothing in the logs explaining why.
+>
+> You can rename the service for a cleaner subdomain. Do it *before* setting
+> `ALLOWED_HOSTS`, or change both together.
 
 > If the build fails on memory, check you set `WEB_CONCURRENCY=1`. That is
 > almost always what it is.
 
 ---
 
-## Step 4 — Seed the source registry
+## Step 4 — Seed the source registry *(automatic)*
+
+**Skip this.** `run_pipeline` seeds an empty database itself, so Step 5 covers
+it. The step remains only so the numbering matches older notes.
+
+To seed explicitly — after editing `source_registry.py`, say — either works:
 
 ```bash
-curl -X POST https://<your-app>.koyeb.app/api/v1/admin/seed-db \
-  -H "X-Admin-Key: <your ADMIN_API_KEY>"
+python manage.py seed_registry
 ```
 
-Expect JSON listing categories and ~41 sources.
+```bash
+curl -X POST https://<host>/api/v1/admin/seed-db -H "X-Admin-Key: <ADMIN_API_KEY>"
+```
 
-**Do this before Step 5.** The pipeline iterates active sources; with none
-seeded it succeeds while doing nothing, which looks identical to working.
+Both are idempotent. Expect 9 categories and 41 sources.
 
 ---
 
@@ -187,8 +208,17 @@ Add four:
 
 Then **Actions → Pipeline — ingest, cluster, momentum → Run workflow**.
 
-Do not wait for the cron. This first manual run is what puts stories in your
-database; it takes 2–4 minutes.
+Do not wait for the cron — this first manual run is what puts stories in your
+database. Measured on the reference deployment:
+
+```text
+Pipeline complete in 157.1s — ingested 129 articles, clustered 500 articles
+(120 still queued), momentum updated on 499 stories, 4 briefs written
+```
+
+Clustering is bounded by a **time budget**, not only a batch size, so a large
+backlog stops cleanly at the deadline and the next run resumes. `(120 still
+queued)` is normal and self-correcting, not an error.
 
 **What is now running on its own:**
 
@@ -335,17 +365,21 @@ REDIS_URL=rediss://default:<password>@<host>.upstash.io:6379
 
 | Symptom | Cause | Fix |
 | --- | --- | --- |
-| Site loads, no stories | `FRONTEND_URL` unset or mismatched | Step 7. Check the browser console for CORS. |
-| Container OOM-killed | `WEB_CONCURRENCY` > 1 | Set it to `1`. Two workers need 587 MiB. |
-| Boot loop: `TCP health check failed on port 8080`, logs otherwise clean | Platform health-checks a different port than the app binds | The image now honours `$PORT`, so this resolves itself on a rebuild. On an older image, set the exposed port to `8000` in the platform settings. Note the logs say `Application startup complete` every time — the app is fine; nothing is listening where the checker is looking. |
-| App refuses to start | `SECRET_KEY` unset with `DEBUG=0` | By design. Set it. |
-| `relation "core_story" does not exist` | Migrations never ran | Run the Pipeline workflow — its first step is `migrate`. |
-| Pipeline succeeds, ingests 0 | Sources not seeded | Step 4, then re-run. |
-| Everything empty after seeding | Cron hasn't fired | Run the workflow manually; GitHub's scheduler lags. |
-| First visit takes a minute | Instance had slept | Confirm `API_URL` secret is set so `keepalive.yml` runs. |
-| Ask returns extractive only | No key, or quota spent | Working as designed. Check Actions logs for `429`. |
+| Koyeb's `404: No active service` on every path | The public route points at a port the app is not listening on | Match all three Koyeb port settings — exposed port, route port, health-check port. Note the instance can report **Healthy** while this is broken: the health check and the route are configured separately. |
+| Bare `400 Bad Request` from Django, empty body | `ALLOWED_HOSTS` does not contain the actual hostname | Copy the Public URL from the Koyeb dashboard. The subdomain is auto-generated and rarely matches your service name. |
+| Boot loop, `TCP health check failed on port 8080`, logs otherwise clean | Health-check port differs from the bound port | The image honours `$PORT`, so leaving platform defaults alone is correct. Logs say `Application startup complete` every time — the app is fine, nothing is listening where the checker looks. |
+| Site loads, no stories | `FRONTEND_URL` unset or mismatched | Step 7. The browser console shows CORS; the API logs look perfectly healthy. |
+| Container OOM-killed | `WEB_CONCURRENCY` > 1 | Set it to `1`. Two workers need 587 MiB against a 512 MB limit. |
+| App refuses to start | `SECRET_KEY` unset with `DEBUG=0` | By design — it will not fall back to a key committed to this repo. |
+| Pipeline cancelled at the job timeout, logs full of `Connection to Redis lost: Retry (n/20)` | A Celery task is being queued with no broker present | Fixed: all dispatch goes through `core/dispatch.py`, which skips when nothing can consume the work. If you add a `.delay()` call, route it through `dispatch()` — twenty one-second retries per call is ~20s per article. |
+| `/health` says `no ingest recorded yet` while ingestion clearly works | Stale build | Fixed: freshness now comes from `Source.last_success_at` in the database, not a per-process cache the API cannot see. |
+| Pipeline succeeds, ingests 0 | Sources not seeded | `run_pipeline` self-seeds now; on an older build run `manage.py seed_registry`. |
+| Everything empty after seeding | Cron has not fired | Run the workflow manually. GitHub's scheduler is best-effort and lags. |
+| First visit takes a minute | Instance had slept | Set the `API_URL` secret so `keepalive.yml` runs. |
+| Ask returns extractive only | No key, or daily quota spent | Working as designed. Check the Actions log for `429`. |
 | `/metrics` returns 200 publicly | `METRICS_TOKEN` unset | Set it and redeploy. |
-| Vector/embedding errors on migrate | pgvector missing | Step 1's `CREATE EXTENSION`. |
+| Vector errors on migrate | pgvector missing | Step 1's `CREATE EXTENSION`. |
+| Koyeb console throwing CORS/500 errors in *its own* UI | Koyeb dashboard outage | Not your app. Check `/api/v1/health` directly instead. |
 
 **Reading the logs.** Koyeb → service → **Logs** for the API; GitHub → Actions →
 the failing run for the pipeline. A red pipeline run means *every* source

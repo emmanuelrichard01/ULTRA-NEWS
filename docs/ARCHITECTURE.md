@@ -228,6 +228,40 @@ story — with `Source` joined — to use three of them, when both counts are al
 denormalised on the Story row. Cost grew with cluster size, so the best-covered
 stories were the most expensive to list.
 
+### Two topologies, one codebase
+
+The pipeline runs either behind Celery workers or synchronously in one process
+(`manage.py run_pipeline`), and the second is what makes a zero-cost deployment
+possible: batch work moves to a CI runner with real memory, while the API stays
+a small read-mostly server.
+
+Supporting both surfaced a class of bug worth naming, because it bit twice.
+**Work that is correct in one topology is pure waste in the other**, and it
+fails silently rather than loudly:
+
+| Work | With a worker | Without one |
+| --- | --- | --- |
+| `.delay()` a task | queued | **~20s of broker retries**, then a caught exception |
+| `refresh_momentum([pk])` per match | story ranks immediately | recomputed wholesale minutes later anyway |
+
+Both were wrapped in `try/except` at the call site, which hid the failure
+without making it any cheaper. Measured effect: a run processing 70 articles in
+25 minutes before being killed, versus **500 articles in 157 seconds** after.
+
+Two rules came out of it:
+
+- **`core/dispatch.py` is the only way to queue a task.** Gating individual
+  call sites does not work, because the bug is that the *next* call site
+  reintroduces the cost.
+- **Batch work is bounded by time, not count.** A fixed batch size assumes a
+  known per-article cost — precisely the assumption that broke. A deadline stops
+  cleanly and keeps committed progress; a job timeout loses the run.
+
+A third instance of the same shape: `/health` read ingest freshness from a cache
+key written by the ingest process. Where ingestion runs elsewhere, the API never
+sees it, so the staleness branch was unreachable — it could report "unknown" or
+"ok" but never "stale". Cross-process signals belong in the database.
+
 **Indexes:** HNSW on `Story.embedding` and `Article.embedding`
 (`vector_cosine_ops`); composite on `(independent_count, -first_seen_at, -id)`
 for the corroboration filter; `(-created_at, story)` for momentum; GIN on
@@ -289,7 +323,7 @@ whichever worker answered it.
 
 ## 12. Testing
 
-104 tests. Migrations **must** run — parts of the schema exist only as
+123 tests. Migrations **must** run — parts of the schema exist only as
 migrations (`0006` pgvector, `0013` the search trigger), so `--nomigrations`
 made the suite unbuildable.
 

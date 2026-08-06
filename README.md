@@ -352,7 +352,7 @@ which turns an upstream release into a red build with no code change behind it.
 
 ## Project Status
 
-Verified on a live stack: **112 tests passing**, 41/41 feeds healthy, clean
+Verified on a live stack: **123 tests passing**, 41/41 feeds healthy, clean
 typecheck, zero lint errors, frontend builds.
 
 Runs at **$0** with every feature intact.
