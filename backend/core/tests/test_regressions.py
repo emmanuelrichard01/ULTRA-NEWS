@@ -324,3 +324,38 @@ def test_velocity_is_publishers_per_hour(db):
 
     # A story breaking right now must not divide by ~zero.
     assert compute_velocity(3, timezone.now() + timedelta(seconds=1)) == 3.0
+
+
+@pytest.mark.django_db
+def test_ranked_editions_do_not_repeat_rows_across_pages(client):
+    """
+    The Record returned page two identical to page one — a ten-of-ten overlap,
+    so scrolling it showed the same stories over and over.
+
+    The cursor encodes (first_seen_at, id), the only immutable key a story has.
+    That matches The Wire's ordering exactly, but The Record ranks by
+    `-independent_count`: "older than the cursor" re-sorted by corroboration
+    re-selects the same most-corroborated stories, because nearly all of them
+    are older than any given cursor.
+
+    No cursor fixes it — corroboration is rewritten as coverage accumulates, so
+    a cursor over it drops and repeats rows as values move. Ranked editions are
+    single-page snapshots, and must not advertise a next cursor at all.
+    """
+    from django.utils import timezone
+
+    now = timezone.now()
+    for i in range(12):
+        Story.objects.create(
+            title=f"Story {i}", slug=f"ranked-{i}",
+            first_seen_at=now - timedelta(hours=i),
+            independent_count=12 - i, source_count=12 - i,
+            momentum_outlets=12 - i,
+        )
+
+    for sort in ("significance", "momentum", "velocity"):
+        payload = client.get(f"/api/v1/stories?sort={sort}&limit=5").json()
+        assert not payload.get("next_cursor"), (
+            f"{sort} advertised a next cursor; paginating a mutable ranking "
+            f"with an immutable-key cursor repeats rows"
+        )

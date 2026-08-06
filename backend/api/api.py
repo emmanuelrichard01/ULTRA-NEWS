@@ -568,10 +568,29 @@ def list_stories(
         # "The Record" — settled, corroborated reporting ordered by weight of
         # evidence rather than recency. Independent corroboration first, breadth
         # of coverage second, recency only as a tiebreak.
+        #
+        # Capped to one page, like the other ranked editions.
+        #
+        # This used to advertise a next cursor, and the result was that page two
+        # returned the SAME rows as page one — a full ten-of-ten overlap, so a
+        # reader scrolling The Record saw the same stories repeat indefinitely.
+        #
+        # The cursor encodes (first_seen_at, id), which is the only immutable
+        # key a story has. That works for The Wire, which is ordered by exactly
+        # those columns. Here the ordering is `-independent_count`, so the
+        # cursor filter and the sort key are different columns: "everything
+        # older than 13:47" then re-sorted by corroboration simply re-selects
+        # the most-corroborated stories, nearly all of which are older than any
+        # given cursor.
+        #
+        # There is no cursor that fixes this. Corroboration counts are rewritten
+        # by clustering as coverage accumulates, and a cursor over a mutating
+        # column drops and repeats rows as values cross the boundary mid-scroll.
+        # `momentum` and `velocity` already resolve this by capping; this branch
+        # was simply the one that had not been brought into line.
         qs = qs.order_by('-independent_count', '-source_count', '-first_seen_at', '-id')
-        stories = list(qs[:limit + 1])
-        has_next = len(stories) > limit
-        stories = stories[:limit]
+        stories = list(qs[:limit])
+        has_next = False
 
     elif sort == "velocity":
         # A ranking snapshot, not a paginated collection: deep pagination over a
