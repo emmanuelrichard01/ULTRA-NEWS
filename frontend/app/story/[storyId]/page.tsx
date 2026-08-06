@@ -89,6 +89,19 @@ function RelatedStories({ stories }: { stories: StoryDetail[] }) {
   );
 }
 
+/**
+ * Cacheable at the edge, purged precisely rather than on a timer.
+ *
+ * The page was rendered on demand for every visit. It does not need to be: the
+ * backend already calls the revalidate webhook when a cluster actually changes,
+ * and `fetchStory` tags its request `story:<slug>`, so `revalidateTag` drops
+ * exactly this page the moment its corroboration count moves.
+ *
+ * The interval below is therefore a backstop for a missed webhook, not the
+ * mechanism — which is why it can be generous without making anything stale.
+ */
+export const revalidate = 300;
+
 export default async function StoryPage({ params }: StoryPageProps) {
   const { storyId } = await params;
 

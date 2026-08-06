@@ -1,7 +1,8 @@
 "use client";
 
 import { useInfiniteQuery, useQuery, keepPreviousData } from "@tanstack/react-query";
-import { use, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import StoryCard from "@/components/StoryCard";
 import StoryCardSkeleton from "@/components/StoryCardSkeleton";
 import VelocityLeaderboard from "@/components/VelocityLeaderboard";
@@ -9,7 +10,7 @@ import CategoryPill from "@/components/CategoryPill";
 import AskWireModal from "@/components/AskWireModal";
 import EditionNav from "@/components/EditionNav";
 import { fetchStories, fetchTrendingStories } from "@/lib/api";
-import type { StoryDetail } from "@/lib/types";
+import type { PaginatedResponse, StoryDetail } from "@/lib/types";
 import { CATEGORY_MAP } from "@/lib/types";
 import { CORROBORATION_FILTERS } from "@/lib/corroboration";
 import type { Edition } from "@/lib/editions";
@@ -22,6 +23,19 @@ import { isToday, isYesterday, differenceInDays } from "date-fns";
  * Editions are orderings of the whole corpus rather than slices of it (see
  * lib/editions.ts), so the same component serves all three and none can run
  * dry. The corroboration filter applies within whichever edition is open.
+ *
+ * **The first page is rendered on the server.** This component receives it as
+ * `initialStories` and seeds React Query with it, so the HTML that reaches the
+ * browser already contains the stories. It previously fetched everything
+ * client-side, which meant a visitor waited for the document, then for the JS,
+ * then for a second round trip to the API before seeing a single headline —
+ * and because the shell could not be cached at the edge, none of those steps
+ * were shared between visitors.
+ *
+ * Query params are read with `useSearchParams()` rather than taken as a prop.
+ * Accepting the `searchParams` prop opts the whole route out of static
+ * rendering; reading them here, under a Suspense boundary, keeps the shell
+ * prerenderable and confines the dynamic part to this subtree.
  */
 
 interface FeedPageProps {
@@ -30,7 +44,8 @@ interface FeedPageProps {
   category?: string;
   titleOverride?: string;
   taglineOverride?: string;
-  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+  /** First page, fetched on the server so it ships inside the HTML. */
+  initialStories?: PaginatedResponse<StoryDetail>;
 }
 
 const ALL_CATEGORIES = Object.entries(CATEGORY_MAP).map(([slug, info]) => ({
@@ -65,16 +80,14 @@ export default function FeedPage({
   category,
   titleOverride,
   taglineOverride,
-  searchParams,
+  initialStories,
 }: FeedPageProps) {
-  const resolvedParams = use(searchParams);
-  const initialCursor =
-    typeof resolvedParams?.cursor === "string" ? resolvedParams.cursor : undefined;
+  const searchParams = useSearchParams();
+  const initialCursor = searchParams.get("cursor") ?? undefined;
 
   // ?sources=2|3 makes a filtered view linkable, and is where the retired
   // /reporting route now lands.
-  const sourcesParam =
-    typeof resolvedParams?.sources === "string" ? Number(resolvedParams.sources) : NaN;
+  const sourcesParam = Number(searchParams.get("sources"));
   const [minSources, setMinSources] = useState<number>(
     Number.isFinite(sourcesParam) && sourcesParam >= 1
       ? sourcesParam
@@ -103,6 +116,14 @@ export default function FeedPage({
     initialPageParam: initialCursor,
     getNextPageParam: (lastPage) => lastPage.next_cursor || undefined,
     placeholderData: keepPreviousData,
+    // Seed from the server render so the first paint has real stories rather
+    // than a skeleton. Only valid for the unfiltered first page: once a reader
+    // changes the corroboration filter or topic, the server payload no longer
+    // describes what they asked for, and reusing it would show the wrong rows.
+    initialData:
+      initialStories && !initialCursor && minSources === (edition.minSources ?? 1)
+        ? { pages: [initialStories], pageParams: [undefined] }
+        : undefined,
   });
 
   const { data: trending = [] } = useQuery({
@@ -234,7 +255,15 @@ export default function FeedPage({
       </div>
 
       {/* ---------------------------------------------------------- states */}
-      {queryStatus === "pending" && (
+      {/*
+        Keyed on absence of data rather than `status === "pending"`.
+        Supplying `initialData` narrows the query's status type so "pending" is
+        unreachable to the compiler — but it is still reachable at runtime, on
+        the paths where no server payload applies: a changed corroboration
+        filter, a different topic, a cursor page. Testing the data is true in
+        both worlds.
+      */}
+      {!data && queryStatus !== "error" && (
         <div className="space-y-2">
           {edition.showLead && <StoryCardSkeleton variant="lead" />}
           {Array.from({ length: 5 }).map((_, i) => (

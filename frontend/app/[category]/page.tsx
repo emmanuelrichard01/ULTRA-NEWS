@@ -1,7 +1,9 @@
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import { Suspense } from 'react';
 
 import FeedPage from '@/components/FeedPage';
+import { fetchStories } from '@/lib/api';
 import { EDITIONS_BY_SLUG } from '@/lib/editions';
 import { CATEGORY_MAP } from '@/lib/types';
 
@@ -18,7 +20,6 @@ import { CATEGORY_MAP } from '@/lib/types';
 
 interface CategoryPageProps {
   params: Promise<{ category: string }>;
-  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
 export async function generateMetadata({ params }: CategoryPageProps): Promise<Metadata> {
@@ -40,18 +41,31 @@ export function generateStaticParams() {
   return Object.keys(CATEGORY_MAP).map((category) => ({ category }));
 }
 
-export default async function CategoryPage({ params, searchParams }: CategoryPageProps) {
+// Prerendered per topic via generateStaticParams, revalidated on an interval.
+// See app/page.tsx for why the `searchParams` prop is deliberately absent.
+export const revalidate = 60;
+
+export default async function CategoryPage({ params }: CategoryPageProps) {
   const { category } = await params;
   const info = CATEGORY_MAP[category];
   if (!info) notFound();
 
+  const edition = EDITIONS_BY_SLUG[''];
+  const initialStories = await fetchStories({
+    sort: edition.sort,
+    minSources: edition.minSources,
+    category,
+  });
+
   return (
-    <FeedPage
-      edition={EDITIONS_BY_SLUG['']}
-      category={category}
-      titleOverride={info.displayName}
-      taglineOverride={info.description}
-      searchParams={searchParams}
-    />
+    <Suspense fallback={null}>
+      <FeedPage
+        edition={edition}
+        category={category}
+        titleOverride={info.displayName}
+        taglineOverride={info.description}
+        initialStories={initialStories}
+      />
+    </Suspense>
   );
 }
