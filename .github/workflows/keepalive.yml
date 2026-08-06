@@ -1,0 +1,52 @@
+name: Keepalive — keep the free instance warm
+
+# Koyeb's Free Instance scales to zero after 1 hour with no traffic, and that
+# threshold is not configurable on the free tier. Waking costs a container start
+# plus an ~11 s embedding-model load on 0.1 vCPU, so a visitor arriving cold
+# waits a minute or more — which for a portfolio deployment is the whole ball
+# game. Someone clicks the link once; it needs to be up.
+#
+# A request every 15 minutes keeps the instance inside the idle window. This is
+# ordinary HTTP traffic to a public health endpoint, not a workaround: the
+# service really is meant to be reachable.
+#
+# Delete this workflow if you move to a paid instance — it stops being useful
+# the moment scale-to-zero is off.
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: keepalive
+  cancel-in-progress: true
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping health endpoint
+        env:
+          API_URL: ${{ secrets.API_URL }}
+        run: |
+          if [ -z "$API_URL" ]; then
+            echo "API_URL secret not set — skipping."
+            exit 0
+          fi
+
+          # --max-time generously: a cold start legitimately takes a while, and
+          # this request is what pays for it so a real visitor does not.
+          status=$(curl -s -o /dev/null -w '%{http_code}' --max-time 180 \
+            "$API_URL/api/v1/health" || echo "000")
+
+          echo "health: HTTP $status"
+
+          # 503 means the app is up and honestly reporting a degraded pipeline —
+          # that is a data problem for the pipeline workflow to surface, not a
+          # reason to fail the keepalive. Only a dead endpoint matters here.
+          case "$status" in
+            200|503) exit 0 ;;
+            *) echo "::warning::API unreachable (HTTP $status)"; exit 1 ;;
+          esac

@@ -208,15 +208,29 @@ open https://ultra-news.vercel.app
 
 ### Resource Requirements
 
-The Celery Worker loads the `bge-small-en-v1.5` embedding model (~100MB) into memory at startup. On Render's Free tier (512MB RAM), this will OOM. **Standard tier (1GB+) is the minimum for the worker.**
+Every process that embeds — the API (for `/ask`) and the Celery workers — loads
+its own copy of `bge-small-en-v1.5`. Measured, with the model loaded and an
+embedding performed:
+
+| Configuration | Resident |
+| --- | --- |
+| One process | **349 MiB** |
+| Two gunicorn workers | **587 MiB** |
+
+So `WEB_CONCURRENCY` is the setting that decides whether the container fits its
+memory limit, and it defaults to `1` for that reason. A 512 MB host runs the
+full app including `/ask`; raise the worker count only alongside the memory.
+
+The model is baked into the image at build time, so containers download nothing
+at boot and do not depend on HuggingFace being reachable.
 
 ### Scaling
 
 | Bottleneck | Solution |
 | ----------- | ---------- |
 | Ingestion throughput | Increase `--concurrency` on the Celery Worker |
-| API response latency | Redis cache TTL (currently 300s on detail endpoints) |
-| Database query speed | pgvector HNSW index (not yet configured — IVFFlat default) |
+| API response latency | Redis cache TTL, conditional GET (ETag/304), and materialised ranking columns — momentum is a stored value, not a per-request aggregate. |
+| Database query speed | pgvector HNSW index (`vector_cosine_ops`), installed by migration `0016`. The ANN shortlist reuses the distance from the query rather than recomputing it. |
 | Frontend TTFB | Vercel Edge caching via ISR (currently 60s revalidation) |
 | Source pool diversity | Add sources to `core/source_registry.py` and re-seed |
 
@@ -448,12 +462,28 @@ correct and lets you skip `PROMETHEUS_MULTIPROC_DIR`.
 
 The embedding model is **baked into the image at build time**, so a booting
 container downloads nothing and does not depend on HuggingFace being reachable.
-It still costs ~11 s to load into memory on a full core, and longer on a
-fraction of one, so first boot after a deploy is slow — but Koyeb does not
-sleep, so you pay it once per deploy rather than once per visitor.
+It still costs ~11 s to load into memory on a full core, and longer on 0.1 vCPU.
 
-The image is ~1 GB. Koyeb builds it remotely; nothing is uploaded from your
-machine.
+### Scale-to-zero, and why it matters here
+
+Koyeb's Free Instance **scales to zero after 1 hour with no traffic**, and that
+threshold cannot be changed on the free tier. A visitor arriving cold therefore
+waits for a container start *plus* the model load — a minute or more.
+
+For a portfolio deployment that is the whole problem: someone opens the link
+once, and a blank minute reads as broken rather than as thrifty.
+
+`.github/workflows/keepalive.yml` pings `/api/v1/health` every 15 minutes, which
+keeps the instance inside its idle window. Set the `API_URL` repository secret
+to enable it; leave it unset and the workflow no-ops. Delete the workflow if you
+move to a paid instance.
+
+> Render's free tier sleeps after **15 minutes**, not 60, which is why Koyeb is
+> the recommendation here despite both having a sleep behaviour.
+
+The image is ~1 GB against a 2 GB instance disk, so it fits with room but not
+lavishly — watch it if you add heavy dependencies. Koyeb builds remotely;
+nothing is uploaded from your machine.
 
 ### GitHub Actions: the pipeline
 
@@ -519,7 +549,7 @@ Check headroom with `python manage.py retention`.
 | Features | **None.** Clustering, corroboration, all three editions, topics, story pages, RSS and `/ask` all work. |
 | Freshness | Capped by the cron interval — ~30 min instead of 15. |
 | Ticker | Silent without Redis. Add Upstash free to restore it. |
-| First load after deploy | Slow while the model loads. Once per deploy, not per request. |
+| Cold starts | Koyeb sleeps after 1 hour idle. The keepalive workflow prevents it; without that, expect a minute-plus first load. |
 | AI quota | Groq's free tier is ~14,400 requests/day, far past what a portfolio demo draws. Past it, answers degrade to extractive rather than failing. Keep the daily ceilings low so degradation is predictable rather than a surprise. |
 
 ### Before you share the link
