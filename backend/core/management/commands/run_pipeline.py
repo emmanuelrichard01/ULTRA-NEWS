@@ -54,6 +54,10 @@ class Command(BaseCommand):
         # promoted story. Left enabled, that alone exhausted the job timeout.
         settings.CELERY_DISPATCH_ENABLED = False
 
+        # This command ends with a full momentum refresh, so refreshing per
+        # matched story on the way there recomputes the same values repeatedly.
+        settings.MOMENTUM_REFRESH_ON_CLUSTER = False
+
         started = time.monotonic()
         ingested = 0
         failed_sources = []

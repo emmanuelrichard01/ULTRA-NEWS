@@ -4,6 +4,7 @@ import uuid
 from datetime import timedelta
 from typing import Protocol
 
+from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 from django.utils.text import slugify
@@ -370,8 +371,6 @@ def _dispatch_synthesis(story_id: int) -> None:
     Dispatching inline let a worker pick the task up before the cluster update was
     visible, so synthesis could read stale counts — or miss the story entirely.
     """
-    from django.conf import settings
-
     # Skip entirely when nothing can consume the queue. `.delay()` to an
     # unreachable broker blocks on connection retries — 5.9s locally, ~39s on a
     # CI runner — and clustering calls this once per promoted story. Catching
@@ -485,8 +484,13 @@ def cluster_article(article: Article, scorer: ClusterScorer = None) -> Story:
                 # Materialised momentum for the Developing edition. Refreshed
                 # here so a story that just gained an outlet ranks immediately,
                 # rather than waiting for the periodic decay pass.
-                from core.momentum import refresh_momentum
-                refresh_momentum([best_match.pk])
+                #
+                # Skipped in a batch run that ends with a full refresh — there it
+                # costs ~1.3s per matched story to compute a number that gets
+                # recomputed minutes later.
+                if getattr(settings, "MOMENTUM_REFRESH_ON_CLUSTER", True):
+                    from core.momentum import refresh_momentum
+                    refresh_momentum([best_match.pk])
 
                 # The story page is cached; purge it now that the cluster has
                 # actually changed.

@@ -246,6 +246,15 @@ CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "redis://redis:6379/1")
 #
 # `run_pipeline` disables this for itself, since it synthesises in-process.
 CELERY_DISPATCH_ENABLED = os.environ.get("CELERY_DISPATCH_ENABLED", "1") == "1"
+
+# Whether clustering refreshes a story's momentum the moment it gains an outlet.
+#
+# Worth it when clustering is a long-lived worker: the story ranks in Developing
+# immediately instead of waiting for the next periodic pass. Pure waste in a
+# batch run that ends with a full refresh anyway — measured at ~1.3s per matched
+# story against a small Postgres tier, paid once per article, to compute a value
+# that is recomputed minutes later.
+MOMENTUM_REFRESH_ON_CLUSTER = os.environ.get("MOMENTUM_REFRESH_ON_CLUSTER", "1") == "1"
 CELERY_RESULT_BACKEND = os.environ.get("CELERY_RESULT_BACKEND", "redis://redis:6379/1")
 CELERY_TIMEZONE = "UTC"
 
