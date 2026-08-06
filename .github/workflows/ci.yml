@@ -75,13 +75,33 @@ jobs:
           cache: 'pip'
 
       # The embedding model is a large download; cache it across runs.
+      # Both paths: huggingface_hub owns the download, fastembed keeps its own
+      # copy, and which one is consulted has moved between versions.
       - name: Cache fastembed model
         uses: actions/cache@v4
         with:
-          path: ~/.cache/huggingface
-          key: fastembed-bge-small-en-v1.5
+          path: |
+            ~/.cache/huggingface
+            ~/.cache/fastembed
+          key: fastembed-bge-small-en-v1.5-v2
 
       - run: pip install -r requirements.txt
+
+      # Fetch the model BEFORE pytest, deliberately.
+      #
+      # conftest.py fails any test that opens an outbound socket, which is what
+      # stops the suite from silently making live API calls. A cache miss would
+      # otherwise surface as dozens of tests failing on "real network connection
+      # to huggingface.co" — the guard working correctly, but reported in the
+      # least useful possible place. Downloading here keeps the guard strict and
+      # the failure legible.
+      - name: Prefetch embedding model
+        run: |
+          python -c "
+          from fastembed import TextEmbedding
+          TextEmbedding(model_name='BAAI/bge-small-en-v1.5')
+          print('embedding model ready')
+          "
       - name: Check for model changes with no migration
         run: python manage.py makemigrations --check --dry-run
       - run: python -m pytest -q --create-db
