@@ -157,3 +157,49 @@ def test_metrics_degrade_to_noops_without_the_library(monkeypatch):
     payload, content_type = obs.render_metrics()
     assert b"disabled" in payload
     assert content_type
+
+
+@pytest.mark.django_db
+def test_health_reads_ingest_freshness_from_the_database(client):
+    """
+    The signal must survive a process boundary.
+
+    It previously read a cache key written by the ingest process. Whenever
+    ingestion runs elsewhere — the $0 deployment runs it on a CI runner with its
+    own in-memory cache — the API never saw the key and reported "no ingest
+    recorded yet" forever, including while ingestion was succeeding on schedule.
+    A staleness check that cannot fire hides the very state it exists to reveal.
+    """
+    from django.core.cache import cache
+    from django.utils import timezone
+
+    from core.models import Source
+
+    cache.clear()  # prove the cache is not what makes this work
+    Source.objects.create(
+        name="Fresh", url="https://fresh.example/rss",
+        is_active=True, last_success_at=timezone.now(),
+    )
+
+    body = client.get("/api/v1/health").json()
+    assert body["ingest"] == "ok", body
+
+
+@pytest.mark.django_db
+def test_health_degrades_when_ingest_goes_stale(client):
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from core.models import Source
+
+    Source.objects.create(
+        name="Stale", url="https://stale.example/rss",
+        is_active=True, last_success_at=timezone.now() - timedelta(hours=3),
+    )
+
+    response = client.get("/api/v1/health")
+    body = response.json()
+    assert body["status"] == "degraded"
+    assert "stale" in body["ingest"]
+    assert response.status_code == 503, "uptime checks must see a non-200"

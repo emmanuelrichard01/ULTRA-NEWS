@@ -311,14 +311,32 @@ def health(request):
 
     # Ingest staleness is reported separately from hard dependency failure — the
     # API still serves correctly, the data is just going stale.
+    #
+    # Read from the DATABASE, not the cache. This used to read a cache key
+    # written by the ingest process, which cannot work whenever ingestion runs
+    # somewhere else: on the $0 deployment it runs on a CI runner with its own
+    # in-memory cache, so the API — a different process on a different host —
+    # never saw the key and reported "no ingest recorded yet" indefinitely,
+    # including while ingestion was succeeding every half hour.
+    #
+    # A staleness signal that cannot fire is worse than none: it makes the
+    # degraded state undetectable while looking like it is being monitored.
+    # Source.last_success_at is already persisted and crosses every boundary.
     try:
-        last_ingest = cache.get("last_successful_ingest_at")
+        from django.db.models import Max
+        from django.utils import timezone
+
+        last_ingest = Source.objects.filter(is_active=True).aggregate(
+            latest=Max("last_success_at")
+        )["latest"]
+
         if last_ingest:
-            from django.utils import timezone
             stale_minutes = (timezone.now() - last_ingest).total_seconds() / 60
             if stale_minutes > 45:
                 status["status"] = "degraded"
                 status["ingest"] = f"stale: {stale_minutes:.0f}m since last successful ingest"
+            else:
+                status["ingest"] = "ok"
         else:
             status["ingest"] = "unknown: no ingest recorded yet"
     except Exception:
