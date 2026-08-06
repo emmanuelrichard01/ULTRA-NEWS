@@ -17,7 +17,7 @@ from ninja import NinjaAPI, Schema
 from ninja.security import APIKeyHeader, HttpBearer
 from pydantic import Field
 
-from core.models import Article, Source, Story, derive_publisher_domain
+from core.models import Article, Source, Story
 
 # Must match the text search configuration used by the search_vector trigger in
 # migration 0013 — a mismatch here silently returns zero results.
@@ -1156,70 +1156,11 @@ def seed_db(request):
     """
     from django.core.management import call_command
 
-    from core.categorization import seed_all_categories
-    from core.source_registry import SOURCES
+    from core.seeding import seed_database
 
     try:
         call_command('migrate', interactive=False, verbosity=0)
-
-        # Seed categories from centralized registry
-        cat_results = []
-        for name, created in seed_all_categories():
-            cat_results.append(f"{name}: {'Created' if created else 'Exists'}")
-
-        # Seed sources from centralized registry
-        source_results = []
-        registry_urls = {s["url"] for s in SOURCES}
-        
-        for s in SOURCES:
-            # An explicit publisher_domain wins over deriving one from the feed
-            # host — needed when a feed is served by a syndication host that
-            # isn't the newsroom that wrote the articles.
-            publisher = s.get("publisher_domain") or derive_publisher_domain(s["url"])
-
-            obj, created = Source.objects.get_or_create(
-                url=s["url"],
-                defaults={
-                    "name": s["name"],
-                    "scraper_type": s["scraper_type"],
-                    "source_type": s.get("source_type", "news"),
-                    "publisher_domain": publisher,
-                    "trust_tier": Source.TrustTier.AUTO_PUBLISH,
-                    "is_active": True,
-                }
-            )
-            if not created:
-                # Update fields if they changed in the registry.
-                # `trust_tier` and `publisher_domain` were assigned but left out
-                # of update_fields, so those writes were silently discarded and
-                # re-seeding never actually promoted a source out of the review
-                # queue.
-                desired = {
-                    "source_type": s.get("source_type", "news"),
-                    "trust_tier": Source.TrustTier.AUTO_PUBLISH,
-                    "name": s["name"],
-                    "is_active": True,
-                    "publisher_domain": publisher,
-                }
-                changed = [f for f, v in desired.items() if getattr(obj, f) != v]
-                if changed:
-                    for field in changed:
-                        setattr(obj, field, desired[field])
-                    obj.save(update_fields=changed)
-            source_results.append(f"{s['name']}: {'Created' if created else 'Exists'}")
-
-        # Deactivate sources no longer in the registry
-        stale = Source.objects.filter(is_active=True).exclude(url__in=registry_urls)
-        stale_names = list(stale.values_list('name', flat=True))
-        stale_count = stale.update(is_active=False)
-
-        return {
-            "status": "completed",
-            "categories": cat_results,
-            "sources": source_results,
-            "deactivated": stale_names,
-            "deactivated_count": stale_count,
-        }
+        return seed_database()
 
     except Exception as e:
         logger.error("seed-db failed: %s", e)

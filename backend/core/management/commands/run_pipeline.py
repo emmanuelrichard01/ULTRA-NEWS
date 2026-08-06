@@ -51,6 +51,17 @@ class Command(BaseCommand):
         source_ids = []
 
         if not options['skip_ingest']:
+            # Self-seed an empty database. Without this a fresh deployment runs
+            # green while doing nothing: ingestion iterates active sources, and
+            # with none registered it succeeds having fetched zero feeds, which
+            # is indistinguishable from working. Seeding is idempotent, so the
+            # check costs one COUNT on every subsequent run.
+            if not Source.objects.exists():
+                from core.seeding import seed_database
+                self.stdout.write("No sources registered — seeding the registry…")
+                summary = seed_database()
+                self.stdout.write(f"  seeded {len(summary['sources'])} sources")
+
             source_ids = list(
                 Source.objects.filter(is_active=True).values_list('id', flat=True)
             )
