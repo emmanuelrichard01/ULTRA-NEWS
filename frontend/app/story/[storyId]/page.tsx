@@ -10,7 +10,7 @@ import SourceLedger from '@/components/story/SourceLedger';
 import IntelligenceBrief from '@/components/IntelligenceBrief';
 import StickyStoryNav from '@/components/StickyStoryNav';
 import CorroborationMeter from '@/components/CorroborationMeter';
-import { fetchStory, fetchRelatedStories } from '@/lib/api';
+import { fetchStory, fetchRelatedStories, fetchStories } from '@/lib/api';
 import type { StoryDetail } from '@/lib/types';
 
 /**
@@ -101,6 +101,38 @@ function RelatedStories({ stories }: { stories: StoryDetail[] }) {
  * mechanism — which is why it can be generous without making anything stale.
  */
 export const revalidate = 300;
+
+/**
+ * Prerender the stories the feeds actually link to.
+ *
+ * `revalidate` alone was not enough: a dynamic segment with no
+ * `generateStaticParams` is rendered per request and never populates the
+ * full-route cache, so every story page returned `X-Vercel-Cache: MISS`
+ * however the fetches were configured.
+ *
+ * Building the front page's stories covers the overwhelming majority of real
+ * traffic, since almost nobody arrives at a story except through a feed.
+ * `dynamicParams` stays at its default, so anything not built here — an older
+ * story, a shared link — still renders on demand and is cached from then on.
+ *
+ * Returning `[]` on failure is deliberate: a build must not depend on the API
+ * being reachable. Worst case every page renders on demand, which is exactly
+ * the behaviour this replaces.
+ */
+export async function generateStaticParams() {
+  try {
+    const [wire, record] = await Promise.all([
+      fetchStories({ limit: 40 }),
+      fetchStories({ limit: 20, sort: 'significance' }),
+    ]);
+    const slugs = new Set(
+      [...wire.items, ...record.items].map((s) => s.slug).filter(Boolean)
+    );
+    return [...slugs].map((storyId) => ({ storyId }));
+  } catch {
+    return [];
+  }
+}
 
 export default async function StoryPage({ params }: StoryPageProps) {
   const { storyId } = await params;
