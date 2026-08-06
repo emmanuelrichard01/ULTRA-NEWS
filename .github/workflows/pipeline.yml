@@ -24,7 +24,7 @@ concurrency:
 jobs:
   run:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 25   # must stay under the 30-minute cron interval
     defaults:
       run:
         working-directory: backend
@@ -36,6 +36,9 @@ jobs:
       ALLOWED_HOSTS: localhost
       # No Redis on the free path, and this process serves no requests.
       CACHE_BACKEND: locmem
+      # No worker exists here. run_pipeline sets this for itself too; stating it
+      # in the environment covers anything else invoked in this job.
+      CELERY_DISPATCH_ENABLED: '0'
       # Briefs are synthesised here rather than on the API host, so the key is
       # needed. Omit the secret and synthesis falls back to extraction — the
       # pipeline still succeeds.
@@ -73,4 +76,6 @@ jobs:
       # One process, one model load. Three separate manage.py calls would pay
       # the ~11s load three times.
       - name: Ingest, cluster, refresh momentum
-        run: python manage.py run_pipeline --workers 8
+        # --synthesize bounds the AI portion. A 70B brief takes ~70s, so the
+        # default of 10 would spend 12 minutes of a 25-minute budget on it.
+        run: python manage.py run_pipeline --workers 8 --synthesize 4

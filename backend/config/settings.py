@@ -233,6 +233,19 @@ else:
 
 # Celery Configuration
 CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "redis://redis:6379/1")
+
+# Whether background tasks may be queued at all.
+#
+# Set to 0 on deployments with no Celery worker. `.delay()` against an
+# unreachable broker does not fail fast: it retries, and the call blocks for
+# seconds before raising — measured at 5.9s locally and ~39s on a GitHub
+# runner, *per call*. Clustering dispatches one per promoted story, so on the
+# worker-less path that cost is paid hundreds of times per run for work that
+# could never have been picked up. It is what turned a routine pipeline run
+# into a 25-minute timeout.
+#
+# `run_pipeline` disables this for itself, since it synthesises in-process.
+CELERY_DISPATCH_ENABLED = os.environ.get("CELERY_DISPATCH_ENABLED", "1") == "1"
 CELERY_RESULT_BACKEND = os.environ.get("CELERY_RESULT_BACKEND", "redis://redis:6379/1")
 CELERY_TIMEZONE = "UTC"
 

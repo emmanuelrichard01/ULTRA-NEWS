@@ -43,7 +43,16 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        from django.conf import settings
+
         from core.models import Source
+
+        # This command synthesises in-process, so queueing the same work for a
+        # worker is pure waste — and on the deployment this command exists for,
+        # there is no worker and no broker. Each `.delay()` then blocks on
+        # connection retries (~39s on a CI runner) before failing, once per
+        # promoted story. Left enabled, that alone exhausted the job timeout.
+        settings.CELERY_DISPATCH_ENABLED = False
 
         started = time.monotonic()
         ingested = 0

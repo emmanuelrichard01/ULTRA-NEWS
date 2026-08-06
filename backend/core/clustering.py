@@ -370,6 +370,16 @@ def _dispatch_synthesis(story_id: int) -> None:
     Dispatching inline let a worker pick the task up before the cluster update was
     visible, so synthesis could read stale counts — or miss the story entirely.
     """
+    from django.conf import settings
+
+    # Skip entirely when nothing can consume the queue. `.delay()` to an
+    # unreachable broker blocks on connection retries — 5.9s locally, ~39s on a
+    # CI runner — and clustering calls this once per promoted story. Catching
+    # the exception afterwards, as this did, makes the failure invisible but
+    # not free.
+    if not getattr(settings, "CELERY_DISPATCH_ENABLED", True):
+        return
+
     def _send():
         try:
             from core.tasks import synthesize_story_brief

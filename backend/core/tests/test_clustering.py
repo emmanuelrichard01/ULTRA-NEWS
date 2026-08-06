@@ -1,5 +1,7 @@
 from datetime import timedelta
 
+from unittest.mock import patch
+
 import pytest
 from django.utils import timezone
 
@@ -111,3 +113,44 @@ def test_cluster_article_merges_on_similarity(base_source, secondary_source, cat
     assert story1.id == story2.id
     assert story2.independent_count == 2
     assert story2.status == Story.Status.DEVELOPING # 2 sources -> Developing
+
+
+# ==========================================================================
+# Task dispatch
+# ==========================================================================
+
+@pytest.mark.django_db
+def test_synthesis_is_not_dispatched_when_dispatch_is_disabled():
+    """
+    The regression guard for a 25-minute pipeline timeout.
+
+    `.delay()` against an unreachable broker does not fail fast — it retries,
+    blocking 5.9s locally and ~39s on a CI runner before raising. Clustering
+    calls it once per promoted story, so on a deployment with no worker that
+    cost was paid hundreds of times per run for work nothing could consume.
+    The exception was caught and logged, which hid the failure without making
+    it any cheaper.
+    """
+    from django.test import override_settings
+
+    from core.clustering import _dispatch_synthesis
+
+    with override_settings(CELERY_DISPATCH_ENABLED=False):
+        with patch("core.tasks.synthesize_story_brief.delay") as delay:
+            _dispatch_synthesis(1)
+
+    assert not delay.called, "dispatch must be skipped when no worker can consume it"
+
+
+@pytest.mark.django_db(transaction=True)
+def test_synthesis_is_dispatched_when_a_worker_is_expected():
+    """The default path must still queue work — this is opt-out, not opt-in."""
+    from django.test import override_settings
+
+    from core.clustering import _dispatch_synthesis
+
+    with override_settings(CELERY_DISPATCH_ENABLED=True):
+        with patch("core.tasks.synthesize_story_brief.delay") as delay:
+            _dispatch_synthesis(1)
+
+    delay.assert_called_once_with(1)
