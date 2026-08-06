@@ -197,27 +197,67 @@ make setup    # builds, starts, migrates, seeds
 # Frontend:  http://localhost:3000
 # API Docs:  http://localhost:8000/api/v1/docs
 
-# 3. Trigger first ingestion
-make ingest
+# 3. Populate it — ingest, cluster and score in one pass
+make pipeline
+```
+
+`make pipeline` runs synchronously and needs no Celery worker, so it works
+identically on a laptop and on a CI runner. `make ingest` is the queued variant
+for when workers are running.
+
+**AI is optional.** With no key configured, briefs and `/ask` answers are built
+from the retrieved sources directly — a supported mode, not a broken one. To turn
+on generated answers, [get a free Groq key](https://console.groq.com/keys)
+(~14,400 requests/day, no card) and set two variables:
+
+```bash
+LLM_PROVIDER=groq
+LLM_API_KEY=<your key>
 ```
 
 ### Developer Commands
 
 ```bash
-make help           # Show all commands
-make status         # Service health check
-make logs           # Tail all service logs
-make logs-backend   # Backend only
-make logs-worker    # Worker only
-make logs-frontend  # Frontend only
-make shell          # Django shell
-make db-shell       # PostgreSQL shell (psql)
-make lint           # Run linters (ruff + tsc)
-make test           # Run all tests
-make restart        # Restart all services
-make clean          # Stop services, remove containers
-make nuke           # ⚠️ Stop services + delete all data
+make help              # Show all commands
+
+# Lifecycle
+make status            # Service health check
+make logs              # Tail all service logs  (also: -backend -worker -frontend)
+make restart           # Restart all services
+make clean             # Stop services, remove containers
+make nuke              # ⚠️ Stop services + delete all data
+
+# Pipeline
+make pipeline          # ingest → cluster → momentum, synchronously
+make ingest            # Queue ingestion on the Celery workers
+make momentum          # Recompute the Developing edition's momentum column
+
+# Data hygiene
+make retention         # Report what retention WOULD delete (dry run)
+make retention-apply   # Apply tiered retention — deletes data
+make sources           # Check every feed in the registry resolves
+make recategorize      # Re-run semantic topic assignment
+
+# Calibration — measure, don't guess
+make calibrate         # Clustering threshold vs labelled pairs
+make calibrate-topics  # Topic coverage and accuracy
+make benchmark         # Compare embedding models on same-event separation
+
+# Observability
+make health            # 503 when degraded, not just a body field
+make metrics           # Domain metrics
+
+# Quality
+make lint              # ruff + tsc + eslint
+make test              # Full suite
+make shell             # Django shell
+make db-shell          # psql
 ```
+
+**On `make calibrate`.** The clustering threshold is 0.80 because it was
+measured, not chosen. An earlier value of 0.68 looked reasonable and produced a
+112-article blob of unrelated geopolitics; the calibration command exists so the
+number can be re-derived rather than argued about.
 
 ---
 
@@ -243,7 +283,11 @@ Copy `.env.example` to `.env` and configure:
 | `TRUSTED_PROXY_COUNT` | — | Proxy hops in front of the app (default `1`). |
 | `NEXTJS_URL` | — | Next.js origin for on-demand cache purges. Blank disables revalidation. |
 | `REVALIDATE_SECRET` | — | Shared secret for the purge webhook. Must match the frontend. |
-| `LLM_API_KEY` | — | Google Gemini key. Without it, `/ask` and story briefs degrade to extractive summaries instead of failing. |
+| `LLM_PROVIDER` | — | `groq` (default) · `cerebras` · `openrouter` · `gemini` · `openai` · `ollama` · `none`. The preset supplies base URL, model and fallback chain, so provider + key is a complete config. |
+| `LLM_API_KEY` | — | Provider key. Without it, `/ask` and story briefs degrade to extractive summaries instead of failing. |
+| `LLM_MODEL` | — | Overrides the preset. **Leave blank unless you mean it** — pointing it at another provider's model 404s every call while the key looks valid. |
+| `LLM_FALLBACK_MODELS` | — | Overrides the preset chain. Presets run strongest-first, largest-daily-allowance-last, so free-tier quota exhaustion degrades quality rather than removing the feature. |
+| `WEB_CONCURRENCY` | — | Gunicorn workers (default `1`). Each loads its own copy of the embedding model: 349 MiB for one, 587 MiB for two. Raise it only when the host has the memory. |
 | `MAX_ASK_DAILY_REQUESTS` | — | Daily `/ask` spend ceiling (default `500`). |
 | `MAX_SYNTHESIS_DAILY_REQUESTS` | — | Daily background-synthesis ceiling (default `200`). |
 
@@ -293,12 +337,26 @@ Migrations **must** run for the suite — parts of the schema exist only as
 migrations, not as model state (`0006` installs pgvector, `0013` installs the
 `search_vector` trigger). `pytest.ini` therefore does not pass `--nomigrations`.
 
+**Tests cannot reach the network.** An autouse fixture in `backend/conftest.py`
+fails any test that opens a socket to a non-local host. This is not a
+precaution — twice, a test mocked one vendor's SDK, the code beneath it changed
+route, the mock silently stopped intercepting, and the suite made live billed
+API calls. Nothing failed, so nothing surfaced it. Opt out with
+`@pytest.mark.allow_network` when a call is genuinely intended.
+
+Lint rules are pinned in `backend/pyproject.toml` and ruff is pinned in CI. A
+bare `ruff check .` means "whatever the installed version enables by default",
+which turns an upstream release into a red build with no code change behind it.
+
 ---
 
 ## Project Status
 
-Verified on a live stack: **104 tests passing**, 41/41 feeds healthy, clean
-typecheck, zero lint errors.
+Verified on a live stack: **112 tests passing**, 41/41 feeds healthy, clean
+typecheck, zero lint errors, frontend builds.
+
+Runs at **$0** with every feature intact — see
+[the $0 path](DEPLOYMENT.md#the-0-path--full-features-nothing-given-up).
 
 ### Working
 
@@ -313,6 +371,10 @@ typecheck, zero lint errors.
 - Question answering with story-level retrieval and a semantic answer cache
 - Outbound RSS per edition
 - Tiered retention, Prometheus metrics, request correlation
+- Pluggable LLM providers with presets and per-model fallback chains, so free-tier
+  quota exhaustion degrades answer quality instead of removing the feature
+- Runs with no Celery worker (`manage.py run_pipeline`), which is what makes the
+  zero-cost deployment possible without dropping anything
 
 ### Known limits
 

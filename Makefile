@@ -77,13 +77,60 @@ db-shell: ## Open PostgreSQL shell (psql)
 
 # ─── Development ─────────────────────────────────────────────────────────────
 
-ingest: ## Trigger a news ingestion cycle (queues Celery task)
+ingest: ## Queue an ingestion cycle on the Celery workers
 	$(BACKEND_EXEC) python manage.py ingest_news
 	@echo "  ℹ️  Ingestion queued. Watch progress: make logs-worker"
 
+pipeline: ## Run ingest → cluster → momentum synchronously, no workers needed
+	@echo "  Running the full pipeline in one process (this is what CI cron runs)."
+	$(BACKEND_EXEC) python manage.py run_pipeline
+
+momentum: ## Recompute the Developing edition's momentum column
+	@echo "  Momentum decays with the clock, so this is not a no-op between ingests."
+	$(BACKEND_EXEC) python manage.py shell -c 		"from core.momentum import refresh_momentum; print(refresh_momentum())"
+
+# ─── Data hygiene ────────────────────────────────────────────────────────────
+
+retention: ## Report what retention WOULD delete (dry run)
+	$(BACKEND_EXEC) python manage.py retention
+
+retention-apply: ## Apply tiered retention — deletes data
+	$(BACKEND_EXEC) python manage.py retention --apply
+
+sources: ## Check every feed in the registry actually resolves
+	$(BACKEND_EXEC) python manage.py validate_sources
+
+reclean: ## Re-extract article text (only after the text-extraction fix)
+	$(BACKEND_EXEC) python manage.py reclean_text --apply
+
+recategorize: ## Re-run semantic topic assignment over all articles
+	$(BACKEND_EXEC) python manage.py recategorize_all
+
+# ─── Calibration — measure, don't guess ──────────────────────────────────────
+
+calibrate: ## Measure the clustering threshold against labelled pairs
+	$(BACKEND_EXEC) python manage.py calibrate_threshold
+
+calibrate-topics: ## Measure topic assignment coverage and accuracy
+	$(BACKEND_EXEC) python manage.py calibrate_topics
+
+benchmark: ## Compare embedding models on same-event separation
+	$(BACKEND_EXEC) python manage.py benchmark_embeddings
+
+# ─── Observability ───────────────────────────────────────────────────────────
+
+health: ## Show health — returns 503 when degraded, not just a body field
+	@curl -s -o /dev/null -w "  HTTP %{http_code} in %{time_total}s" $(API_URL)/api/v1/health
+	@echo ""
+	@curl -s $(API_URL)/api/v1/health
+	@echo ""
+
+metrics: ## Show domain metrics (alert on pending_clustering first)
+	@curl -s $(API_URL)/metrics | grep -E '^ultranews_(sources|articles_pending|llm_calls|answer_cache)' || echo '  No metrics — is /metrics unlocked for this host?'
+
 lint: ## Run all linters (ruff + tsc + eslint)
 	@echo "── Python (ruff) ──"
-	$(BACKEND_EXEC) ruff check .
+	$(BACKEND_EXEC) ruff check --no-cache .
 	@echo ""
 	@echo "── TypeScript (tsc) ──"
 	cd $(FRONTEND_DIR) && npx tsc --noEmit
