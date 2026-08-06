@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import { Suspense } from 'react';
 
 import FeedPage from '@/components/FeedPage';
-import { fetchStories } from '@/lib/api';
+import { fetchStories, fetchLeadStories } from '@/lib/api';
 import { EDITIONS_BY_SLUG } from '@/lib/editions';
 import { CATEGORY_MAP } from '@/lib/types';
 
@@ -51,11 +51,13 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
   if (!info) notFound();
 
   const edition = EDITIONS_BY_SLUG[''];
-  const initialStories = await fetchStories({
-    sort: edition.sort,
-    minSources: edition.minSources,
-    category,
-  });
+
+  // Leads are scoped to the topic, so a Climate page leads with the newest
+  // confirmed climate stories rather than with the front page's.
+  const [initialStories, leadStories] = await Promise.all([
+    fetchStories({ sort: edition.sort, minSources: edition.minSources, category }),
+    fetchLeadStories({ category, limit: 4 }),
+  ]);
 
   return (
     <Suspense fallback={null}>
@@ -65,6 +67,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
         titleOverride={info.displayName}
         taglineOverride={info.description}
         initialStories={initialStories}
+        leadStories={leadStories}
       />
     </Suspense>
   );

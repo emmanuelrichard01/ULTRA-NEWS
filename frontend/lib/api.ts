@@ -108,19 +108,57 @@ export async function fetchStories(
 }
 
 /**
- * Stories ranked by coverage velocity, for the leaderboard.
+ * Stories accumulating independent coverage fastest, for The Wire's sidebar.
  *
- * Fetched separately rather than sorted client-side. The leaderboard used to
- * re-sort whatever page of the feed happened to be loaded, so it ranked a
- * 20-story window and called it "fastest moving" — a story accelerating on
- * page 3 simply never appeared.
+ * Reads `sort=momentum`, NOT `sort=velocity`.
+ *
+ * This panel used to fetch velocity, and velocity_score is independent_count
+ * divided by hours alive — an average over a story's whole life, which ranks
+ * NEWEST rather than fastest-spreading. Measured against the live corpus, its
+ * top twenty were all single-outlet stories, the leader being a twenty-minute
+ * old item scoring 55/hr; a story fifteen newsrooms had confirmed over a day
+ * could not place. The panel then filtered to stories with two or more outlets,
+ * found that none of its twenty qualified, and rendered nothing — so every
+ * reader of The Wire paid for the round trip and got an empty column.
+ *
+ * `momentum_outlets` is the column built for this question: independent outlets
+ * that joined inside a recent window, refreshed when an article joins a cluster
+ * and swept every five minutes so it DECAYS as the window slides. It answers
+ * "what is being picked up right now", which is what the panel always claimed
+ * to show.
  */
-export async function fetchTrendingStories(
+export async function fetchMomentumStories(
   options: { category?: string; limit?: number } = {}
 ): Promise<StoryDetail[]> {
   const page = await fetchStories({
-    sort: 'velocity',
-    limit: options.limit ?? 20,
+    sort: 'momentum',
+    limit: options.limit ?? 8,
+    category: options.category,
+  });
+  return page.items;
+}
+
+/**
+ * The most recent stories another newsroom has independently confirmed.
+ *
+ * The Wire is ordered by recency, so its first row is whatever landed most
+ * recently — which on a corpus that is overwhelmingly single-source is usually
+ * one outlet's unconfirmed report. Handing that the front page's hero spends
+ * the loudest promise the product can make on the weakest evidence it has.
+ *
+ * Asking the API for `sort=latest&min_sources=2&limit=1` gets the front page a
+ * lead that is both current and corroborated, which is the judgement a wire
+ * editor makes. It is a different question from The Record's, which ranks by
+ * weight of evidence and ignores recency — so the two editions do not end up
+ * leading with the same story every day.
+ */
+export async function fetchLeadStories(
+  options: { category?: string; limit?: number } = {}
+): Promise<StoryDetail[]> {
+  const page = await fetchStories({
+    sort: 'latest',
+    minSources: 2,
+    limit: options.limit ?? 5,
     category: options.category,
   });
   return page.items;

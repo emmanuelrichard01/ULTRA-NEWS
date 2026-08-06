@@ -2,6 +2,13 @@
 
 import { useMemo, useState } from 'react';
 
+import {
+  distinctiveWords,
+  framingsByOutlet,
+  isDistinctive,
+  marksFor,
+  tokenize,
+} from '@/lib/framing';
 import type { StoryArticle } from '@/lib/types';
 
 /**
@@ -20,48 +27,34 @@ import type { StoryArticle } from '@/lib/types';
  * Words unique to a single outlet's headline are marked, because that is where
  * framing lives: "strikes kill five" versus "retaliatory operation" is the
  * story.
+ *
+ * The word analysis itself lives in lib/framing.ts, shared with the feed
+ * card's FramingCompare. Two copies of it would eventually disagree, and the
+ * same story would then highlight different words on the feed than on the page
+ * it links to.
  */
 
 interface FramingMatrixProps {
   articles: StoryArticle[];
 }
 
-const STOPWORDS = new Set([
-  'the', 'a', 'an', 'and', 'or', 'but', 'of', 'in', 'on', 'at', 'to', 'for',
-  'with', 'as', 'by', 'from', 'is', 'are', 'was', 'were', 'be', 'been', 'it',
-  'its', 'that', 'this', 'has', 'have', 'had', 'will', 'says', 'say', 'said',
-  'after', 'over', 'into', 'more', 'than', 'his', 'her', 'their', 'they',
-]);
-
-function contentWords(title: string): string[] {
-  return (title.toLowerCase().match(/\b[a-z][a-z'-]{2,}\b/g) ?? []).filter(
-    (w) => !STOPWORDS.has(w)
-  );
-}
-
 export default function FramingMatrix({ articles }: FramingMatrixProps) {
   const [showAll, setShowAll] = useState(false);
 
-  // One headline per outlet — the earliest, which is its initial framing before
-  // it had a chance to follow anyone else's lead.
-  const perOutlet = useMemo(() => {
-    const byOutlet = new Map<string, StoryArticle>();
-    [...articles]
-      .sort((a, b) => new Date(a.published_date).getTime() - new Date(b.published_date).getTime())
-      .forEach((a) => {
-        if (!byOutlet.has(a.source.name)) byOutlet.set(a.source.name, a);
-      });
-    return [...byOutlet.values()];
-  }, [articles]);
+  const perOutlet = useMemo(
+    () =>
+      framingsByOutlet(
+        articles.map((a) => ({
+          source: a.source.name,
+          title: a.title,
+          publishedAt: a.published_date,
+          article: a,
+        }))
+      ),
+    [articles]
+  );
 
-  // A word is "distinctive" when only one outlet used it.
-  const distinctive = useMemo(() => {
-    const counts = new Map<string, number>();
-    perOutlet.forEach((a) => {
-      new Set(contentWords(a.title)).forEach((w) => counts.set(w, (counts.get(w) ?? 0) + 1));
-    });
-    return new Set([...counts.entries()].filter(([, n]) => n === 1).map(([w]) => w));
-  }, [perOutlet]);
+  const distinctive = useMemo(() => distinctiveWords(perOutlet), [perOutlet]);
 
   if (perOutlet.length < 2) return null;
 
@@ -78,30 +71,28 @@ export default function FramingMatrix({ articles }: FramingMatrixProps) {
       </p>
 
       <ul className="divide-y divide-[var(--border)] border-y border-[var(--border)]">
-        {visible.map((article) => {
-          const words = article.title.split(/(\s+)/);
+        {visible.map((entry) => {
+          const marks = marksFor(entry.title, distinctive);
           return (
-            <li key={article.source.name} className="grid gap-1.5 py-4 sm:grid-cols-[9rem_1fr] sm:gap-5">
-              <span className="font-data pt-[3px] text-[12px] font-semibold text-[var(--foreground-muted)]">
-                {article.source.name}
-              </span>
-              <p className="text-body-md font-display leading-snug text-[var(--foreground)]">
-                {words.map((word, i) => {
-                  const bare = word.toLowerCase().replace(/[^a-z'-]/g, '');
-                  const isDistinctive = bare.length > 2 && distinctive.has(bare);
-                  return isDistinctive ? (
-                    <mark
-                      key={i}
-                      className="rounded-[2px] bg-[var(--accent-secondary)]/20 px-[2px] text-[var(--foreground)]"
-                    >
-                      {word}
-                    </mark>
-                  ) : (
-                    <span key={i}>{word}</span>
-                  );
-                })}
-              </p>
-            </li>
+          <li key={entry.source} className="grid gap-1.5 py-4 sm:grid-cols-[9rem_1fr] sm:gap-5">
+            <span className="font-data pt-[3px] text-[12px] font-semibold text-[var(--foreground-muted)]">
+              {entry.source}
+            </span>
+            <p className="text-body-md font-display leading-snug text-[var(--foreground)]">
+              {tokenize(entry.title).map((word, i) =>
+                isDistinctive(word, marks) ? (
+                  <mark
+                    key={i}
+                    className="rounded-[2px] bg-[var(--accent-secondary)]/20 px-[2px] text-[var(--foreground)]"
+                  >
+                    {word}
+                  </mark>
+                ) : (
+                  <span key={i}>{word}</span>
+                )
+              )}
+            </p>
+          </li>
           );
         })}
       </ul>

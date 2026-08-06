@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { AskSparkle } from './AskTrigger';
 import { BROWSER_API_URL } from '@/lib/api';
 
 /**
@@ -295,16 +296,34 @@ export default function AskWireModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="ask-title"
-        className="animate-fade-in flex max-h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--background)] shadow-[var(--shadow-lg)]"
+        className="ai-border animate-fade-in flex max-h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--background)] shadow-[var(--shadow-lg)]"
       >
-        <div className="flex items-center justify-between gap-4 border-b border-[var(--border)] px-5 py-3.5">
-          <h2 id="ask-title" className="text-label text-[var(--foreground-muted)]">
-            Ask the wire room
-          </h2>
+        {/*
+          The header states what this is before the reader types anything.
+          Previously it carried the name only, in 11px uppercase, which told
+          someone who had just clicked a magnifying glass exactly nothing about
+          why the answers would take fifteen seconds or where they came from.
+        */}
+        <div className="flex items-start justify-between gap-4 border-b border-[var(--border)] px-5 py-4">
+          <div className="flex min-w-0 items-start gap-3">
+            <AskSparkle className="mt-0.5 shrink-0 text-[var(--accent)]" />
+            <div className="min-w-0">
+              <h2
+                id="ask-title"
+                className="text-display-sm font-display text-[var(--foreground)]"
+              >
+                Ask the wire room
+              </h2>
+              <p className="text-body-sm mt-0.5 text-[var(--foreground-muted)]">
+                Machine-written from clustered reporting, and it names the
+                outlets it drew on.
+              </p>
+            </div>
+          </div>
           <button
             onClick={onClose}
             aria-label="Close"
-            className="rounded p-1 text-[var(--foreground-subtle)] transition-colors hover:text-[var(--foreground)]"
+            className="-mr-1 shrink-0 rounded p-1 text-[var(--foreground-subtle)] transition-colors hover:text-[var(--foreground)]"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
               <path d="M18 6 6 18M6 6l12 12" />
@@ -332,9 +351,22 @@ export default function AskWireModal({
             <button
               type="submit"
               disabled={loading || !query.trim()}
-              className="text-label shrink-0 rounded-[var(--radius-chip)] bg-[var(--foreground)] px-3.5 py-2 text-[var(--background)] transition-opacity disabled:opacity-30"
+              className="text-label flex shrink-0 items-center gap-1.5 rounded-[var(--radius-chip)] bg-[var(--foreground)] px-3.5 py-2 text-[var(--background)] transition-opacity disabled:opacity-30"
             >
-              {loading ? 'Asking…' : 'Ask'}
+              {loading ? (
+                <>
+                  {/* A spinner only while the request is genuinely in flight —
+                      once the stream opens, the words themselves are the
+                      progress indicator. */}
+                  <span
+                    aria-hidden="true"
+                    className="h-3 w-3 animate-spin rounded-full border-[1.5px] border-current border-t-transparent"
+                  />
+                  Asking
+                </>
+              ) : (
+                'Ask'
+              )}
             </button>
           </div>
         </form>
@@ -414,11 +446,37 @@ export default function AskWireModal({
             </div>
           )}
 
+          {/*
+            Empty state.
+
+            Says how the answer is built, in three steps, because the honest
+            selling point of this feature is the method: it retrieves real
+            clusters and cites them, and it will tell you when a claim rests on
+            one unconfirmed source. A reader who does not know that has no
+            reason to trust the paragraph, and every reason to assume it is the
+            same chatbot they have been offered everywhere else.
+          */}
           {!loading && !state && !error && (
             <div>
-              <p className="text-body-sm mb-4 text-[var(--foreground-muted)]">
-                Ask about anything on the wire. Answers are drawn from clustered
-                reporting and name the outlets they came from.
+              <ol className="mb-6 space-y-2.5">
+                {[
+                  'Your question is matched against clustered coverage, not keywords.',
+                  'The answer is written from those stories and cites the outlets.',
+                  'If it rests on a single unconfirmed source, it says so.',
+                ].map((step, i) => (
+                  <li key={i} className="flex gap-3">
+                    <span className="font-data mt-[3px] shrink-0 text-[11px] tabular-nums text-[var(--foreground-subtle)]">
+                      {String(i + 1).padStart(2, '0')}
+                    </span>
+                    <span className="text-body-sm text-[var(--foreground-muted)]">
+                      {step}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+
+              <p className="text-label mb-2.5 text-[var(--foreground-subtle)]">
+                Try one
               </p>
               <div className="flex flex-wrap gap-2">
                 {SUGGESTIONS.map((suggestion) => (

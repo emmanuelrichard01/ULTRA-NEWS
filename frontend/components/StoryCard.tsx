@@ -1,35 +1,47 @@
-"use client";
-
 import Link from 'next/link';
-import { useState } from 'react';
-import { formatDistanceToNow } from 'date-fns';
+
 import CorroborationMeter from './CorroborationMeter';
 import CategoryPill from './CategoryPill';
 import NewsImage from './NewsImage';
-import FramingSwitcher, { type Framing } from './FramingSwitcher';
+import SourceChain from './SourceChain';
+import FramingCompare, { type Framing } from './FramingCompare';
+import { relativeTime } from '@/lib/time';
+import { cleanExcerpt } from '@/lib/text';
 
 /**
  * StoryCard — the feed's primary unit.
  *
+ * The corroboration meter leads the metadata line on every variant, and it is
+ * the first thing in the row for a reason: the number of independent newsrooms
+ * behind a story is the product's whole claim, so it is stated before the
+ * headline rather than after it. Because it is always first, the meters line up
+ * into a column down the feed and can be compared at a glance.
+ *
  * Structural note: the card uses a "stretched link" — the whole surface is
  * clickable via an absolutely-positioned pseudo-element on the headline's <a>,
- * while controls sit as SIBLINGS lifted with z-10. The previous version wrapped
- * everything, buttons included, inside one <a>. Interactive content inside an
- * anchor is invalid HTML: it breaks keyboard navigation, confuses screen
- * readers, and forced `e.preventDefault()` calls throughout to stop the link
- * from firing when a button was pressed.
+ * while controls sit as SIBLINGS lifted with z-10. Interactive content inside
+ * an anchor is invalid HTML: it breaks keyboard navigation, confuses screen
+ * readers, and forces `e.preventDefault()` calls throughout to stop the link
+ * firing when a button is pressed.
  *
- * Also gone: a "velocity sparkline" whose first two bars were hardcoded to 40%
- * and 70%. Inventing a data visualisation is a strange thing to do anywhere; on
- * a product whose whole claim is verification it undermines the premise.
+ * The `useState` this used to hold — tracking which framing was hovered, in
+ * order to swap the headline — is gone with the switcher. FramingCompare owns
+ * its own disclosure state, so the card itself is now stateless.
  */
 
-interface StoryCardProps {
+export interface StoryCardProps {
   title: string;
   slug: string;
   imageUrl?: string | null;
   excerpt?: string;
-  publishedDate: string | Date;
+  /**
+   * The time to show. Which timestamp this is comes from the edition — see
+   * `timeField` in lib/editions.ts. A chronological edition means "first
+   * reported"; a momentum edition means "last outlet joined".
+   */
+  timestamp: string | Date;
+  /** Prefix that says which of those two this is, e.g. "updated". */
+  timestampPrefix?: string;
   /** Total articles in the cluster. */
   sourceCount: number;
   /** Distinct publishers — the number corroboration is measured in. */
@@ -37,12 +49,13 @@ interface StoryCardProps {
   sources?: string[];
   categories?: string[];
   framingPreview?: Framing[];
-  variant?: 'lead' | 'standard' | 'compact';
-  priority?: boolean;
+  variant?: 'standard' | 'compact';
   /** Outlets gained inside the momentum window — Developing edition only. */
   recentOutlets?: number | null;
   /** Position in a ranked edition. Omitted in chronological ones. */
   rank?: number;
+  /** Thumbnails are noise in a ranked list of fast-moving stories. */
+  showImage?: boolean;
 }
 
 export default function StoryCard({
@@ -50,228 +63,166 @@ export default function StoryCard({
   slug,
   imageUrl,
   excerpt,
-  publishedDate,
+  timestamp,
+  timestampPrefix,
   sourceCount,
   independentCount,
   sources = [],
   categories = [],
   framingPreview = [],
   variant = 'standard',
-  priority = false,
   recentOutlets = null,
   rank,
+  showImage = true,
 }: StoryCardProps) {
-  const dateObj = typeof publishedDate === 'string' ? new Date(publishedDate) : publishedDate;
+  const dateObj = typeof timestamp === 'string' ? new Date(timestamp) : timestamp;
   const outlets = independentCount ?? sources.length ?? 1;
-
-  const [framedTitle, setFramedTitle] = useState<string | null>(null);
-
   const href = `/story/${slug}`;
 
-  const timestamp = (
+  const time = (
     <time
       dateTime={dateObj.toISOString()}
-      className="font-data text-[11px] text-[var(--foreground-subtle)] tabular-nums"
+      title={dateObj.toLocaleString()}
+      // The server renders this when the page is revalidated, the browser when
+      // it hydrates, and those are different clocks — a story on the boundary
+      // legitimately reads "59m ago" in the HTML and "1h ago" after hydration.
+      // The `dateTime` attribute carries the exact instant either way, so the
+      // difference is cosmetic and the warning is noise.
+      suppressHydrationWarning
+      className="font-data shrink-0 text-[11px] tabular-nums text-[var(--foreground-subtle)]"
     >
-      {formatDistanceToNow(dateObj, { addSuffix: true })}
+      {timestampPrefix ? `${timestampPrefix} ` : ''}
+      {relativeTime(dateObj)}
     </time>
   );
 
-  // Deliberately does NOT change on hover. It shares a justify-between row with
-  // the framing switcher, so swapping in "as headlined by X" resized it and slid
-  // the buttons sideways under the pointer — the same feedback loop the headline
-  // had, in the other axis. The active outlet is already indicated by its button.
-  const attribution =
+  // Sources arrive oldest-first, so their order says who broke the story and
+  // who followed. SourceChain renders that; a joined list threw it away.
+  const attribution = (variant: 'lead' | 'inline') =>
     sources.length > 0 ? (
-      <span className="font-data truncate text-[11px] text-[var(--foreground-muted)]">
-        {sources.slice(0, 3).join(' · ')}
-        {sources.length > 3 && ` +${sources.length - 3}`}
-      </span>
+      <SourceChain
+        sources={sources}
+        independentCount={outlets}
+        variant={variant}
+      />
     ) : null;
 
-  const handleFraming = (t: string | null) => {
-    setFramedTitle(t);
-  };
+  const summary = cleanExcerpt(excerpt, title);
 
   /**
    * Momentum badge — states the evidence, not a score.
    *
-   * "4 new outlets · 12h" is checkable. An abstract "velocity 3.7" was not, and
-   * the sparkline that used to sit here had two of its three bars hardcoded.
+   * "+4 in 12h" is checkable. An abstract "velocity 3.7" was not, and the
+   * sparkline that used to sit here had two of its three bars hardcoded.
+   *
+   * Phrased differently when every outlet arrived inside the window, because
+   * "+16 in 12h" beside a meter reading "16 outlets" is the same number twice.
+   * That a story went from nothing to sixteen newsrooms in half a day is the
+   * more interesting fact anyway, so it says that instead.
    */
   const momentum =
     recentOutlets && recentOutlets > 0 ? (
-      <span className="font-data inline-flex items-center gap-1.5 rounded-[var(--radius-chip)] border border-[var(--accent)]/25 bg-[var(--accent)]/8 px-2 py-[3px] text-[11px] text-[var(--accent)]">
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <span className="font-data inline-flex shrink-0 items-center gap-1.5 rounded-[var(--radius-chip)] border border-[var(--accent)]/25 bg-[var(--accent)]/8 px-2 py-[3px] text-[11px] text-[var(--accent)]">
+        <svg
+          width="10"
+          height="10"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
           <path d="M7 17 17 7M17 7H9M17 7v8" />
         </svg>
-        {recentOutlets} new {recentOutlets === 1 ? 'outlet' : 'outlets'} · 12h
+        {recentOutlets >= outlets
+          ? 'all coverage in 12h'
+          : `+${recentOutlets} in 12h`}
       </span>
     ) : null;
 
-  /**
-   * Headline that cannot change height when the framing switches.
-   *
-   * Every candidate headline is rendered stacked in one grid cell; only the
-   * active one is visible. The cell sizes to the TALLEST variant, so swapping
-   * between them shifts nothing.
-   *
-   * Without this the card reflowed on every hover: a longer headline pushed the
-   * framing buttons down, the pointer landed on a different button, that
-   * selected a different headline, and the text flickered back and forth in a
-   * feedback loop the reader could not escape.
-   */
-  const headline = (className: string) => {
-    const variants = [title, ...framingPreview.map((f) => f.title)];
-    const activeIndex = framedTitle ? variants.indexOf(framedTitle) : 0;
-
-    return (
-      <span className="grid">
-        {variants.map((text, i) => (
-          <span
-            key={i}
-            aria-hidden={i === activeIndex ? undefined : true}
-            className={`col-start-1 row-start-1 ${className} ${
-              i === activeIndex ? '' : 'invisible'
-            }`}
-          >
-            {text}
-          </span>
-        ))}
-      </span>
-    );
-  };
-
-  // ---------------------------------------------------------------- lead
-  if (variant === 'lead') {
-    return (
-      <article className="group relative">
-        <div className="relative aspect-[16/9] sm:aspect-[21/9] w-full overflow-hidden rounded-[var(--radius-card)] bg-[var(--surface-sunken)]">
-          <NewsImage
-            src={imageUrl}
-            alt=""
-            priority={priority}
-            className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.02]"
-          />
-        </div>
-
-        <div className="pt-5">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 mb-3">
-            <CorroborationMeter outlets={outlets} size="md" />
-            {momentum}
-            {categories.slice(0, 2).map((cat) => (
-              <CategoryPill key={cat} label={cat} size="xs" />
-            ))}
-            {timestamp}
-          </div>
-
-          <h2 className="text-display-xl font-display text-[var(--foreground)] mb-3 text-balance">
-            <Link
-              href={href}
-              className="after:absolute after:inset-0 after:content-[''] hover:text-[var(--accent)] transition-colors"
-            >
-              {headline('text-balance')}
-            </Link>
-          </h2>
-
-          {excerpt && (
-            <p className="text-body-lg text-[var(--foreground-muted)] measure mb-4">
-              {excerpt}
-            </p>
-          )}
-
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            {attribution}
-            <FramingSwitcher
-              baseTitle={title}
-              framings={framingPreview}
-              onActiveChange={handleFraming}
-              size="md"
-            />
-          </div>
-        </div>
-      </article>
-    );
-  }
+  // The 'lead' variant that used to live here — picture, then kicker, then
+  // headline, then standfirst, stacked — is now LeadHero, which overlays the
+  // same information onto the image and takes roughly half the height. See that
+  // component for why.
 
   // ------------------------------------------------------------- compact
   if (variant === 'compact') {
     return (
-      <article className="group relative py-4 border-b border-[var(--border)] last:border-0">
-        <div className="flex items-start gap-3">
-          <CorroborationMeter outlets={outlets} size="sm" showLabel={false} className="mt-1 shrink-0" />
-          <div className="min-w-0">
-            <h3 className="text-display-sm font-display text-[var(--foreground)] leading-snug">
-              <Link
-                href={href}
-                className="after:absolute after:inset-0 after:content-[''] hover:text-[var(--accent)] transition-colors"
-              >
-                {title}
-              </Link>
-            </h3>
-            <div className="mt-1.5 flex items-center gap-2">
-              {timestamp}
-              {attribution}
-            </div>
-          </div>
+      <article className="group relative border-b border-[var(--border)] py-3.5 last:border-0">
+        <div className="mb-1.5 flex items-center gap-2.5">
+          <CorroborationMeter outlets={outlets} size="sm" showLabel={false} />
+          {time}
         </div>
+        <h3 className="text-body-md font-display leading-snug text-[var(--foreground)]">
+          <Link
+            href={href}
+            className="transition-colors after:absolute after:inset-0 after:content-[''] hover:text-[var(--accent)]"
+          >
+            {title}
+          </Link>
+        </h3>
       </article>
     );
   }
 
   // ------------------------------------------------------------ standard
+  //
+  // Headline sizing: this was `text-display-lg` — clamped up to 32px — which is
+  // a *section heading* size applied to every row of a list. Combined with 28px
+  // of vertical padding it put about three stories on a laptop screen, so
+  // scanning a wire feed meant scrolling past two headlines at a time. At
+  // display-md the same column fits roughly twice as many without the headline
+  // ceasing to be the loudest thing in the row.
   return (
-    <article className="group relative py-7 border-b border-[var(--border)]">
-      <div className="flex gap-5 sm:gap-7">
-        {rank !== undefined && (
-          <span
-            className="font-data hidden w-6 shrink-0 pt-1 text-right text-[13px] tabular-nums text-[var(--foreground-subtle)] sm:block"
-            aria-hidden="true"
-          >
-            {rank}
-          </span>
-        )}
+    <article className="group relative border-b border-[var(--border)] py-5">
+      <div className="flex min-w-0 gap-4 sm:gap-6">
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mb-2.5">
+          <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+            {rank !== undefined && (
+              <span
+                className="font-data text-[11px] tabular-nums text-[var(--foreground-subtle)]"
+                aria-hidden="true"
+              >
+                {String(rank).padStart(2, '0')}
+              </span>
+            )}
             <CorroborationMeter outlets={outlets} size="sm" />
             {momentum}
             {categories.slice(0, 1).map((cat) => (
               <CategoryPill key={cat} label={cat} size="xs" />
             ))}
-            {timestamp}
+            {time}
           </div>
 
-          <h3 className="text-display-lg font-display text-[var(--foreground)] leading-[1.15] text-balance">
+          <h3 className="text-display-md text-balance font-display leading-[1.2] text-[var(--foreground)]">
             <Link
               href={href}
-              className="after:absolute after:inset-0 after:content-[''] hover:text-[var(--accent)] transition-colors"
+              className="transition-colors after:absolute after:inset-0 after:content-[''] hover:text-[var(--accent)]"
             >
-              {headline('text-balance')}
+              {title}
             </Link>
           </h3>
 
-          {excerpt && (
-            <p className="text-body-md text-[var(--foreground-muted)] mt-2.5 line-clamp-2 measure">
-              {excerpt}
+          {summary && (
+            <p className="text-body-sm measure mt-2 line-clamp-2 text-[var(--foreground-muted)]">
+              {summary}
             </p>
           )}
 
-          <div className="mt-3.5 flex flex-wrap items-center gap-x-4 gap-y-2">
-            {attribution}
-            <FramingSwitcher
-              baseTitle={title}
-              framings={framingPreview}
-              onActiveChange={handleFraming}
-            />
+          <div className="mt-2.5 flex flex-col gap-1.5">
+            {attribution('inline')}
+            <FramingCompare framings={framingPreview} />
           </div>
         </div>
 
-        {imageUrl && (
-          <div className="relative shrink-0 w-24 h-24 sm:w-40 sm:h-28 overflow-hidden rounded-[var(--radius-card)] bg-[var(--surface-sunken)]">
+        {imageUrl && showImage && (
+          <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-[var(--radius-card)] bg-[var(--surface-sunken)] sm:h-24 sm:w-32">
             <NewsImage
               src={imageUrl}
               alt=""
-              className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+              className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
             />
           </div>
         )}
@@ -287,3 +238,5 @@ export default function StoryCard({
     </article>
   );
 }
+
+

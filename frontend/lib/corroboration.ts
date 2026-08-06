@@ -74,6 +74,32 @@ export function outletPhrase(independentOutlets: number): string {
 }
 
 /**
+ * Where an outlet count sits on a 0-1 scale, for anything that draws it.
+ *
+ * Logarithmic, and this is the whole point. The previous meter filled six
+ * segments and stopped, so every story from six outlets to sixty rendered
+ * identically — the display saturated at exactly the point where the product's
+ * central claim gets strong, and a reader could not tell a well-covered story
+ * from an overwhelmingly corroborated one.
+ *
+ * A linear scale fails the other way: sized to fit 30 outlets, the difference
+ * between 1 and 2 becomes a rounding error, and 1-to-2 is the single most
+ * important transition in the product — it is where "someone claimed this"
+ * becomes "someone else confirmed it".
+ *
+ * Log spacing gives the early steps room and still separates 6 from 16. The
+ * exact number is always printed alongside, so the scale only has to rank, not
+ * to be read off.
+ */
+const SCALE_CEILING = 20;
+
+export function corroborationScale(independentOutlets: number): number {
+  const n = Math.max(independentOutlets, 1);
+  if (n >= SCALE_CEILING) return 1;
+  return Math.log(n) / Math.log(SCALE_CEILING);
+}
+
+/**
  * The feed's corroboration filter.
  *
  * `minSources` maps directly onto the API's `min_sources` parameter, so what the
