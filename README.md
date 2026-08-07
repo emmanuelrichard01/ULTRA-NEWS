@@ -168,14 +168,19 @@ Story ──→ [wire | developing | corroborated]
 
 All under `/api/v1/`:
 
+Read endpoints are rate limited to 60 requests/minute per IP. A caller presenting
+`X-Internal-Token` matching `INTERNAL_API_TOKEN` is exempt — that is how a
+`next build` and ISR revalidation avoid throttling themselves. It grants nothing
+else, and `/ask` is never exempt because it can call a paid model provider.
+
 | Endpoint | Method | Auth | Description |
 | ---------- | -------- | ------ | ------------- |
 | `/stories` | GET | — | List stories. `sort=latest\|momentum\|significance`, `min_sources`, `category`. Only `latest` paginates — ranking keys are mutable. |
-| `/stories/{slug}` | GET | — | Story detail: all contributing articles, timeline, framing, independent_count, velocity_score. |
+| `/stories/{slug}` | GET | — | Story detail: all contributing articles, timeline, framing, `independent_count`. Each article carries `source.publisher`, which is the identity corroboration is counted in — several feeds can share one newsroom. |
 | `/stories/{slug}/related` | GET | — | Semantically related stories via pgvector similarity search. |
 | `/news` | GET | — | List articles. Full-text search via `q=`, category filter. |
 | `/articles/{slug}` | GET | — | Single article detail (excerpt + outbound link). |
-| `/sources` | GET | — | Source registry: all feeds with tier, region, health, article counts. |
+| `/sources` | GET | — | Source registry: all feeds with tier, region, health, article counts, `publisher_domain`, and the trust metrics from `core/trust.py` (`articles_broken_first`, `corroboration_rate`). |
 | `/ask` | POST | — | Question answering over clustered reporting. Story-level retrieval, semantic answer cache, degrades to source-derived output without a model. |
 | `/health` | GET | — | DB, cache, ingest freshness, clustering backlog, failing sources. **Returns 503 when degraded.** |
 | `/metrics` | GET | Token/IP | Prometheus metrics. Access-controlled. |
@@ -290,13 +295,15 @@ Copy `.env.example` to `.env` and configure:
 | `WEB_CONCURRENCY` | — | Gunicorn workers (default `1`). Each loads its own copy of the embedding model: 349 MiB for one, 587 MiB for two. Raise it only when the host has the memory. |
 | `MAX_ASK_DAILY_REQUESTS` | — | Daily `/ask` spend ceiling (default `500`). |
 | `MAX_SYNTHESIS_DAILY_REQUESTS` | — | Daily background-synthesis ceiling (default `200`). |
+| `INTERNAL_API_TOKEN` | — | Exempts a trusted caller from per-IP rate limiting on the public **read** endpoints, and nothing else. Set it here and in the frontend's server environment, or a `next build` — 100+ requests in seconds from one IP — exhausts the 60/min budget and the pages meant to be static prerender empty. Leave blank to meter every caller. `/ask` is never exempt. |
 
 ### Frontend
 
 | Variable | Required | Description |
 | :--- | :---: | :--- |
 | `NEXT_PUBLIC_API_URL` | ✅ | Backend API URL (no trailing slash) |
-| `NEXT_PUBLIC_APP_URL` | — | Public app URL (for meta tags) |
+| `NEXT_PUBLIC_APP_URL` | — | Canonical public URL. Drives `metadataBase`, every Open Graph tag, the canonical links, `robots.txt` and `sitemap.xml`. Falls back to Vercel's own URL vars, then localhost. |
+| `INTERNAL_API_TOKEN` | — | Must match the backend's. Sent on **server-side** fetches only, so builds and ISR revalidation are not rate limited. Deliberately not `NEXT_PUBLIC_` — that prefix would inline it into the client bundle and hand every visitor a key that switches off the rate limiter. Next reads `.env` from the Next project root, so for a host-run `npm run build` it must be in `frontend/.env` or exported. |
 | `REVALIDATE_SECRET` | — | Must match the backend. The purge route returns 503 when unset — it fails closed. |
 | `IMAGE_HOST_ALLOWLIST` | — | Comma-separated `next/image` host allowlist. Defaults to the CDNs used by the source registry. Never set to `**` — that makes the deployment an open image proxy. |
 
@@ -366,8 +373,17 @@ reference behind it.
 - Corroboration measured in **independent publishers**, resolved via the Public
   Suffix List — two feeds from one newsroom count once
 - Three editions, each an ordering of the whole corpus
+- Front page pairs the most recent **confirmed** stories against the most recent
+  **unconfirmed** ones, so the product's central question is legible before a
+  word is read, alongside a momentum ranking drawn from `momentum_outlets`
+- Feed cards compare how each outlet worded the same event, marking the words
+  unique to one of them
 - Story pages: verification statement, conflicts-first brief, corroboration
-  timeline, pickup-pattern chart, framing matrix, source ledger
+  timeline, a cumulative curve of independent newsrooms over time that marks
+  when a story crossed into confirmed and corroborated, framing matrix, source
+  ledger
+- `robots.txt`, `sitemap.xml` and per-route canonicals, with previews and branch
+  deployments excluded from indexing
 - Semantic topic classification (98% coverage, up from 53% with keywords)
 - Source health with circuit breaker, conditional GET and transient-error retry
 - Question answering with story-level retrieval and a semantic answer cache
@@ -385,7 +401,10 @@ reference behind it.
   *worse* separation (`manage.py benchmark_embeddings`), so this needs
   entity-aware matching rather than more dimensions.
 - **Publisher independence is inferred from domains**, so outlets under common
-  ownership count separately.
+  ownership count separately. Feeds sharing a domain — "BBC News" and "BBC
+  World" — are correctly counted once; the UI derives this in one place
+  (`frontend/lib/outlets.ts`) because deriving it per-component is how a page
+  ends up printing two different counts for the same story.
 - **Topic classification is semantic, not editorial**, and misfiles near
   category boundaries.
 - Coverage skews toward English-language feeds.

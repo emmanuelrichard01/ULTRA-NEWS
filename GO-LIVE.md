@@ -6,8 +6,9 @@ this is the recipe.
 
 **Time:** ~35 minutes, most of it waiting on the first Docker build.
 **Cost:** $0. No card required at any step.
-**You give up:** the live breaking-news ticker, unless you add free Redis in
-[Step 9](#step-9--optional-turn-the-ticker-back-on). Nothing else.
+**You give up:** nothing the reader sees. Without Redis you lose cache-pattern
+purging and midnight-accurate spend counters — see
+[Step 9](#step-9--optional-add-redis). Every page and endpoint serves fine.
 
 | # | Step | Where | Time |
 | --- | --- | --- | --- |
@@ -20,7 +21,7 @@ this is the recipe.
 | 6 | [Frontend](#step-6--frontend-vercel) | Vercel | 4 min |
 | 7 | [Connect CORS](#step-7--connect-cors) | Koyeb | 2 min |
 | 8 | [Verify](#step-8--verify) | terminal | 3 min |
-| 9 | [Ticker](#step-9--optional-turn-the-ticker-back-on) | Upstash | optional |
+| 9 | [Redis](#step-9--optional-add-redis) | Upstash | optional |
 | 10 | [Before you share it](#step-10--before-you-share-the-link) | — | 2 min |
 
 > **Order matters.** The database must exist before the API, the API before you
@@ -36,6 +37,7 @@ python -c "import secrets; print('SECRET_KEY      =', secrets.token_urlsafe(64))
 python -c "import secrets; print('ADMIN_API_KEY   =', secrets.token_urlsafe(32))"
 python -c "import secrets; print('METRICS_TOKEN   =', secrets.token_urlsafe(24))"
 python -c "import secrets; print('REVALIDATE_SECRET =', secrets.token_urlsafe(24))"
+python -c "import secrets; print('INTERNAL_API_TOKEN =', secrets.token_urlsafe(32))"
 ```
 
 Keep these open in a scratch file. Each gets pasted into two places, and
@@ -130,6 +132,9 @@ DEBUG=0
 SECRET_KEY=<step 0>
 ADMIN_API_KEY=<step 0>
 METRICS_TOKEN=<step 0>
+# Exempts the frontend's build and ISR reads from per-IP rate limiting.
+# Grants nothing else: no writes, no admin surface, and /ask stays metered.
+INTERNAL_API_TOKEN=<step 0>
 DATABASE_URL=<step 1, pooled>
 ALLOWED_HOSTS=<copy the exact hostname from the Koyeb dashboard>
 
@@ -256,10 +261,26 @@ Environment variables:
 ```bash
 NEXT_PUBLIC_API_URL=https://<your-app>.koyeb.app
 NEXT_PUBLIC_APP_URL=https://<your-app>.vercel.app
+
+# Same value you set as INTERNAL_API_TOKEN on the backend.
+# Exempts the build and ISR revalidation from the API's per-IP rate limit.
+# Without it a build issues 100+ requests in seconds from one address, blows
+# through the 60/minute budget, and the story pages that should be prerendered
+# come out empty and fall back to rendering on demand.
+INTERNAL_API_TOKEN=<the-same-random-string>
 ```
 
 > **No trailing slash on `NEXT_PUBLIC_API_URL`.**
 > `https://x.koyeb.app` ✅  `https://x.koyeb.app/` ❌
+
+> **`INTERNAL_API_TOKEN` must not be renamed `NEXT_PUBLIC_INTERNAL_API_TOKEN`.**
+> That prefix inlines the value into the client bundle, which would hand every
+> visitor a token that switches off your own rate limiting.
+
+> **`NEXT_PUBLIC_APP_URL` is worth setting even though it is optional.**
+> It drives `metadataBase`, every Open Graph tag, the canonical links,
+> `robots.txt` and `sitemap.xml`. Unset, those fall back to Vercel's generated
+> deployment URL, which changes on every deploy.
 
 Deploy, and note your Vercel URL.
 
@@ -322,23 +343,28 @@ Then open your Vercel URL and:
 
 ---
 
-## Step 9 — Optional: turn the ticker back on
+## Step 9 — Optional: add Redis
 
 Everything works without Redis. Measured, with Redis unreachable, every endpoint
 returned 200: the three editions, sources, RSS, `/ask`, and the SSE stream.
 
-The one real difference is the live ticker. Compared side by side:
+> **The front-end ticker this step used to restore no longer exists.** It
+> rendered nothing whenever it held no stories, and it only ever filled from
+> SSE `new_story` events — so on a fresh page load it was empty and stayed
+> empty unless ingestion happened to run while the reader was still there, in
+> exchange for opening an EventSource on every route. The Wire is the live view
+> now, and it arrives populated. `/api/v1/stream` still exists and still emits;
+> nothing in the UI subscribes to it.
+
+What Redis actually buys you now:
 
 | | With Redis | Without |
 | --- | --- | --- |
-| `/api/v1/stream` | `event: new_story` with payloads | connects, pings, no events |
+| Feed-count cache | pattern-purged on ingest | expires on its TTL, so counts can lag |
+| Daily spend counters | shared, reset at midnight | per-process, reset on redeploy |
+| Rate limiting | shared across workers | per-process, so the effective limit multiplies by worker count |
 
-The stream still opens and holds — it simply never announces anything. Two
-smaller effects: feed-count cache entries are not pattern-purged, so counts can
-lag their TTL; and the daily spend counters live in process memory, so they
-reset on redeploy rather than at midnight.
-
-To restore it: create a free [Upstash](https://upstash.com) Redis database, then
+To add it: create a free [Upstash](https://upstash.com) Redis database, then
 in Koyeb **remove** `CACHE_BACKEND=locmem` and add:
 
 ```bash

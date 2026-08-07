@@ -48,6 +48,17 @@ empty:
 "Developing" ranks by outlets that picked a story up in the last 12 hours, so a
 story appears while it's accelerating and drops out once it settles.
 
+The front page puts the two halves of the question side by side: the most recent
+stories a second newsroom has **confirmed**, next to the most recent ones
+**nobody has** — the same wire, the same hour, split by the only thing that
+decides whether a count means anything. Beside them, what is being picked up
+fastest right now.
+
+A single-source story is not a doubtful one. Original investigative reporting
+starts at one outlet by definition, and most items in that column are simply
+early. What makes one worth a second look is how long it has stood alone, which
+is what that column is ordered by.
+
 ## Ask the Wire Room
 
 A question box that answers from the clustered reporting and names the outlets

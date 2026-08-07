@@ -70,7 +70,7 @@ Format: `[Component] Action: Details`
 
 ```
 [Backend] Fix: compute_tier velocity bug — single-source stories should be Wire
-[Frontend] Feat: Add VelocityLeaderboard component to homepage
+[Frontend] Feat: Add Not-yet-confirmed panel beside the front-page lead
 [Infra] Chore: Add celerybeat-schedule to .gitignore
 [Docs] Update: Rewrite ARCHITECTURE.md to match V3 codebase
 ```
@@ -104,7 +104,10 @@ Format: `[Component] Action: Details`
 ### Frontend
 
 - **Framework**: Jest + React Testing Library (when implemented)
-- **Priority components**: StoryCard, CorroborationMeter, VelocityLeaderboard, FeedPage
+- **Priority components**: StoryCard, CorroborationMeter, FeedPage, LeadCarousel,
+  MovingFastest, FramingCompare, and `lib/outlets.ts` — the last of these is the
+  single place independent-outlet counts are derived, and getting it wrong
+  silently overstates corroboration.
 
 ---
 

@@ -134,6 +134,7 @@ Expected response:
 | ---------- | ------- |
 | `NEXT_PUBLIC_API_URL` | `https://your-app.onrender.com` |
 | `NEXT_PUBLIC_APP_URL` | `https://ultra-news.vercel.app` |
+| `INTERNAL_API_TOKEN` | *(same value as the backend's)* |
 
 > [!WARNING]
 > `NEXT_PUBLIC_API_URL` must **not** have a trailing slash. `https://your-app.onrender.com` ✅ `https://your-app.onrender.com/` ❌
@@ -196,13 +197,15 @@ open https://ultra-news.vercel.app
 | `CELERY_BROKER_URL` | ✅ | Same as `REDIS_URL` |
 | `CELERY_RESULT_BACKEND` | ✅ | Same as `REDIS_URL` |
 | `FRONTEND_URL` | ✅ | Vercel URL for CORS |
+| `INTERNAL_API_TOKEN` | — | Shared secret that exempts the frontend's server-side reads from rate limiting. Grants no writes and no admin surface. Must match the Vercel value. |
 
 ### Frontend (Vercel)
 
 | Variable | Required | Description |
 | :--- | :---: | :--- |
 | `NEXT_PUBLIC_API_URL` | ✅ | Backend API URL (no trailing slash) |
-| `NEXT_PUBLIC_APP_URL` | — | Public app URL (for meta tags, OG) |
+| `NEXT_PUBLIC_APP_URL` | ✅ | Canonical public URL. Drives `metadataBase`, Open Graph tags, canonical links, `robots.txt` and `sitemap.xml`. Without it these fall back to Vercel's generated URL, which changes per deployment. |
+| `INTERNAL_API_TOKEN` | — | Must match the backend's. Exempts the build and ISR revalidation from per-IP rate limiting — without it a build's 100+ requests exhaust the 60/min budget and story pages prerender empty. Server-side only; never prefix it `NEXT_PUBLIC_`. |
 
 ---
 
@@ -409,15 +412,17 @@ so put the batch work on Actions and keep the API small.
 ### Redis: optional
 
 Verified — the API serves `/health`, `/stories` and `/sources` on Django's
-in-memory cache, and the Redis-backed extras (breaking ticker, pattern
-invalidation) degrade quietly rather than erroring.
+in-memory cache, and the Redis-backed extras (pattern invalidation, shared
+rate-limit and spend counters) degrade quietly rather than erroring.
 
 ```bash
 CACHE_BACKEND=locmem   # single-process only
 ```
 
-Correct on one process. With Upstash's free tier you get shared caching and the
-live ticker back; without it, the ticker is silent and nothing else changes.
+Correct on one process. With Upstash's free tier you get shared caching,
+pattern purging and rate-limit counters shared across workers. Without it each
+worker keeps its own counters, so the effective rate limit multiplies by worker
+count — fine at `WEB_CONCURRENCY=1`, worth knowing above it.
 
 ### Koyeb: the API
 
@@ -550,7 +555,7 @@ Check headroom with `python manage.py retention`.
 | --- | --- |
 | Features | **None.** Clustering, corroboration, all three editions, topics, story pages, RSS and `/ask` all work. |
 | Freshness | Capped by the cron interval — ~30 min instead of 15. |
-| Ticker | Silent without Redis. Add Upstash free to restore it. |
+| Rate limiting | Per-process without Redis, so the effective limit multiplies by worker count. Immaterial at `WEB_CONCURRENCY=1`. |
 | Cold starts | Koyeb sleeps after 1 hour idle. The keepalive workflow prevents it; without that, expect a minute-plus first load. |
 | AI quota | Groq's free tier is ~14,400 requests/day, far past what a portfolio demo draws. Past it, answers degrade to extractive rather than failing. Keep the daily ceilings low so degradation is predictable rather than a surprise. |
 
