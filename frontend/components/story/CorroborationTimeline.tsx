@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { formatDistanceToNow, differenceInMinutes } from 'date-fns';
 
+import { groupByOutlet, mergedFeedCount } from '@/lib/outlets';
 import type { StoryArticle } from '@/lib/types';
 
 /**
@@ -40,23 +41,21 @@ function formatLag(minutes: number): string {
 export default function CorroborationTimeline({ articles }: CorroborationTimelineProps) {
   const [expanded, setExpanded] = useState(false);
 
-  const sorted = [...articles].sort(
-    (a, b) => new Date(a.published_date).getTime() - new Date(b.published_date).getTime()
-  );
-  if (sorted.length === 0) return null;
+  /*
+    Grouped by PUBLISHER, not by feed name.
 
-  // One entry per outlet — the first time each published. A newsroom filing
-  // three updates is one corroboration, not three.
-  const seen = new Set<string>();
-  const firstByOutlet = sorted.filter((a) => {
-    if (seen.has(a.source.name)) return false;
-    seen.add(a.source.name);
-    return true;
-  });
+    This filtered on `source.name`, which counted "BBC News" and "BBC World" as
+    two independent confirmations of the same story. The heading then reported
+    17 outlets directly beneath a masthead reading "Corroborated by 16" — the
+    backend having grouped correctly on publisher domain. See lib/outlets.ts.
+  */
+  const outlets = groupByOutlet(articles);
+  if (outlets.length === 0) return null;
 
-  const origin = new Date(firstByOutlet[0].published_date);
-  const visible = expanded ? firstByOutlet : firstByOutlet.slice(0, 6);
-  const hidden = firstByOutlet.length - visible.length;
+  const mergedFeeds = mergedFeedCount(outlets);
+  const origin = outlets[0].firstPublishedAt;
+  const visible = expanded ? outlets : outlets.slice(0, 6);
+  const hidden = outlets.length - visible.length;
 
   return (
     <section aria-labelledby="timeline-heading" className="border-t border-[var(--border)] py-12">
@@ -65,12 +64,28 @@ export default function CorroborationTimeline({ articles }: CorroborationTimelin
           How this was corroborated
         </h2>
         <span className="font-data text-[12px] text-[var(--foreground-subtle)]">
-          {firstByOutlet.length} independent {firstByOutlet.length === 1 ? 'outlet' : 'outlets'}
+          {outlets.length} independent {outlets.length === 1 ? 'newsroom' : 'newsrooms'}
         </span>
       </div>
       <p className="text-body-sm measure mb-8 mt-1.5 text-[var(--foreground-muted)]">
-        Each outlet the first time it published, in order, with the time elapsed
-        since the story broke.
+        Each newsroom the first time it published, in order, with the time
+        elapsed since the story broke.
+        {/*
+          Stated rather than hidden. Merging two feeds into one row is the
+          product's central rule enforcing itself, and showing the reader it
+          happened is more convincing than a count that silently already
+          accounts for it.
+        */}
+        {mergedFeeds > 0 && (
+          <>
+            {' '}
+            <span className="text-[var(--foreground-subtle)]">
+              {mergedFeeds === 1
+                ? 'One feed is merged into its newsroom below — a newsroom cannot corroborate itself.'
+                : `${mergedFeeds} feeds are merged into their newsrooms below — a newsroom cannot corroborate itself.`}
+            </span>
+          </>
+        )}
       </p>
 
       <ol className="relative">
@@ -80,13 +95,14 @@ export default function CorroborationTimeline({ articles }: CorroborationTimelin
           aria-hidden="true"
         />
 
-        {visible.map((article, i) => {
-          const when = new Date(article.published_date);
+        {visible.map((outlet, i) => {
+          const article = outlet.first;
+          const when = outlet.firstPublishedAt;
           const lag = differenceInMinutes(when, origin);
           const isFirst = i === 0;
 
           return (
-            <li key={article.slug ?? `${article.source.name}-${i}`} className="relative pb-7 pl-8 last:pb-0">
+            <li key={outlet.publisher} className="relative pb-7 pl-8 last:pb-0">
               {/* Node */}
               <span
                 className={`absolute left-0 top-[5px] flex h-[15px] w-[15px] items-center justify-center rounded-full border-2 ${
@@ -99,7 +115,7 @@ export default function CorroborationTimeline({ articles }: CorroborationTimelin
 
               <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                 <span className="font-data text-[13px] font-semibold text-[var(--foreground)]">
-                  {article.source.name}
+                  {outlet.name}
                 </span>
                 {isFirst ? (
                   <span className="text-label rounded-[var(--radius-chip)] bg-[var(--accent)]/10 px-1.5 py-[2px] text-[var(--accent)]">
@@ -117,6 +133,15 @@ export default function CorroborationTimeline({ articles }: CorroborationTimelin
                   {formatDistanceToNow(when, { addSuffix: true })}
                 </time>
               </div>
+
+              {/* Names the merge on the row it happened, so a reader wondering
+                  where "BBC World" went can see it was folded into the BBC. */}
+              {outlet.feedNames.length > 1 && (
+                <p className="font-data mt-1 text-[11px] text-[var(--foreground-subtle)]">
+                  {outlet.feedNames.length} feeds from this newsroom, counted
+                  once: {outlet.feedNames.join(' · ')}
+                </p>
+              )}
 
               <h3 className="text-body-md mt-1.5 font-display leading-snug text-[var(--foreground)]">
                 <a

@@ -73,6 +73,28 @@ const OUTBOUND_FEEDS = [
   },
 ];
 
+function Stat({
+  label,
+  value,
+  note,
+}: {
+  label: string;
+  value: string;
+  note?: string;
+}) {
+  return (
+    <div>
+      <dt className="text-label text-[var(--foreground-subtle)]">{label}</dt>
+      <dd className="font-data mt-1 text-[20px] tabular-nums text-[var(--foreground)]">
+        {value}
+      </dd>
+      {note && (
+        <dd className="mt-0.5 text-[11px] text-[var(--foreground-subtle)]">{note}</dd>
+      )}
+    </div>
+  );
+}
+
 function HealthDot({ health }: { health: SourceInfo['health'] }) {
   const { dot, label, title } = HEALTH[health] ?? HEALTH.failing;
   return (
@@ -87,11 +109,30 @@ export default async function SourcesPage() {
   const sources = await fetchSources();
   const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
-  const publishers = new Set(sources.map((s) => s.name)).size;
+  /*
+    Newsrooms, not feeds.
+
+    This counted `new Set(sources.map(s => s.name))` — the rows themselves — so
+    it reported one publisher per feed and the page read "Feeds 41 · Publishers
+    41" however many feeds shared a newsroom. "BBC News" and "BBC World" are two
+    feeds and one publisher, which is the distinction the entire product rests
+    on, stated wrongly on the page that exists to explain what a source is.
+  */
+  const publishers = new Set(
+    sources.map((s) => s.publisher_domain || s.name)
+  ).size;
   const healthy = sources.filter((s) => s.health === 'active').length;
+  const stale = sources.filter((s) => s.health === 'stale').length;
   const failing = sources.filter((s) => s.health === 'failing').length;
-  // Reported per-source in the registry below rather than as a headline number.
-  // const totalArticles = sources.reduce((sum, s) => sum + s.article_count, 0);
+
+  // How often a feed is the FIRST to file on a story it belongs to. Already
+  // computed by the backend and never surfaced — and it is the most
+  // interesting thing this page can say, because it separates the newsrooms
+  // that break stories from the ones that follow.
+  const totalBrokenFirst = sources.reduce(
+    (sum, s) => sum + (s.articles_broken_first || 0),
+    0
+  );
 
   const byTier = new Map<number, SourceInfo[]>();
   sources.forEach((s) => {
@@ -110,20 +151,43 @@ export default async function SourcesPage() {
         </p>
       </header>
 
+      {/*
+        Four figures that each say something different.
+
+        This previously ran "Healthy 0/41" beside "Failing 41" — two tiles
+        restating one fact, and on a stale environment they combined into a
+        wall that read as a broken site rather than a stale ingest. Health is
+        now one tile with all three states in one line, and the space that
+        freed goes to the count of stories these feeds broke first, which is
+        the only figure here that says anything about the journalism.
+      */}
       <dl className="grid grid-cols-2 gap-x-6 gap-y-5 border-b border-[var(--border)] py-7 sm:grid-cols-4">
-        {[
-          { label: 'Feeds', value: sources.length.toLocaleString() },
-          { label: 'Publishers', value: publishers.toLocaleString() },
-          { label: 'Healthy', value: `${healthy}/${sources.length}` },
-          { label: 'Failing', value: failing.toLocaleString() },
-        ].map((stat) => (
-          <div key={stat.label}>
-            <dt className="text-label text-[var(--foreground-subtle)]">{stat.label}</dt>
-            <dd className="font-data mt-1 text-[20px] tabular-nums text-[var(--foreground)]">
-              {stat.value}
-            </dd>
-          </div>
-        ))}
+        <Stat label="Feeds" value={sources.length.toLocaleString()} />
+        <Stat
+          label="Newsrooms"
+          value={publishers.toLocaleString()}
+          note={
+            publishers < sources.length
+              ? `${sources.length - publishers} feeds share a newsroom`
+              : undefined
+          }
+        />
+        <Stat
+          label="Ingesting"
+          value={`${healthy}/${sources.length}`}
+          note={
+            failing || stale
+              ? [failing && `${failing} failing`, stale && `${stale} stale`]
+                  .filter(Boolean)
+                  .join(' · ')
+              : 'all healthy'
+          }
+        />
+        <Stat
+          label="Broke first"
+          value={totalBrokenFirst.toLocaleString()}
+          note="stories filed before anyone else"
+        />
       </dl>
 
       {/* Subscribe */}
@@ -161,11 +225,33 @@ export default async function SourcesPage() {
         <h2 id="registry-heading" className="text-display-md font-display text-[var(--foreground)]">
           The registry
         </h2>
-        <p className="text-body-sm measure mb-6 mt-1 text-[var(--foreground-muted)]">
+        <p className="text-body-sm measure mt-1 text-[var(--foreground-muted)]">
           Tiers reflect how much a source contributes to clustering — wire
           services are syndicated widely and seed most clusters, regional outlets
           add geographic independence.
         </p>
+        {/* The columns explained once, in prose, rather than in tooltips nobody
+            on a phone can reach. */}
+        <dl className="text-body-sm measure mb-6 mt-4 space-y-1.5 border-l-2 border-[var(--border-strong)] pl-4 text-[var(--foreground-subtle)]">
+          <div>
+            <dt className="inline font-semibold text-[var(--foreground-muted)]">
+              Broke first —{' '}
+            </dt>
+            <dd className="inline">
+              stories where this outlet filed before any other. Original
+              reporting rather than pickup.
+            </dd>
+          </div>
+          <div>
+            <dt className="inline font-semibold text-[var(--foreground-muted)]">
+              Corroborated —{' '}
+            </dt>
+            <dd className="inline">
+              share of this outlet&rsquo;s articles that reached three
+              independent newsrooms.
+            </dd>
+          </div>
+        </dl>
 
         {sources.length === 0 ? (
           <p className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-6 text-body-sm text-[var(--foreground-muted)]">
@@ -181,43 +267,80 @@ export default async function SourcesPage() {
                   <h3 className="section-rule text-label mb-3 text-[var(--foreground-subtle)]">
                     Tier {tier} · {TIER_NAMES[tier] ?? 'Other'}
                   </h3>
-                  <ul className="divide-y divide-[var(--border)] border-y border-[var(--border)]">
-                    {tierSources
-                      .sort((a, b) => b.article_count - a.article_count)
-                      .map((source) => (
-                        <li
-                          key={source.url}
-                          className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 py-3"
-                        >
-                          <div className="min-w-0 flex-1">
-                            <span className="text-body-md text-[var(--foreground)]">
-                              {source.name}
-                            </span>
-                            <span className="font-data ml-2 text-[11px] text-[var(--foreground-subtle)]">
-                              {source.region_label}
-                            </span>
-                          </div>
+                  {/*
+                    A table, because this is tabular data and it was being
+                    rendered as a list of bare numbers.
 
-                          <div className="flex shrink-0 items-center gap-5">
-                            <span
-                              className="font-data text-[12px] tabular-nums text-[var(--foreground-muted)]"
-                              title={`${source.article_count} articles ingested`}
+                    Each row used to end with "1,284" and "37%" and a coloured
+                    dot, with nothing on screen saying what any of them counted
+                    — the only explanation lived in `title` attributes, which
+                    never appear on touch, never appear for keyboard users, and
+                    are not read out in most screen-reader modes. Column headers
+                    state it once for every row, cost one line, and make the
+                    numbers sortable by eye.
+                  */}
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[34rem] border-collapse text-left">
+                      <caption className="sr-only">
+                        Tier {tier} sources: articles ingested, stories broken
+                        first, corroboration rate and ingest health
+                      </caption>
+                      <thead>
+                        <tr className="border-y border-[var(--border)]">
+                          <th scope="col" className="text-label py-2 font-semibold text-[var(--foreground-subtle)]">
+                            Outlet
+                          </th>
+                          <th scope="col" className="text-label py-2 text-right font-semibold text-[var(--foreground-subtle)]">
+                            Articles
+                          </th>
+                          <th scope="col" className="text-label py-2 text-right font-semibold text-[var(--foreground-subtle)]">
+                            Broke first
+                          </th>
+                          <th scope="col" className="text-label py-2 text-right font-semibold text-[var(--foreground-subtle)]">
+                            Corroborated
+                          </th>
+                          <th scope="col" className="text-label py-2 pl-4 font-semibold text-[var(--foreground-subtle)]">
+                            Ingest
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {tierSources
+                          .sort((a, b) => b.article_count - a.article_count)
+                          .map((source) => (
+                            <tr
+                              key={source.url}
+                              className="border-b border-[var(--border)] last:border-0"
                             >
-                              {source.article_count.toLocaleString()}
-                            </span>
-                            {source.corroboration_rate > 0 && (
-                              <span
-                                className="font-data hidden text-[12px] tabular-nums text-[var(--foreground-muted)] sm:inline"
-                                title="Share of this source's articles that reached three independent outlets"
-                              >
-                                {source.corroboration_rate.toFixed(0)}%
-                              </span>
-                            )}
-                            <HealthDot health={source.health} />
-                          </div>
-                        </li>
-                      ))}
-                  </ul>
+                              <th scope="row" className="py-2.5 pr-4 font-normal">
+                                <span className="text-body-md text-[var(--foreground)]">
+                                  {source.name}
+                                </span>
+                                <span className="font-data ml-2 text-[11px] text-[var(--foreground-subtle)]">
+                                  {source.region_label}
+                                </span>
+                              </th>
+                              <td className="font-data py-2.5 text-right text-[12px] tabular-nums text-[var(--foreground-muted)]">
+                                {source.article_count.toLocaleString()}
+                              </td>
+                              <td className="font-data py-2.5 text-right text-[12px] tabular-nums text-[var(--foreground-muted)]">
+                                {source.articles_broken_first > 0
+                                  ? source.articles_broken_first.toLocaleString()
+                                  : '—'}
+                              </td>
+                              <td className="font-data py-2.5 text-right text-[12px] tabular-nums text-[var(--foreground-muted)]">
+                                {source.corroboration_rate > 0
+                                  ? `${source.corroboration_rate.toFixed(0)}%`
+                                  : '—'}
+                              </td>
+                              <td className="py-2.5 pl-4">
+                                <HealthDot health={source.health} />
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               ))}
           </div>

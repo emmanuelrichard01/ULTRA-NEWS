@@ -205,35 +205,18 @@ export default async function StoryPage({ params }: StoryPageProps) {
           }}
         />
       )}
-      <StickyStoryNav
-        title={story.title}
-        sourceCount={story.independent_count}
-        isVerified={story.independent_count >= 3}
-        isDeveloping={story.independent_count === 2}
-      />
+      {/*
+        One structured-data graph, not two.
 
-      {/* schema.org NewsArticle. `sameAs` lists the corroborating reports, which
-          is the machine-readable form of this page's whole argument. */}
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
-            '@context': 'https://schema.org',
-            '@type': 'NewsArticle',
-            headline: story.title,
-            datePublished: story.first_seen_at,
-            dateModified: story.last_updated_at,
-            description: story.summary,
-            articleSection: story.categories?.[0],
-            sameAs: chronological.slice(0, 10).map((a) => a.url),
-            publisher: {
-              '@type': 'Organization',
-              name: 'Ultra News',
-              url: process.env.NEXT_PUBLIC_APP_URL || 'https://ultra-news.demo',
-            },
-          }),
-        }}
-      />
+        A second inline block used to sit here declaring the page a NewsArticle
+        published by Ultra News, with `ultra-news.demo` hardcoded as the
+        publisher URL. Emitting both left the page describing itself two
+        contradictory ways — an article we authored, and a collection of other
+        newsrooms' articles — and a crawler resolving that conflict is doing so
+        arbitrarily. See storyStructuredData above for why CollectionPage is
+        the honest one.
+      */}
+      <StickyStoryNav title={story.title} sourceCount={story.independent_count} />
 
       <StoryMasthead story={story} outletNames={outletNames} brokenBy={brokenBy} />
 

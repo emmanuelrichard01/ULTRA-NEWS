@@ -296,7 +296,9 @@ export default function AskWireModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="ask-title"
-        className="ai-border animate-fade-in flex max-h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--background)] shadow-[var(--shadow-lg)]"
+        // No `border` utility: `.ai-border` supplies the real border now, and
+        // two declarations for one edge is how they drift apart.
+        className="ai-border animate-fade-in flex max-h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-[var(--radius-card)] bg-[var(--background)] shadow-[var(--shadow-lg)]"
       >
         {/*
           The header states what this is before the reader types anything.

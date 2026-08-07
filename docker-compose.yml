@@ -53,6 +53,11 @@ services:
       # Local dev talks to the app directly, so X-Forwarded-For must not be
       # trusted. Enable only behind a proxy that overwrites the header.
       - TRUST_PROXY_HEADERS=0
+      # Exempts the frontend's server-side reads from per-IP rate limiting, so
+      # a build or an ISR revalidation — a hundred-plus requests in seconds
+      # from one address — is not throttled into serving empty prerenders. Must
+      # match the frontend service's INTERNAL_API_TOKEN below.
+      - INTERNAL_API_TOKEN=${INTERNAL_API_TOKEN:-dev-internal-token-change-in-prod}
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health').status == 200 else 1)\""]
       interval: 30s
@@ -152,6 +157,11 @@ services:
       - NEXT_PUBLIC_APP_URL=http://localhost:3000
       # Must match the backend's REVALIDATE_SECRET for on-demand purges to work.
       - REVALIDATE_SECRET=dev-revalidate-secret-change-in-prod
+      # Must match the backend's INTERNAL_API_TOKEN. Server-side only — the
+      # absent NEXT_PUBLIC_ prefix is deliberate and load-bearing: with it, the
+      # token would be inlined into the client bundle and every visitor would
+      # hold a key that disables our own rate limiting.
+      - INTERNAL_API_TOKEN=${INTERNAL_API_TOKEN:-dev-internal-token-change-in-prod}
 
 volumes:
   postgres_data:

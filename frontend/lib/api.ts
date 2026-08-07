@@ -45,6 +45,30 @@ const API_URL =
       'http://localhost:8000'
     : BROWSER_API_URL;
 
+/**
+ * Headers for server-side reads.
+ *
+ * Carries INTERNAL_API_TOKEN, which exempts this caller from the API's per-IP
+ * rate limit. A build is a legitimate burst from one address — `next build`
+ * prerenders nine topic pages, two ranked editions and sixty story pages
+ * across seven parallel workers, comfortably past a hundred requests in a few
+ * seconds — so against a 60/minute budget the pages that were supposed to be
+ * static came out empty and fell back to rendering on demand. ISR revalidation
+ * has the same shape.
+ *
+ * Deliberately NOT prefixed `NEXT_PUBLIC_`: that would inline it into the
+ * client bundle and hand every visitor a token that turns off our own rate
+ * limiting. The `typeof window` guard is a second belt — this function returns
+ * nothing in a browser even if the variable somehow existed there.
+ *
+ * Unset, the header is simply absent and every request is metered as before.
+ */
+function serverHeaders(): HeadersInit | undefined {
+  if (typeof window !== 'undefined') return undefined;
+  const token = process.env.INTERNAL_API_TOKEN;
+  return token ? { 'X-Internal-Token': token } : undefined;
+}
+
 // ==========================================================================
 // Stories
 // ==========================================================================
@@ -94,6 +118,7 @@ export async function fetchStories(
 
   try {
     const res = await fetch(`${API_URL}/api/v1/stories?${params.toString()}`, {
+      headers: serverHeaders(),
       next: { revalidate: 60 },
     });
     if (!res.ok) {
@@ -190,7 +215,7 @@ export const fetchStory = cache(async function fetchStory(
       // the backend calls the revalidate webhook when a cluster changes, so
       // `revalidateTag('story:<slug>')` drops exactly this entry. The interval
       // is a backstop for a missed webhook.
-      { next: { tags: [`story:${slug}`, 'story'], revalidate: 300 } }
+      { headers: serverHeaders(), next: { tags: [`story:${slug}`, 'story'], revalidate: 300 } }
     );
     if (!res.ok) {
       if (res.status !== 404) {
@@ -222,7 +247,7 @@ export const fetchArticle = cache(async function fetchArticle(
   try {
     const res = await fetch(
       `${API_URL}/api/v1/articles/${encodeURIComponent(slug)}`,
-      { next: { revalidate: 300 } }
+      { headers: serverHeaders(), next: { revalidate: 300 } }
     );
     if (!res.ok) {
       if (res.status !== 404) {
@@ -245,7 +270,7 @@ export async function fetchRelatedStories(slug: string): Promise<StoryDetail[]> 
   try {
     const res = await fetch(
       `${API_URL}/api/v1/stories/${encodeURIComponent(slug)}/related?limit=5`,
-      { next: { revalidate: 300 } }
+      { headers: serverHeaders(), next: { revalidate: 300 } }
     );
     if (!res.ok) return [];
     const data = await res.json();
@@ -262,6 +287,7 @@ export async function fetchRelatedStories(slug: string): Promise<StoryDetail[]> 
 export async function fetchSources(): Promise<SourceInfo[]> {
   try {
     const res = await fetch(`${API_URL}/api/v1/sources`, {
+      headers: serverHeaders(),
       next: { revalidate: 300 },
     });
     if (!res.ok) return [];

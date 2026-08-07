@@ -39,7 +39,21 @@ export interface StoryArticle {
   excerpt: string;
   image_url?: string;
   published_date: string;
-  source: { name: string };
+  source: {
+    name: string;
+    /**
+     * Publisher identity — the unit corroboration is counted in.
+     *
+     * Distinct from `name`, and the difference is the whole rule: "BBC News"
+     * and "BBC World" are two feed names and one newsroom. Anything deriving a
+     * count of independent outlets must group on this, or it will report two
+     * confirmations where the backend counted one.
+     *
+     * Optional because older cached payloads predate the field; group on
+     * `publisher ?? name` and the worst case is the previous behaviour.
+     */
+    publisher?: string;
+  };
 }
 
 export interface AISummary {
@@ -85,6 +99,12 @@ export interface ArticleDetail {
 
 export interface SourceInfo {
   name: string;
+  /**
+   * The newsroom behind this feed. Several feeds can share one — "BBC News"
+   * and "BBC World" are two feeds and one publisher — so any count of
+   * newsrooms must be taken over this, never over `name`.
+   */
+  publisher_domain?: string;
   url: string;
   source_type: string;
   /**

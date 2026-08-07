@@ -308,43 +308,75 @@ body {
    box with a magnifying glass, which is the universal mark for "search this
    text", the one thing it does not do.
 
-   So it gets a treatment nothing else has: a light that travels around its
-   edge. Used once, on one control, an effect like this reads as a property of
-   that control rather than as decoration. Used twice it would just be a theme.
+   So it gets a treatment nothing else has: a light that travels its edge. Used
+   once, on one control, that reads as a property of the control rather than as
+   decoration.
 
-   The sweep runs over the first 45% of the cycle and holds still for the rest,
-   so the button is quiet most of the time and catches the eye periodically
-   rather than continuously — a persistent animation on a page of headlines is
-   a distraction, and this one sits directly above the news.
+   This is the second attempt. The first rotated a conic gradient through a
+   registered `--wire-angle`, and it looked cheap for four separate reasons,
+   all of them structural rather than a matter of tuning:
+
+     1. The element had no real border — the whole visible edge WAS the
+        animated gradient. So for the 55% of the cycle the sweep spent parked,
+        the control's outline was a frozen coloured arc on one corner and
+        nothing anywhere else. It read as a rendering artefact.
+     2. A conic sweep is angular, so on a 240x44 button the light crawls around
+        the short ends and races down the long edges. It never resembles
+        something travelling the perimeter at a constant speed.
+     3. It required `@property`. Without registered custom properties the angle
+        never animates at all, leaving the gradient frozen at 0deg
+        permanently — a static smear, forever, as the DEFAULT in any browser
+        that lacks the feature.
+     4. Hover changed `animation-duration`, which retimes a running animation
+        and made the highlight visibly jump the moment the pointer arrived.
+
+   What replaces it: a narrow band of light sweeping across a masked ring, by
+   animating `background-position`. That is uniformly supported, moves at a
+   constant speed regardless of the box's proportions, and — the part that
+   matters most — parks OFF the element between passes, so the resting state is
+   a clean hairline rather than a frozen smudge.
    -------------------------------------------- */
-@property --wire-angle {
-  syntax: '<angle>';
-  initial-value: 0deg;
-  inherits: false;
-}
-
 .ai-border {
   position: relative;
+  /* A real border, so the control is correct with no animation at all: no
+     @property, reduced motion, an old browser, or simply between passes. The
+     sweep is an enhancement on top of a finished thing, never the thing. */
+  border: 1px solid var(--border);
+  transition: border-color var(--duration-normal) var(--ease-out);
 }
 
-/* Border-only gradient: paint the full rectangle, then mask out everything but
-   a 1px ring. `border-image` cannot do a conic gradient with a radius, and a
-   wrapper element with padding would change the control's box model. */
+.ai-border:hover,
+.ai-border:focus-within {
+  border-color: var(--border-hover);
+}
+
+/* The travelling light. Painted over the full box, then masked to a 1px ring so
+   only the edge shows it. */
 .ai-border::before {
   content: '';
   position: absolute;
-  inset: 0;
+  /* -1px so the ring sits ON the border rather than inside it — an absolutely
+     positioned child resolves `inset` against the padding box. */
+  inset: -1px;
   border-radius: inherit;
   padding: 1px;
   pointer-events: none;
-  background: conic-gradient(
-    from var(--wire-angle),
-    transparent 0%,
-    color-mix(in srgb, var(--accent) 90%, transparent) 8%,
-    color-mix(in srgb, var(--accent-secondary) 90%, transparent) 16%,
-    transparent 28%,
-    transparent 100%
+  /* A wide, soft band rather than a narrow bright one. The hard-edged version
+     read as a flash crossing the control; spreading it over roughly a third of
+     the gradient and easing the stops makes it read as light. */
+  background-image: linear-gradient(
+    100deg,
+    transparent 30%,
+    color-mix(in srgb, var(--accent) 35%, transparent) 40%,
+    color-mix(in srgb, var(--accent) 75%, transparent) 47%,
+    color-mix(in srgb, var(--accent-secondary) 80%, transparent) 53%,
+    color-mix(in srgb, var(--accent-secondary) 30%, transparent) 60%,
+    transparent 70%
   );
+  background-size: 220% 100%;
+  background-repeat: no-repeat;
+  /* Parked off the right edge. The idle state shows nothing. */
+  background-position: 130% 50%;
   -webkit-mask:
     linear-gradient(#000 0 0) content-box,
     linear-gradient(#000 0 0);
@@ -353,43 +385,68 @@ body {
     linear-gradient(#000 0 0) content-box,
     linear-gradient(#000 0 0);
   mask-composite: exclude;
-  opacity: 0.85;
-  animation: wire-sweep 16s linear infinite;
+  animation: wire-sweep 9s var(--ease-in-out) infinite;
 }
 
+/* Crosses in the first third, then waits off-canvas. Quiet most of the time,
+   which is the correct behaviour for something sitting above a page of news. */
 @keyframes wire-sweep {
   0% {
-    --wire-angle: 0deg;
+    background-position: 130% 50%;
   }
-  45% {
-    --wire-angle: 360deg;
+  32% {
+    background-position: -30% 50%;
   }
   100% {
-    --wire-angle: 360deg;
+    background-position: -30% 50%;
   }
 }
 
-/* On approach the light comes round faster and brighter — the control
-   answering the pointer before it is clicked. */
+/* On approach the light keeps moving, slowly and evenly.
+
+   A different animation NAME rather than a different duration on the same one:
+   changing duration retimes a running animation and the highlight jumps to a
+   new position. Swapping the name restarts cleanly from 0%, and 0% is off the
+   element, so the restart itself is invisible.
+
+   The first version of this ran 1.5s with a hold at the end and an eased
+   curve, and it was too fast and too abrupt: the band shot across, stopped
+   dead, waited, then shot across again. Three separate things made it jarring
+   — the speed, the hard stop, and `ease-out` decelerating into the hold before
+   snapping back to the start.
+
+   So: more than twice as slow, `linear` so the speed never changes, and no
+   hold at all. The band crosses and the next one is already on its way in,
+   which reads as something continuously alive rather than something flashing
+   at you. */
 .ai-border:hover::before,
 .ai-border:focus-visible::before,
 .ai-border:focus-within::before {
-  animation-duration: 3.5s;
-  opacity: 1;
+  animation: wire-sweep-hover 3.4s linear infinite;
 }
 
-/* A thin bloom under the edge, so the sweep reads as light rather than as a
-   coloured stroke. Kept very low so it never competes with a headline. */
+@keyframes wire-sweep-hover {
+  from {
+    background-position: 130% 50%;
+  }
+  to {
+    background-position: -30% 50%;
+  }
+}
+
+/* A low bloom beneath the edge on approach, so the sweep reads as light rather
+   than as a coloured stroke. Kept faint — it must never compete with a
+   headline. */
 .ai-border::after {
   content: '';
   position: absolute;
-  inset: 0;
+  inset: -1px;
   border-radius: inherit;
   pointer-events: none;
   opacity: 0;
   transition: opacity var(--duration-normal) var(--ease-out);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent),
-    0 2px 14px color-mix(in srgb, var(--accent) 16%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent),
+    0 2px 16px color-mix(in srgb, var(--accent) 15%, transparent);
 }
 
 .ai-border:hover::after,
@@ -397,29 +454,14 @@ body {
   opacity: 1;
 }
 
-/* --------------------------------------------
-   Brand logo, theme-swapped in CSS
-
-   Both logo files are square tiles with a solid ground, so each only reads on
-   the theme it was drawn for. The swap is CSS rather than JavaScript because
-   next-themes resolves the theme after mount: reading it in the component
-   renders the wrong tile on the server and corrects on hydration, which is a
-   visible flash on the first paint of every page. The `.dark` class is on
-   <html> before anything paints, so this cannot flash.
-
-   Both images stay in the DOM; only one is displayed. They are 6KB and 12KB
-   local files, so the second request is cheaper than the flash would be.
-   -------------------------------------------- */
-.brand-logo-dark {
-  display: none;
-}
-
-.dark .brand-logo-light {
-  display: none;
-}
-
-.dark .brand-logo-dark {
-  display: block;
+/* Under reduced motion the ring simply never appears; the real border carries
+   the control. The blanket rule at the end of this file collapses the duration,
+   which would otherwise park the highlight mid-crossing. */
+@media (prefers-reduced-motion: reduce) {
+  .ai-border::before {
+    animation: none;
+    background-position: 130% 50%;
+  }
 }
 
 /* --------------------------------------------

@@ -134,7 +134,12 @@ export const EDITIONS: Edition[] = [
     timePrefix: 'updated',
     showLead: false,
     showRanks: true,
-    showImages: false,
+    // Was false, on the argument that thumbnails are noise in a ranked list of
+    // what is moving. In practice a reader arriving at Developing from an
+    // edition that has pictures reads their absence as a page that failed to
+    // load, not as an editorial choice — and the three editions looking like
+    // three different products is a worse outcome than a slightly denser list.
+    showImages: true,
     showSidebar: false,
     showStatus: false,
     showUnconfirmed: false,

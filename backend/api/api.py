@@ -90,22 +90,66 @@ def _consume_quota(key: str, limit: int, window: int) -> bool:
     an INCR, so concurrent requests cannot interleave the way the old
     get-then-set did — under that version a burst all read the same count and
     sailed through together.
+
+    **Fails open.** Any cache failure returns True and lets the request through.
+
+    This previously caught only ValueError, so anything else Redis raised — a
+    connection reset, a pool exhausted under exactly the kind of burst this
+    function exists to handle, a timeout — propagated out of the decorator and
+    Django turned it into a 500. That inverts the entire point: a rate limiter
+    is a protective measure, and this one converted a recoverable cache blip
+    into an outage on the read endpoints, under load, which is precisely when
+    it must not. It is also how a burst produced 500s rather than the 429s the
+    code appears to promise.
+
+    Serving an unmetered request during a cache outage is the cheaper failure.
     """
-    if cache.add(key, 1, timeout=window):
-        return True
     try:
-        count = cache.incr(key)
-    except ValueError:
-        # Key expired between add and incr — start a fresh window.
-        cache.set(key, 1, timeout=window)
+        if cache.add(key, 1, timeout=window):
+            return True
+        try:
+            count = cache.incr(key)
+        except ValueError:
+            # Key expired between add and incr — start a fresh window.
+            cache.set(key, 1, timeout=window)
+            return True
+        return count <= limit
+    except Exception:
+        logger.warning("Rate limiter cache unavailable; allowing request", exc_info=True)
         return True
-    return count <= limit
 
 
-def rate_limit(requests=60, window=60):
+def _is_trusted_internal(request) -> bool:
+    """
+    Whether this request carries the internal token.
+
+    Compared in constant time. A short-circuiting `==` on a secret leaks its
+    length and prefix to anyone able to measure response times, and this one is
+    checked on every read request.
+    """
+    expected = getattr(settings, "INTERNAL_API_TOKEN", "")
+    if not expected:
+        return False
+    presented = request.headers.get("X-Internal-Token", "")
+    return bool(presented) and secrets.compare_digest(presented, expected)
+
+
+def rate_limit(requests=60, window=60, allow_internal=True):
+    """
+    Per-IP fixed-window limit.
+
+    `allow_internal` exempts callers presenting INTERNAL_API_TOKEN, which is how
+    a Next.js build and ISR revalidation get through: both are legitimate bursts
+    from one IP, and a build alone issues well over a hundred requests in a few
+    seconds while prerendering. Left off for anything expensive or
+    state-changing — /ask pays a model provider per call, so it is metered for
+    everyone.
+    """
     def decorator(func):
         @wraps(func)
         def wrapper(request, *args, **kwargs):
+            if allow_internal and _is_trusted_internal(request):
+                return func(request, *args, **kwargs)
             key = f"rl:{func.__name__}:{client_ip(request)}"
             if not _consume_quota(key, requests, window):
                 raise HttpError(429, "Too Many Requests")
@@ -696,7 +740,24 @@ def get_story(request, story_slug: str):
             "excerpt": article.excerpt,
             "image_url": article.image_url,
             "published_date": article.published_date.isoformat(),
-            "source": {"name": article.source.name},
+            # `publisher` is the identity corroboration is actually counted in.
+            #
+            # Only `name` used to be sent, and the story page grouped its
+            # timeline by it — so "BBC News" and "BBC World", two feeds from one
+            # newsroom, were drawn as two independent confirmations. The page
+            # then displayed "17 independent outlets" beside a masthead reading
+            # "Corroborated by 16", because `independent_count` is computed here
+            # over publisher_domain and gets it right.
+            #
+            # Two numbers for the same fact is bad; the wrong one being the one
+            # that contradicts "a newsroom cannot corroborate itself" is worse,
+            # on the page that exists to demonstrate exactly that rule. The
+            # frontend could not fix it alone: nothing in the payload said the
+            # two feeds were the same publisher.
+            "source": {
+                "name": article.source.name,
+                "publisher": article.source.publisher_domain or article.source.name,
+            },
         })
 
     result = {
@@ -931,6 +992,13 @@ def list_sources(request):
         result.append({
             "health": health,
             "name": s.name,
+            # The newsroom behind the feed. Several feeds can share one: "BBC
+            # News" and "BBC World" are two entries here and one publisher.
+            # Without this the Sources page counted its own rows and reported
+            # 41 publishers for 41 feeds, which is the same mistake the story
+            # page was making — and this is the page that exists to explain
+            # what a source IS.
+            "publisher_domain": s.publisher_domain or "",
             "url": s.url,
             "source_type": s.source_type,
             "tier": tier,
@@ -1015,7 +1083,10 @@ class AskResponse(Schema):
     synthesis_type: str = "extractive"
 
 @api.post("/ask")
-@rate_limit(10, 60)
+# No internal bypass. Every other endpoint here reads the database; this one can
+# call a paid model provider, so it stays metered for all callers including our
+# own build. Nothing in a prerender asks a question anyway.
+@rate_limit(10, 60, allow_internal=False)
 def ask_the_wire_room(request, payload: AskRequest):
     """
     Phase 5: Ask the Wire Room RAG

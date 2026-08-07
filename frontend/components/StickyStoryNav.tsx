@@ -17,10 +17,16 @@ interface StickyStoryNavProps {
   title: string;
   /** Independent publishers. */
   sourceCount: number;
-  isVerified: boolean;
-  isDeveloping: boolean;
 }
 
+/*
+ * `isVerified` and `isDeveloping` used to be required props. Both were computed
+ * at the call site from the outlet count, passed in, and then never read —
+ * the component derives everything it needs from `sourceCount` through
+ * describeCorroboration, which is the single place that mapping is allowed to
+ * live. Two call sites computing thresholds by hand is how the vocabulary
+ * drifts.
+ */
 export default function StickyStoryNav({ title, sourceCount }: StickyStoryNavProps) {
   const [isVisible, setIsVisible] = useState(false);
   const [copied, setCopied] = useState(false);

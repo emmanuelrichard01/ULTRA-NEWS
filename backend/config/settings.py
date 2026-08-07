@@ -37,6 +37,25 @@ ALLOWED_HOSTS = [h.strip() for h in os.environ.get('ALLOWED_HOSTS', 'localhost,1
 ADMIN_API_KEY = os.environ.get('ADMIN_API_KEY', '')
 
 # ==========================================================================
+# Trusted internal caller
+# ==========================================================================
+# Shared secret that exempts a caller from per-IP rate limiting on the public
+# READ endpoints. It grants nothing else: no write access, no extra data, no
+# admin surface.
+#
+# It exists because a Next.js build is a legitimate burst from a single IP.
+# `next build` prerenders every topic page, both ranked editions and sixty
+# story pages across seven parallel workers, which is well over a hundred
+# requests in a few seconds — so the 60/minute budget meant on-demand
+# rendering and empty prerenders on the pages that were supposed to be static.
+# ISR revalidation has the same shape.
+#
+# Left empty, nothing changes: every caller is rate limited as before. It has
+# to be set on both the API and the frontend's server-side environment to do
+# anything, and it must never be given to the browser (NEXT_PUBLIC_*).
+INTERNAL_API_TOKEN = os.environ.get('INTERNAL_API_TOKEN', '')
+
+# ==========================================================================
 # Trusted proxy configuration
 # ==========================================================================
 # Whether X-Forwarded-For may be believed when identifying a client IP.

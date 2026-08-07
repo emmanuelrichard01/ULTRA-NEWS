@@ -19,10 +19,48 @@ export const metadata: Metadata = {
     'How Ultra News clusters coverage, what a corroboration count does and does not mean, and where the method falls short.',
 };
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+/**
+ * The page's own contents, in order.
+ *
+ * Declared once and used for both the index and the section headings, so a
+ * section cannot appear in one and not the other — the usual failure mode of a
+ * hand-maintained table of contents.
+ */
+const SECTIONS = [
+  { id: 'the-number', title: 'What the number means' },
+  { id: 'limits', title: 'What it does not mean' },
+  { id: 'clustering', title: 'How stories are grouped' },
+  { id: 'briefs', title: 'The AI briefs' },
+  { id: 'shortcomings', title: 'Where it falls short' },
+  { id: 'open-source', title: 'Open source' },
+] as const;
+
+type SectionId = (typeof SECTIONS)[number]['id'];
+
+function Section({
+  id,
+  title,
+  children,
+}: {
+  id: SectionId;
+  title: string;
+  children: React.ReactNode;
+}) {
+  const index = SECTIONS.findIndex((s) => s.id === id) + 1;
+
   return (
-    <section className="border-t border-[var(--border)] py-9">
-      <h2 className="text-display-md font-display mb-4 text-[var(--foreground)]">{title}</h2>
+    // `scroll-mt` clears the sticky header: without it, jumping to a section
+    // from the index lands with its heading hidden behind the navbar.
+    <section id={id} className="scroll-mt-20 border-t border-[var(--border)] py-9">
+      <h2 className="text-display-md font-display mb-4 flex gap-3 text-[var(--foreground)]">
+        <span
+          className="font-data pt-[6px] text-[12px] tabular-nums text-[var(--foreground-subtle)]"
+          aria-hidden="true"
+        >
+          {String(index).padStart(2, '0')}
+        </span>
+        {title}
+      </h2>
       <div className="text-body-md measure space-y-4 text-[var(--foreground-muted)]">
         {children}
       </div>
@@ -45,7 +83,40 @@ export default function AboutPage() {
         </p>
       </header>
 
-      <Section title="What the number means">
+      {/*
+        A contents index.
+
+        This page is six sections of continuous prose and had no wayfinding at
+        all: a reader who arrived wanting one specific answer — usually "what
+        does this number NOT mean" — had to scroll and skim to find it. The
+        index costs eight lines and makes the page's shape visible before the
+        reading starts.
+      */}
+      <nav aria-labelledby="contents-heading" className="border-b border-[var(--border)] py-6">
+        <h2 id="contents-heading" className="text-label mb-3 text-[var(--foreground-subtle)]">
+          Contents
+        </h2>
+        <ol className="grid gap-x-8 gap-y-2 sm:grid-cols-2">
+          {SECTIONS.map((section, i) => (
+            <li key={section.id} className="flex gap-3">
+              <span
+                className="font-data text-[12px] tabular-nums text-[var(--foreground-subtle)]"
+                aria-hidden="true"
+              >
+                {String(i + 1).padStart(2, '0')}
+              </span>
+              <a
+                href={`#${section.id}`}
+                className="text-body-sm text-[var(--foreground-muted)] underline decoration-[var(--border)] underline-offset-4 transition-colors hover:text-[var(--foreground)] hover:decoration-[var(--border-hover)]"
+              >
+                {section.title}
+              </a>
+            </li>
+          ))}
+        </ol>
+      </nav>
+
+      <Section id="the-number" title="What the number means">
         <p>
           Every story carries a count of{' '}
           <strong className="text-[var(--foreground)]">independent publishers</strong> — not
@@ -67,7 +138,7 @@ export default function AboutPage() {
         </div>
       </Section>
 
-      <Section title="What it does not mean">
+      <Section id="limits" title="What it does not mean">
         <p>
           A high count is not a truth score. Ten outlets can repeat the same
           mistaken wire report, and that is exactly what a corroboration count
@@ -83,7 +154,7 @@ export default function AboutPage() {
         </p>
       </Section>
 
-      <Section title="How stories are grouped">
+      <Section id="clustering" title="How stories are grouped">
         <p>
           Headlines are converted into vectors by an embedding model running
           locally, and articles whose vectors are close enough are treated as
@@ -102,7 +173,7 @@ export default function AboutPage() {
         </p>
       </Section>
 
-      <Section title="The AI briefs">
+      <Section id="briefs" title="The AI briefs">
         <p>
           Where a story has several sources, a language model writes a short brief
           summarising what they collectively say and, more usefully, where they
@@ -117,7 +188,7 @@ export default function AboutPage() {
         </p>
       </Section>
 
-      <Section title="Where it falls short">
+      <Section id="shortcomings" title="Where it falls short">
         <p>
           Topic classification is semantic rather than editorial, and misfiles
           things near category boundaries. Publisher independence is inferred
@@ -135,7 +206,7 @@ export default function AboutPage() {
         </p>
       </Section>
 
-      <Section title="Open source">
+      <Section id="open-source" title="Open source">
         <p>
           The whole system is open source — ingestion, clustering, the thresholds
           and the benchmarks used to set them. If you think a threshold is wrong,
