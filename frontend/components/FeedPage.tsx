@@ -11,8 +11,8 @@ import StoryCardSkeleton from "@/components/StoryCardSkeleton";
 import TopicFilter from "@/components/TopicFilter";
 import LeadCarousel from "@/components/LeadCarousel";
 import UnconfirmedPanel from "@/components/UnconfirmedPanel";
-import AskWireModal from "@/components/AskWireModal";
 import EditionBar from "@/components/EditionBar";
+import { useAsk } from "@/components/AskProvider";
 import MovingFastest from "@/components/MovingFastest";
 import WireStatus from "@/components/WireStatus";
 import { fetchStories } from "@/lib/api";
@@ -107,7 +107,7 @@ export default function FeedPage({
   );
 
   const [activeCategory, setActiveCategory] = useState<string | undefined>(category);
-  const [isAskOpen, setIsAskOpen] = useState(false);
+  const { open: openAsk } = useAsk();
 
   /**
    * Only the filters this edition can actually act on.
@@ -180,17 +180,6 @@ export default function FeedPage({
   useEffect(() => {
     if (autoLoad && inView && hasNextPage && !isFetchingNextPage) fetchNextPage();
   }, [autoLoad, inView, hasNextPage, isFetchingNextPage, fetchNextPage]);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-        e.preventDefault();
-        setIsAskOpen(true);
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
 
   const stories: StoryDetail[] = data?.pages.flatMap((p) => p.items) ?? [];
   const totalCount = data?.pages[0]?.count ?? 0;
@@ -374,10 +363,8 @@ export default function FeedPage({
             <WireStatus stories={stories} totalCount={totalCount} />
           ) : null
         }
-        onAsk={() => setIsAskOpen(true)}
+        onAsk={openAsk}
       />
-
-      <AskWireModal isOpen={isAskOpen} onClose={() => setIsAskOpen(false)} />
 
       {/* --------------------------------------------------------- controls
         One row, and every control on it names what it does.

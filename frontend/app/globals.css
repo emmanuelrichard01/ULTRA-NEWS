@@ -398,6 +398,31 @@ body {
 }
 
 /* --------------------------------------------
+   Brand logo, theme-swapped in CSS
+
+   Both logo files are square tiles with a solid ground, so each only reads on
+   the theme it was drawn for. The swap is CSS rather than JavaScript because
+   next-themes resolves the theme after mount: reading it in the component
+   renders the wrong tile on the server and corrects on hydration, which is a
+   visible flash on the first paint of every page. The `.dark` class is on
+   <html> before anything paints, so this cannot flash.
+
+   Both images stay in the DOM; only one is displayed. They are 6KB and 12KB
+   local files, so the second request is cheaper than the flash would be.
+   -------------------------------------------- */
+.brand-logo-dark {
+  display: none;
+}
+
+.dark .brand-logo-light {
+  display: none;
+}
+
+.dark .brand-logo-dark {
+  display: block;
+}
+
+/* --------------------------------------------
    Feed activity hairline
 
    Shown while a filter change is in flight. This replaces dropping the entire

@@ -11,7 +11,8 @@ import IntelligenceBrief from '@/components/IntelligenceBrief';
 import StickyStoryNav from '@/components/StickyStoryNav';
 import CorroborationMeter from '@/components/CorroborationMeter';
 import { fetchStory, fetchRelatedStories, fetchStories } from '@/lib/api';
-import type { StoryDetail } from '@/lib/types';
+import { IS_INDEXABLE, absoluteUrl } from '@/lib/site';
+import type { StoryDetail, StoryDetailFull } from '@/lib/types';
 
 /**
  * Story page.
@@ -49,14 +50,55 @@ export async function generateMetadata({ params }: StoryPageProps): Promise<Meta
   return {
     title: story.title,
     description,
+    // Story pages are reachable with query strings and from several feeds;
+    // without a canonical those variants compete with each other.
+    alternates: { canonical: `/story/${storyId}` },
     openGraph: {
       title: story.title,
       description,
       type: 'article',
+      url: absoluteUrl(`/story/${storyId}`),
       publishedTime: story.first_seen_at,
       modifiedTime: story.last_updated_at,
     },
+    twitter: { card: 'summary_large_image', title: story.title, description },
     other: { 'article:section': story.categories?.[0] || 'News' },
+  };
+}
+
+/**
+ * Per-story structured data.
+ *
+ * Typed `CollectionPage`, not `NewsArticle`, and the distinction is the whole
+ * product. Ultra News did not report any of this: a story here is a cluster of
+ * other newsrooms' articles, shown as excerpts that link out. Marking it up as
+ * an article we published would claim authorship of reporting we do not own —
+ * the exact thing the footer promises we do not do — and would invite search
+ * engines to surface our page instead of the newsroom's.
+ *
+ * `hasPart` names the real articles and their real publishers, which is both
+ * accurate and the most useful thing a crawler can learn here.
+ */
+function storyStructuredData(story: StoryDetailFull, storyId: string) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    '@id': absoluteUrl(`/story/${storyId}#page`),
+    url: absoluteUrl(`/story/${storyId}`),
+    name: story.title,
+    description: story.summary,
+    datePublished: story.first_seen_at,
+    dateModified: story.last_updated_at,
+    inLanguage: 'en',
+    isPartOf: { '@id': absoluteUrl('/#website') },
+    about: (story.categories ?? []).map((c) => ({ '@type': 'Thing', name: c })),
+    hasPart: (story.articles ?? []).slice(0, 20).map((article) => ({
+      '@type': 'NewsArticle',
+      headline: article.title,
+      url: article.url,
+      datePublished: article.published_date,
+      publisher: { '@type': 'Organization', name: article.source.name },
+    })),
   };
 }
 
@@ -155,6 +197,14 @@ export default async function StoryPage({ params }: StoryPageProps) {
 
   return (
     <article className="mx-auto max-w-3xl">
+      {IS_INDEXABLE && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(storyStructuredData(story, storyId)),
+          }}
+        />
+      )}
       <StickyStoryNav
         title={story.title}
         sourceCount={story.independent_count}

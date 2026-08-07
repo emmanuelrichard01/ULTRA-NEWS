@@ -10,6 +10,7 @@ const edition = EDITIONS_BY_SLUG['record'];
 export const metadata: Metadata = {
   title: edition.name,
   description: edition.tagline,
+  alternates: { canonical: `/record` },
 };
 
 // Prerendered and revalidated on an interval — see app/page.tsx for why the

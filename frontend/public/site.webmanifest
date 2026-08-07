@@ -1,24 +1,33 @@
 {
   "name": "Ultra News",
   "short_name": "Ultra News",
-  "description": "Curated Intelligence for the Accelerated Mind",
+  "description": "Coverage of the same event, grouped, with the number of independent outlets behind it.",
   "icons": [
     {
       "src": "/android-chrome-192x192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
       "src": "/android-chrome-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/android-chrome-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ],
-  "theme_color": "#000000",
-  "background_color": "#ffffff",
+  "theme_color": "#faf8f4",
+  "background_color": "#faf8f4",
   "display": "standalone",
   "start_url": "/",
-  "scope": "/"
+  "scope": "/",
+  "categories": ["news", "magazines"],
+  "lang": "en",
+  "dir": "ltr"
 }

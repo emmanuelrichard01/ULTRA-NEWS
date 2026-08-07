@@ -30,6 +30,7 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
   return {
     title: info.displayName,
     description: info.description,
+    alternates: { canonical: `/${category}` },
     openGraph: {
       title: `${info.displayName} — Ultra News`,
       description: info.description,
