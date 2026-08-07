@@ -171,6 +171,14 @@ indefinitely.
 
 ## 6. AI
 
+> Full treatment in **[AI.md](AI.md)** — pipeline, prompts, providers, limits.
+> Summarised here only as far as the architecture needs.
+
+Two distinct jobs. **Clustering is embeddings only** — no LLM, no API call, and
+it is what produces the corroboration count. **Prose is an LLM** — briefs and
+answers — and is optional. The number a model is shown is a database aggregate;
+no model produces or can alter it. Nothing browses the web at question time.
+
 **Retrieval is story-level.** Article-level retrieval let one heavily-covered
 event fill every context slot. Now: over-fetch 40 articles → group into stories →
 rerank on similarity + corroboration + recency.

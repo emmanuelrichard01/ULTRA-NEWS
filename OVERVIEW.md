@@ -102,5 +102,7 @@ Django + Celery + PostgreSQL (with pgvector) on the back; Next.js on the front;
 `bge-small-en-v1.5` running locally for embeddings, so clustering and topic
 classification cost nothing per article. Everything runs in Docker.
 
-Full technical detail is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); the
-method and its limits are documented at `/about` in the running app.
+Full technical detail is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), and
+[docs/AI.md](docs/AI.md) covers what the AI does and does not do — it groups and
+counts coverage, it does not judge what is true. The method and its limits are
+documented at `/about` in the running app.

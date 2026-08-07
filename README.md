@@ -414,6 +414,18 @@ why.
 
 ---
 
+## Documentation
+
+| Document | Covers |
+| --- | --- |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System design, clustering, caching, performance, security |
+| [docs/AI.md](docs/AI.md) | How the AI works end to end — embeddings, retrieval, prompts, providers, limits |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | What is deliberately not done, and why |
+| [docs/SOP.md](docs/SOP.md) | Working conventions |
+| [DEPLOYMENT.md](DEPLOYMENT.md) | Running it, both topologies |
+
+---
+
 ## License
 
 MIT License © 2025 Ultra News
