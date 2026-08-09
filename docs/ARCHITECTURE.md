@@ -299,6 +299,12 @@ articles/day. Tiered, because parts of a row have different useful lifetimes:
 `/metrics` (Prometheus, access-controlled) and `/api/v1/health` (503 when
 degraded, so uptime checks work without parsing a body).
 
+**Liveness is a separate endpoint.** `/api/v1/health/live` reports only whether
+the process is serving HTTP, and touches no dependency. `/health` reports
+degraded on stale ingest and on a clustering backlog — conditions a restart
+cannot clear — so pointing an orchestrator at it converts a late cron into a
+restart loop. Platforms get `/health/live`; monitoring gets `/health`.
+
 The signal to alert on is **`ultranews_articles_pending_clustering`**. An article
 that is never clustered is invisible to every reader while every request still
 returns 200 — no request-level metric reveals it.
@@ -331,7 +337,7 @@ whichever worker answered it.
 
 ## 12. Testing
 
-123 tests. Migrations **must** run — parts of the schema exist only as
+127 tests. Migrations **must** run — parts of the schema exist only as
 migrations (`0006` pgvector, `0013` the search trigger), so `--nomigrations`
 made the suite unbuildable.
 

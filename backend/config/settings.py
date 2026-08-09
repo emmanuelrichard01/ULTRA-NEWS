@@ -1,4 +1,5 @@
 import os
+import socket
 from pathlib import Path
 
 from django.core.exceptions import ImproperlyConfigured
@@ -32,6 +33,22 @@ SECRET_KEY = _required_secret('SECRET_KEY', 'django-insecure-dev-only-key')
 
 # SECURITY: Explicit allowed hosts (no wildcards in production)
 ALLOWED_HOSTS = [h.strip() for h in os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',') if h.strip()]
+
+# Platform health probes address the container by its own internal hostname, not
+# by the public domain — on Koyeb that is the service UUID, `<uuid>:8080`. That
+# host is not in ALLOWED_HOSTS, so Django rejected every probe with a 400 and
+# logged a DisallowedHost traceback, tens of times per instance lifetime. The
+# platform counted the 400 as a passing health check, so the noise was the only
+# symptom: real errors were buried, and CPU went on building tracebacks for
+# requests that should have been cheap 200s.
+#
+# The container's own hostname is the correct thing to trust here. It is not
+# attacker-controlled — reaching the process by it already requires being inside
+# the platform's network — and it makes the probe work on any host that does
+# this, without pinning a UUID that changes when the service is recreated.
+_container_hostname = socket.gethostname()
+if _container_hostname and _container_hostname not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(_container_hostname)
 
 # Admin API Key for protected endpoints
 ADMIN_API_KEY = os.environ.get('ADMIN_API_KEY', '')

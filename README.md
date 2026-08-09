@@ -182,7 +182,8 @@ else, and `/ask` is never exempt because it can call a paid model provider.
 | `/articles/{slug}` | GET | — | Single article detail (excerpt + outbound link). |
 | `/sources` | GET | — | Source registry: all feeds with tier, region, health, article counts, `publisher_domain`, and the trust metrics from `core/trust.py` (`articles_broken_first`, `corroboration_rate`). |
 | `/ask` | POST | — | Question answering over clustered reporting. Story-level retrieval, semantic answer cache, degrades to source-derived output without a model. |
-| `/health` | GET | — | DB, cache, ingest freshness, clustering backlog, failing sources. **Returns 503 when degraded.** |
+| `/health/live` | GET | — | Liveness only: is the process serving HTTP? Touches nothing, always 200. Point platform health checks and uptime monitors here. |
+| `/health` | GET | — | DB, cache, ingest freshness, clustering backlog, failing sources. **Returns 503 when degraded.** For monitoring, not for orchestrators — a restart cannot fix stale ingest. |
 | `/metrics` | GET | Token/IP | Prometheus metrics. Access-controlled. |
 | `/feeds/{wire,developing,record}.xml` | GET | — | Outbound RSS, one per edition. Each item states its corroboration level. |
 | `/admin/trigger-ingest` | POST | OIDC JWT | Trigger Celery ingestion via GitHub Actions. |
@@ -359,7 +360,7 @@ which turns an upstream release into a red build with no code change behind it.
 
 ## Project Status
 
-Verified on a live stack: **123 tests passing**, 41/41 feeds healthy, clean
+Verified on a live stack: **126 tests passing** (1 skipped), 41/41 feeds healthy, clean
 typecheck, zero lint errors, frontend builds.
 
 Runs at **$0** with every feature intact.

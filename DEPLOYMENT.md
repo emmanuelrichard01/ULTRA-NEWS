@@ -190,7 +190,8 @@ open https://ultra-news.vercel.app
 | :--- | :---: | :--- |
 | `SECRET_KEY` | ✅ | Django security key (random, 64+ chars) |
 | `DEBUG` | ✅ | `0` for production |
-| `ALLOWED_HOSTS` | ✅ | Comma-separated hostnames |
+| `ALLOWED_HOSTS` | ✅ | Comma-separated hostnames. The container's own hostname is appended automatically so platform health probes are not rejected — you do not need to add it. |
+| `INGEST_STALE_MINUTES` | — | Minutes since the last successful ingest before `/health` reports degraded (default `90`). Must exceed your ingest interval by enough to absorb scheduler lag — GitHub's cron routinely runs 30+ minutes late. |
 | `ADMIN_API_KEY` | ✅ | Admin endpoint authentication (random, 48+ chars) |
 | `DATABASE_URL` | ✅ | PostgreSQL connection (internal URL) |
 | `REDIS_URL` | ✅ | Redis connection (internal URL) |
@@ -354,8 +355,29 @@ invisible to readers until clustered, so a rising backlog means the product is
 silently going stale while every request still returns 200 — no request-level
 check reveals it.
 
-`/api/v1/health` returns 503 when degraded and reports the same signals for
-platforms that only do HTTP checks.
+### Two health endpoints, and which to point where
+
+| Endpoint | Answers | Point at it |
+| --- | --- | --- |
+| `/api/v1/health/live` | Is the process serving HTTP? | **Platform health checks, uptime monitors** |
+| `/api/v1/health` | Are DB, cache, ingest and clustering all healthy? | Monitoring dashboards, humans, alerting |
+
+`/api/v1/health` returns 503 when degraded, which is correct for monitoring and
+wrong for an orchestrator. It reports degraded on stale ingest and on a growing
+clustering backlog — **neither of which restarting the container can fix**. Wire
+a platform restart to it and a late cron becomes a restart loop: kill the
+container, come back, data is still stale, 503 again.
+
+`/api/v1/health/live` touches no database, cache or network, so it answers
+correctly while dependencies are down — exactly when a liveness check must not
+lie.
+
+> On Koyeb, check the service's health-check configuration. A platform prober
+> that addresses the container by its internal hostname was being answered with
+> `400 DisallowedHost` — and Koyeb counted the 400 as passing, so the check was
+> decorative while the logs filled with tracebacks. Django now trusts the
+> container's own hostname (`socket.gethostname()`), so those probes get a real
+> response. Set the health-check path to `/api/v1/health/live`.
 
 ---
 
@@ -480,10 +502,38 @@ waits for a container start *plus* the model load — a minute or more.
 For a portfolio deployment that is the whole problem: someone opens the link
 once, and a blank minute reads as broken rather than as thrifty.
 
-`.github/workflows/keepalive.yml` pings `/api/v1/health` every 15 minutes, which
-keeps the instance inside its idle window. Set the `API_URL` repository secret
-to enable it; leave it unset and the workflow no-ops. Delete the workflow if you
-move to a paid instance.
+`.github/workflows/keepalive.yml` pings `/api/v1/health/live`. Set the `API_URL`
+repository secret to enable it; leave it unset and the workflow no-ops. Delete
+the workflow if you move to a paid instance.
+
+**Do not rely on it alone.** The cron says every 15 minutes. Measured delivery
+over two days:
+
+| | Observed gap |
+| --- | --- |
+| Typical, daytime | 27–56 min |
+| Worst, daytime | 75 min |
+| Worst, overnight | **138 min** |
+
+GitHub deprioritises scheduled workflows under load, and against a 60-minute
+idle window those numbers are not a margin. What actually happens: the instance
+sleeps, the late ping arrives, and the ping *becomes* the cold start it was
+meant to prevent — arriving while Koyeb is still starting the container, so it
+records a failure having triggered a start it never confirmed. Two instance
+lifetimes measured at 67m06s and 67m14s, to the second: a 60-minute idle timer
+plus detection lag, with no traffic in between.
+
+The workflow now retries three times to survive that, but retries do not fix
+arriving 138 minutes late.
+
+**Put an external uptime monitor on `/api/v1/health/live` at a 5-minute
+interval** and treat this workflow as a backstop. An external monitor fires on
+schedule and alerts someone; a GitHub cron can do neither.
+
+> Each cold start is another image pull, and a pull that fails takes the service
+> down until someone redeploys by hand — observed once, as
+> `Image download failure`, which is a platform-side error you cannot fix in
+> code. The defence is not pulling several times a day.
 
 > Render's free tier sleeps after **15 minutes**, not 60, which is why Koyeb is
 > the recommendation here despite both having a sleep behaviour.

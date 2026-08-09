@@ -139,6 +139,51 @@ def test_health_degrades_on_large_backlog(client, settings, django_assert_num_qu
         api_module.CLUSTER_BACKLOG_DEGRADED = original
 
 
+@pytest.mark.django_db
+def test_liveness_touches_no_database(client, django_assert_num_queries):
+    """
+    Liveness must answer while dependencies are down — that is when a platform
+    asks. Any query here would make the endpoint fail exactly when it matters,
+    turning a degraded database into a restart loop.
+
+    The `django_db` mark is required even though the assertion is that nothing
+    is queried: `django_assert_num_queries` opens a connection to count on, and
+    pytest-django blocks that without it.
+    """
+    with django_assert_num_queries(0):
+        response = client.get("/api/v1/health/live")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
+
+
+@pytest.mark.django_db
+def test_liveness_stays_up_while_deep_health_is_degraded(client):
+    """
+    The property the split exists for.
+
+    Stale ingest means the data is old, not that this process is broken, and no
+    restart can refresh it. Platform checks read liveness, so a late pipeline
+    must not be able to recycle a container that is serving correctly.
+    """
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from core.models import Source
+
+    Source.objects.create(
+        name="Stale", url="https://stale.example/rss",
+        is_active=True, last_success_at=timezone.now() - timedelta(hours=6),
+    )
+
+    deep = client.get("/api/v1/health")
+    assert deep.status_code == 503
+    assert "stale" in deep.json()["ingest"]
+
+    assert client.get("/api/v1/health/live").status_code == 200
+
+
 def test_metrics_degrade_to_noops_without_the_library(monkeypatch):
     """
     prometheus-client is optional. Instrumentation must never be the reason a

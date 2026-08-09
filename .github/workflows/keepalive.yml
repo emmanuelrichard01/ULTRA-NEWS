@@ -6,9 +6,19 @@ name: Keepalive — keep the free instance warm
 # waits a minute or more — which for a portfolio deployment is the whole ball
 # game. Someone clicks the link once; it needs to be up.
 #
-# A request every 15 minutes keeps the instance inside the idle window. This is
-# ordinary HTTP traffic to a public health endpoint, not a workaround: the
-# service really is meant to be reachable.
+# This is ordinary HTTP traffic to a public health endpoint, not a workaround:
+# the service really is meant to be reachable.
+#
+# DO NOT RELY ON THIS ALONE. The cron says every 15 minutes; GitHub delivers it
+# every 27-75 minutes during the day and has gone 138 minutes overnight, because
+# scheduled workflows are best-effort and deprioritised under load. Measured
+# against a 60-minute idle window that is not a margin, it is a coin toss — the
+# instance sleeps, and this workflow arrives late and becomes the cold start it
+# was supposed to prevent.
+#
+# Put an external uptime monitor on /api/v1/health/live at a 5-minute interval
+# and treat this as a backstop. An external monitor fires on time and alerts
+# someone; this cannot do either.
 #
 # Delete this workflow if you move to a paid instance — it stops being useful
 # the moment scale-to-zero is off.
@@ -36,17 +46,29 @@ jobs:
             exit 0
           fi
 
+          # Three attempts, because the first request to a sleeping instance is
+          # the one that wakes it and frequently does not survive the wake: Koyeb
+          # answers with a gateway error while the container starts, and this
+          # workflow used to record that as a failure and give up — having
+          # triggered a cold start without confirming it finished.
+          #
           # --max-time generously: a cold start legitimately takes a while, and
           # this request is what pays for it so a real visitor does not.
-          status=$(curl -s -o /dev/null -w '%{http_code}' --max-time 180 \
-            "$API_URL/api/v1/health" || echo "000")
+          status=000
+          for attempt in 1 2 3; do
+            status=$(curl -s -o /dev/null -w '%{http_code}' --max-time 180 \
+              "$API_URL/api/v1/health/live" || echo "000")
+            echo "attempt $attempt: HTTP $status"
 
-          echo "health: HTTP $status"
+            # 503 means the app is up and honestly reporting a degraded pipeline
+            # — that is a data problem for the pipeline workflow to surface, not
+            # a reason to fail the keepalive. Only a dead endpoint matters here.
+            case "$status" in
+              200|503) exit 0 ;;
+            esac
 
-          # 503 means the app is up and honestly reporting a degraded pipeline —
-          # that is a data problem for the pipeline workflow to surface, not a
-          # reason to fail the keepalive. Only a dead endpoint matters here.
-          case "$status" in
-            200|503) exit 0 ;;
-            *) echo "::warning::API unreachable (HTTP $status)"; exit 1 ;;
-          esac
+            [ "$attempt" -lt 3 ] && sleep 30
+          done
+
+          echo "::warning::API unreachable after 3 attempts (HTTP $status)"
+          exit 1

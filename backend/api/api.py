@@ -32,6 +32,18 @@ from core.momentum import MOMENTUM_WINDOW_HOURS  # noqa: F401
 # cycles' worth means it is losing ground rather than catching up.
 CLUSTER_BACKLOG_DEGRADED = 2000
 
+# Minutes since the last successful ingest before /health reports degraded.
+#
+# This was 45 against a 30-minute pipeline cron — 15 minutes of margin. GitHub's
+# scheduler is best-effort and measurably does not hold that: observed delivery
+# gaps reached 63 minutes during the day and 138 overnight, so the threshold
+# fired on a pipeline that was working, just late. A staleness signal that cries
+# wolf gets ignored, which costs more than having none.
+#
+# 90 minutes is three missed runs — long enough that GitHub's lag alone will not
+# trip it, short enough to catch a pipeline that has actually stopped.
+INGEST_STALE_MINUTES = int(os.environ.get("INGEST_STALE_MINUTES", 90))
+
 logger = logging.getLogger(__name__)
 
 api = NinjaAPI(
@@ -326,6 +338,25 @@ def decode_cursor(cursor: str) -> tuple[datetime, int]:
 # Health & Monitoring
 # ==========================================================================
 
+@api.get("/health/live", response={200: dict})
+def health_live(request):
+    """
+    Liveness: is this process serving HTTP? Nothing else.
+
+    Separate from /health because the two answer different questions, and wiring
+    a platform restart to the wrong one is a trap. /health reports degraded when
+    ingest is stale or the clustering backlog is growing — neither of which a
+    restart can fix. Point an orchestrator at it and a late cron becomes a
+    restart loop: kill the container, come back, data is still stale, 503 again.
+
+    This endpoint touches no database, no cache and no network, so it answers
+    correctly while dependencies are down — which is exactly when a liveness
+    check must not lie. Point platform health checks here; point monitoring and
+    humans at /health.
+    """
+    return 200, {"status": "ok"}
+
+
 @api.get("/health", response={200: dict, 503: dict})
 def health(request):
     """
@@ -334,6 +365,9 @@ def health(request):
     Returns HTTP 503 when degraded. Previously this always returned 200 with a
     "degraded" string in the body, which no load balancer or uptime check reads —
     so a dead database looked healthy to every automated consumer.
+
+    This is the *readiness and data* view, for monitoring and for humans. Do not
+    point a platform health check at it — see /health/live for why.
     """
     status = {"status": "ok", "db": "ok", "cache": "ok", "ingest": "ok"}
 
@@ -376,7 +410,7 @@ def health(request):
 
         if last_ingest:
             stale_minutes = (timezone.now() - last_ingest).total_seconds() / 60
-            if stale_minutes > 45:
+            if stale_minutes > INGEST_STALE_MINUTES:
                 status["status"] = "degraded"
                 status["ingest"] = f"stale: {stale_minutes:.0f}m since last successful ingest"
             else:
