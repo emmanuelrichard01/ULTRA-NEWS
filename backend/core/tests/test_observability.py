@@ -158,6 +158,16 @@ def test_liveness_touches_no_database(client, django_assert_num_queries):
 
 
 @pytest.mark.django_db
+def test_liveness_answers_head_as_well_as_get(client):
+    """
+    Uptime monitors default to HEAD — UptimeRobot does. A GET-only route replies
+    405, which a monitor reports as an outage while the service is fine.
+    """
+    assert client.get("/api/v1/health/live").status_code == 200
+    assert client.head("/api/v1/health/live").status_code == 200
+
+
+@pytest.mark.django_db
 def test_liveness_stays_up_while_deep_health_is_degraded(client):
     """
     The property the split exists for.

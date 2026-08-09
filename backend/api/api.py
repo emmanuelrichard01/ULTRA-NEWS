@@ -338,10 +338,15 @@ def decode_cursor(cursor: str) -> tuple[datetime, int]:
 # Health & Monitoring
 # ==========================================================================
 
-@api.get("/health/live", response={200: dict})
+@api.api_operation(["GET", "HEAD"], "/health/live", response={200: dict})
 def health_live(request):
     """
     Liveness: is this process serving HTTP? Nothing else.
+
+    HEAD is answered as well as GET because uptime monitors default to it —
+    UptimeRobot does — and a GET-only route replies 405, which a monitor reads
+    as an outage. A liveness check that reports down while the service is up is
+    worse than no check: it trains you to ignore the alert.
 
     Separate from /health because the two answer different questions, and wiring
     a platform restart to the wrong one is a trap. /health reports degraded when
