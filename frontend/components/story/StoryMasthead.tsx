@@ -3,6 +3,7 @@ import Link from 'next/link';
 import CorroborationMeter from '@/components/CorroborationMeter';
 import CategoryPill from '@/components/CategoryPill';
 import NewsImage from '@/components/NewsImage';
+import VideoBadge from '@/components/VideoBadge';
 import AskAboutStory from './AskAboutStory';
 import { describeCorroboration } from '@/lib/corroboration';
 import type { StoryDetailFull } from '@/lib/types';
@@ -32,6 +33,10 @@ export default function StoryMasthead({ story, outletNames, brokenBy, image }: S
   const outlets = story.independent_count;
   const descriptor = describeCorroboration(outlets);
   const firstSeen = new Date(story.first_seen_at);
+  // Counted in publishers, like corroboration: two BBC feeds are one outlet.
+  const videoOutlets = new Set(
+    story.articles.filter((a) => a.video_url).map((a) => a.source.publisher ?? a.source.name)
+  ).size;
 
   return (
     <header className="border-b border-[var(--border)] pb-10">
@@ -114,10 +119,15 @@ export default function StoryMasthead({ story, outletNames, brokenBy, image }: S
               <>{story.source_count} articles in total</>
             )}
           </p>
+          {videoOutlets > 0 && (
+            <a href="#sources" className="mt-3 inline-flex transition-opacity hover:opacity-80">
+              <VideoBadge outlets={videoOutlets} variant="count" />
+            </a>
+          )}
         </div>
       </div>
       <div className="mt-8">
-        <AskAboutStory slug={story.slug} title={story.title} />
+        <AskAboutStory slug={story.slug} title={story.title} independentCount={story.independent_count} />
       </div>
 
       {image && (

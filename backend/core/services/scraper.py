@@ -8,7 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from time import mktime, sleep
 from typing import Any, Dict, Iterable, List, Optional
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
 import feedparser
 import httpx
@@ -146,6 +146,78 @@ def strip_boilerplate(text: str) -> str:
     for pattern in _BOILERPLATE_PATTERNS:
         text = pattern.sub(" ", text)
     return " ".join(text.split()).strip()
+
+
+# ---------------------------------------------------------------------------
+# Video detection
+#
+# Ultra News never plays or re-hosts publisher video — it links to reporting,
+# it does not republish it. What it records is WHETHER an article carries
+# video, so a story can say "3 outlets have video" and send the reader to each
+# publisher's own player. The URL is kept for that link and for a possible
+# click-to-load official embed later; it is never streamed from here.
+# ---------------------------------------------------------------------------
+
+# Whole path segments only: a slug like /watch-this-space/ is an article about
+# watching something, and a wrong "has video" badge is worse than a missing one.
+_VIDEO_PAGE_PATH = re.compile(r"/(videos?|watch|video-news|clips?)(/|$)", re.IGNORECASE)
+_EMBED_HOSTS = ("youtube.com/embed/", "youtube-nocookie.com/embed/", "player.vimeo.com/video/", "dailymotion.com/embed/")
+
+
+def looks_like_video_page(url: str) -> bool:
+    """A URL whose path marks it as a video page (/video/, /videos/, /watch/)."""
+    try:
+        return bool(_VIDEO_PAGE_PATH.search(urlparse(url).path))
+    except ValueError:
+        return False
+
+
+def extract_video(html: str, base_url: str) -> Optional[str]:
+    """
+    The video an article page carries, if any.
+
+    In order of how explicitly the publisher declares it: Open Graph video, a
+    video Open Graph type (the page itself), a Twitter player card, an official
+    embed iframe, then a native <video> element.
+    """
+    try:
+        from lxml import html as lxml_html
+
+        tree = lxml_html.fromstring(html)
+    except Exception:
+        return None
+
+    def absolute(value: str) -> str:
+        value = value.strip()
+        return value if value.startswith(("http://", "https://")) else urljoin(base_url, value)
+
+    for xpath in (
+        '//meta[@property="og:video:secure_url"]/@content',
+        '//meta[@property="og:video:url"]/@content',
+        '//meta[@property="og:video"]/@content',
+    ):
+        found = tree.xpath(xpath)
+        if found and found[0].strip():
+            return absolute(found[0])
+
+    og_type = tree.xpath('//meta[@property="og:type"]/@content')
+    if og_type and og_type[0].strip().lower().startswith("video"):
+        return base_url
+
+    player = tree.xpath('//meta[@name="twitter:card"][@content="player"]')
+    if player:
+        src = tree.xpath('//meta[@name="twitter:player"]/@content')
+        return absolute(src[0]) if src and src[0].strip() else base_url
+
+    for src in tree.xpath('//iframe/@src'):
+        if any(host in src for host in _EMBED_HOSTS):
+            return absolute(src)
+
+    for src in tree.xpath('//video/@src | //video/source/@src'):
+        if src.strip() and not src.startswith("blob:"):
+            return absolute(src)
+
+    return None
 
 
 def generate_excerpt(full_text: str, max_words: int = EXCERPT_WORD_LIMIT) -> str:
@@ -349,17 +421,38 @@ class RSSScraper(BaseScraper):
             'content': summary,
             'published_date': published_date,
             'image_url': self._entry_image(entry),
+            'video_url': self._entry_video(entry),
             'deep_fetch_success': False,
         }
 
     @staticmethod
-    def _entry_image(entry) -> Optional[str]:
-        if entry.get('media_content'):
-            return entry.media_content[0].get('url')
+    def _is_video_media(item) -> bool:
+        kind = (item.get('type') or '').lower()
+        return kind.startswith('video/') or (item.get('medium') or '').lower() == 'video'
+
+    @classmethod
+    def _entry_image(cls, entry) -> Optional[str]:
+        # Skip video items: `media_content[0]` used to be taken whatever it was,
+        # so a feed that lists its clip first set an .mp4 as the article's image
+        # and every card for it rendered a broken picture.
+        for item in entry.get('media_content') or []:
+            if item.get('url') and not cls._is_video_media(item):
+                return item.get('url')
         if entry.get('media_thumbnail'):
             return entry.media_thumbnail[0].get('url')
         for link in entry.get('links', []):
             if getattr(link, 'rel', '') == 'enclosure' and getattr(link, 'type', '').startswith('image/'):
+                return link.href
+        return None
+
+    @classmethod
+    def _entry_video(cls, entry) -> Optional[str]:
+        """Video the FEED declares: media:content or an enclosure typed video."""
+        for item in entry.get('media_content') or []:
+            if item.get('url') and cls._is_video_media(item):
+                return item.get('url')
+        for link in entry.get('links', []):
+            if getattr(link, 'rel', '') == 'enclosure' and getattr(link, 'type', '').startswith('video/'):
                 return link.href
         return None
 
@@ -408,6 +501,8 @@ class RSSScraper(BaseScraper):
         image = self._extract_og_image(downloaded, entry['url'])
         if image:
             entry['image_url'] = image
+        if not entry.get('video_url'):
+            entry['video_url'] = extract_video(downloaded, entry['url'])
 
     @staticmethod
     def _extract_og_image(html: str, base_url: str) -> Optional[str]:
@@ -443,6 +538,9 @@ class RSSScraper(BaseScraper):
             'content_hash': generate_content_hash(f"{entry['title']} {content}"),
             'published_date': entry['published_date'],
             'image_url': entry['image_url'],
+            # Pages whose URL says they are video (/video/, /watch/) count even
+            # when no page was fetched — the feed item IS the clip.
+            'video_url': entry.get('video_url') or (entry['url'] if looks_like_video_page(entry['url']) else None),
             'deep_fetch_success': entry['deep_fetch_success'],
         }
 

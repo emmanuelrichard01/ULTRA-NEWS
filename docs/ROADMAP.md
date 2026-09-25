@@ -68,6 +68,12 @@ state, with nothing surfacing the failure:
 - [x] Topic insights (corroboration mix, most active newsrooms), searchable
       and sortable source directory, redesigned About, 404 that suggests
       stories rather than dead-ending
+- [x] Evidence-first sharing (native sheet on phones, intent-link menu and
+      downloadable card on desktop, UTM-tagged, no SDKs)
+- [x] Video badges from ingest-time detection, linking to the publisher's
+      page; no re-hosting
+- [ ] Click-to-load official embeds (YouTube nocookie) where a publisher
+      embeds one; shareable Ask answers
 
 ### AI
 

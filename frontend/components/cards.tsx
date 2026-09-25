@@ -2,6 +2,7 @@ import Link from 'next/link';
 
 import CorroborationMeter from './CorroborationMeter';
 import NewsImage from './NewsImage';
+import VideoBadge from './VideoBadge';
 import { corroborationScale, outletPhrase } from '@/lib/corroboration';
 import { relativeTime } from '@/lib/time';
 import { cleanExcerpt } from '@/lib/text';
@@ -181,13 +182,14 @@ export function OverlayCard({
       <div className="media-scrim" aria-hidden="true" />
 
       <div className="absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-2 p-4 sm:p-5">
-        {category ? (
-          <span className="rounded-[var(--radius-pill)] border border-white/20 bg-black/30 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.08em] text-white/90 backdrop-blur-md">
-            {CATEGORY_MAP[category]?.displayName ?? category}
-          </span>
-        ) : (
-          <span />
-        )}
+        <span className="flex flex-wrap items-center gap-1.5">
+          {category && (
+            <span className="rounded-[var(--radius-pill)] border border-white/20 bg-black/30 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.08em] text-white/90 backdrop-blur-md">
+              {CATEGORY_MAP[category]?.displayName ?? category}
+            </span>
+          )}
+          <VideoBadge outlets={story.video_outlets ?? 0} variant="overlay" />
+        </span>
         <OutletBadge outlets={story.independent_count} />
       </div>
 
@@ -256,6 +258,12 @@ export function StoryTile({
         <CorroborationMeter outlets={story.independent_count} size="sm" />
         <span aria-hidden="true">·</span>
         <Time iso={story.first_seen_at} className="text-[11px]" />
+        {(story.video_outlets ?? 0) > 0 && (
+          <>
+            <span aria-hidden="true">·</span>
+            <VideoBadge outlets={story.video_outlets} />
+          </>
+        )}
       </div>
       <h3 className="text-display-sm font-display mt-2 text-balance text-[var(--foreground)]">
         <Link

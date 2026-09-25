@@ -482,7 +482,7 @@ def _card_articles(story_ids: list[int]) -> dict[int, dict]:
         )
         .order_by('story_id', 'published_date', 'id')
         .values(
-            'story_id', 'title', 'url', 'image_url',
+            'story_id', 'title', 'url', 'image_url', 'video_url',
             'source__name', 'source__publisher_domain', 'source__url',
         )
     )
@@ -494,7 +494,13 @@ def _card_articles(story_ids: list[int]) -> dict[int, dict]:
             'sources': [],
             'framing_preview': [],
             '_seen': set(),
+            '_video_publishers': set(),
         })
+
+        # Counted in PUBLISHERS, like corroboration: two BBC feeds with the
+        # same clip are one outlet that has video, not two.
+        if row['video_url']:
+            card['_video_publishers'].add(row['source__publisher_domain'] or row['source__name'])
 
         # First image encountered wins — rows arrive oldest-first, so this is the
         # image from whichever outlet broke the story.
@@ -517,6 +523,7 @@ def _card_articles(story_ids: list[int]) -> dict[int, dict]:
 
     for card in cards.values():
         card.pop('_seen', None)
+        card['video_outlets'] = len(card.pop('_video_publishers', ()))
     return cards
 
 
@@ -724,6 +731,7 @@ def list_stories(
             "categories": [cat.slug for cat in story.categories.all()],
             "sources": card.get("sources", []),
             "framing_preview": card.get("framing_preview", []),
+            "video_outlets": card.get("video_outlets", 0),
             # Present only for the momentum edition — outlets that picked the
             # story up inside the window. Lets the UI say "4 new outlets in the
             # last 12 hours" rather than showing an abstract score.
@@ -778,6 +786,7 @@ def get_story(request, story_slug: str):
             "url": article.url,
             "excerpt": article.excerpt,
             "image_url": article.image_url,
+            "video_url": article.video_url,
             "published_date": article.published_date.isoformat(),
             # `publisher` is the identity corroboration is actually counted in.
             #

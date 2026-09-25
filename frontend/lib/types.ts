@@ -29,6 +29,11 @@ export interface StoryDetail {
    * Present only for the Developing edition (`sort=momentum`).
    */
   recent_outlets?: number | null;
+  /**
+   * Independent publishers whose coverage of this story includes video.
+   * Counted like corroboration: two feeds from one newsroom count once.
+   */
+  video_outlets?: number;
 }
 
 export interface StoryArticle {
@@ -38,6 +43,8 @@ export interface StoryArticle {
   url: string;
   excerpt: string;
   image_url?: string;
+  /** Set when the publisher's article carries video. Link to `url`, never play this. */
+  video_url?: string | null;
   published_date: string;
   source: {
     name: string;

@@ -418,6 +418,15 @@ reference behind it.
   with images, real RSS alternates, `llms.txt`, `security.txt`, SVG favicon and
   a manifest with shortcuts; previews and branch deployments excluded from
   indexing
+- Sharing that carries the evidence: the system share sheet on phones, and on
+  desktop a menu with copy link, downloadable story card and intent links for
+  WhatsApp, X, Bluesky, Threads, LinkedIn, Telegram, Reddit and email. The
+  pre-filled text leads with the newsroom count, links are UTM-tagged, and no
+  network SDK is loaded
+- Video badges: publisher video is detected at ingest (og:video, player
+  embeds, feed media, /video/ pages) and counted per newsroom. Cards say a
+  story has video and the source ledger links "Watch at <outlet>". Ultra News
+  never re-hosts or plays publisher video
 - Semantic topic classification (98% coverage, up from 53% with keywords)
 - Source health with circuit breaker, conditional GET and transient-error retry
 - Question answering with story-level retrieval, streamed answers, numbered

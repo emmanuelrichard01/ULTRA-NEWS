@@ -95,6 +95,7 @@ def scrape_single_source(self, source_id):
                         content_hash=data.get('content_hash', ''),
                         published_date=data['published_date'],
                         image_url=data.get('image_url'),
+                        video_url=data.get('video_url'),
                         story=None,  # Explicitly unset; clustered later
                     )
 

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 
 import CorroborationMeter from './CorroborationMeter';
+import VideoBadge from './VideoBadge';
 import CategoryPill from './CategoryPill';
 import NewsImage from './NewsImage';
 import SourceChain from './SourceChain';
@@ -56,6 +57,8 @@ export interface StoryCardProps {
   rank?: number;
   /** Thumbnails are noise in a ranked list of fast-moving stories. */
   showImage?: boolean;
+  /** Distinct outlets with video of the story; badges the card when > 0. */
+  videoOutlets?: number;
 }
 
 export default function StoryCard({
@@ -74,6 +77,7 @@ export default function StoryCard({
   recentOutlets = null,
   rank,
   showImage = true,
+  videoOutlets = 0,
 }: StoryCardProps) {
   const dateObj = typeof timestamp === 'string' ? new Date(timestamp) : timestamp;
   const outlets = independentCount ?? sources.length ?? 1;
@@ -152,6 +156,7 @@ export default function StoryCard({
         <div className="mb-1.5 flex items-center gap-2.5">
           <CorroborationMeter outlets={outlets} size="sm" showLabel={false} />
           {time}
+          <VideoBadge outlets={videoOutlets} />
         </div>
         <h3 className="text-body-md font-display leading-snug text-[var(--foreground)]">
           <Link
@@ -210,6 +215,7 @@ export default function StoryCard({
               <CategoryPill key={cat} label={cat} size="xs" />
             ))}
             {time}
+            <VideoBadge outlets={videoOutlets} />
           </div>
 
           <h3 className="text-display-md text-balance font-display text-[var(--foreground)]">

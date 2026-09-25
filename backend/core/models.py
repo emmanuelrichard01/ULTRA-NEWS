@@ -315,6 +315,11 @@ class Article(models.Model):
     source = models.ForeignKey(Source, on_delete=models.CASCADE, related_name='articles')
     url = models.URLField(max_length=1000, unique=True)
     image_url = models.URLField(max_length=1000, blank=True, null=True)
+    # Where the publisher's video for this article lives, when it has one:
+    # og:video, a video enclosure, an official embed, or the article page itself
+    # when it is a video page. Recorded so a story can say which outlets have
+    # video and link to each publisher's own player — never streamed from here.
+    video_url = models.URLField(max_length=1000, blank=True, null=True)
     # V3: excerpt-only model — short excerpt for display, full text in RawDocument
     excerpt = models.TextField(
         blank=True,

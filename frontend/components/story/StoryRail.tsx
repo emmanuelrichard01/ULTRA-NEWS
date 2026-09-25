@@ -6,6 +6,8 @@ import { AskSparkle } from '@/components/AskTrigger';
 import { useAsk } from '@/components/AskProvider';
 import CorroborationMeter from '@/components/CorroborationMeter';
 import ListenButton from './ListenButton';
+import ShareMenu from '@/components/ShareMenu';
+import { storyEvidence } from '@/lib/share';
 import { describeCorroboration } from '@/lib/corroboration';
 import { coverageSpread } from '@/lib/spread';
 import { relativeTime } from '@/lib/time';
@@ -55,7 +57,6 @@ export default function StoryRail({
 }: StoryRailProps) {
   const { open } = useAsk();
   const [active, setActive] = useState<string | null>(sections[0]?.id ?? null);
-  const [copied, setCopied] = useState(false);
 
   // Scroll-spy: the section crossing the upper-middle band of the viewport is
   // the one being read. A band rather than a line, so short sections still
@@ -81,25 +82,6 @@ export default function StoryRail({
 
   const descriptor = describeCorroboration(independentCount);
   const spread = coverageSpread(firstSeenAt, lastUpdatedAt, independentCount);
-
-  const share = async () => {
-    const url = window.location.href;
-    if (navigator.share) {
-      try {
-        await navigator.share({ title, url });
-        return;
-      } catch {
-        // Dismissed — fall through to the clipboard.
-      }
-    }
-    try {
-      await navigator.clipboard.writeText(url);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1800);
-    } catch {
-      // Clipboard unavailable; nothing useful to say.
-    }
-  };
 
   return (
     <div className="space-y-5">
@@ -164,9 +146,12 @@ export default function StoryRail({
         </button>
         <div className="flex gap-2">
           <ListenButton text={listenText} label="Listen to brief" className="flex-1 [&>button]:w-full [&>button]:justify-center" />
-          <button type="button" onClick={share} className="pill pill-outline !py-2 text-[13px]">
-            {copied ? 'Copied' : 'Share'}
-          </button>
+          <ShareMenu
+            path={`/story/${slug}`}
+            title={title}
+            evidence={storyEvidence(independentCount)}
+            cardPath={`/story/${slug}/opengraph-image`}
+          />
         </div>
       </div>
 

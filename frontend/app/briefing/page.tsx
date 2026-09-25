@@ -6,6 +6,7 @@ import JsonLd, { breadcrumbList } from '@/components/JsonLd';
 import CorroborationMeter from '@/components/CorroborationMeter';
 import NewsImage from '@/components/NewsImage';
 import ListenButton from '@/components/story/ListenButton';
+import ShareMenu from '@/components/ShareMenu';
 import { RankedList } from '@/components/cards';
 import { fetchBriefing } from '@/lib/api';
 import { IS_INDEXABLE, absoluteUrl } from '@/lib/site';
@@ -145,6 +146,13 @@ export default async function BriefingPage() {
         </p>
         <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
           <ListenButton text={listenText} label="Listen to the briefing" />
+          <ShareMenu
+            path="/briefing"
+            title="The Briefing — today, confirmed"
+            evidence={`${briefing.items.length} stories confirmed by independent newsrooms`}
+            cardPath="/briefing/opengraph-image"
+            align="left"
+          />
           <span className="font-data text-[12px] text-[var(--foreground-subtle)]">
             {minutes} min read · {outlets} newsrooms
           </span>

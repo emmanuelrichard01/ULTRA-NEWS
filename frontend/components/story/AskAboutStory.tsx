@@ -2,6 +2,8 @@
 
 import { AskSparkle } from '@/components/AskTrigger';
 import { useAsk } from '@/components/AskProvider';
+import ShareMenu from '@/components/ShareMenu';
+import { storyEvidence } from '@/lib/share';
 
 /**
  * "Ask about this story" — opens the Wire Room scoped to this cluster.
@@ -11,7 +13,15 @@ import { useAsk } from '@/components/AskProvider';
  * disagree?" gets an answer about THIS story rather than whichever neighbour
  * scored best on the words.
  */
-export default function AskAboutStory({ slug, title }: { slug: string; title: string }) {
+export default function AskAboutStory({
+  slug,
+  title,
+  independentCount,
+}: {
+  slug: string;
+  title: string;
+  independentCount: number;
+}) {
   const { open } = useAsk();
   const ask = (query?: string) => open({ story: { slug, title }, query });
 
@@ -21,6 +31,13 @@ export default function AskAboutStory({ slug, title }: { slug: string; title: st
         <AskSparkle className="transition-transform duration-500 group-hover:rotate-[18deg]" />
         Ask about this story
       </button>
+      <ShareMenu
+        path={`/story/${slug}`}
+        title={title}
+        evidence={storyEvidence(independentCount)}
+        cardPath={`/story/${slug}/opengraph-image`}
+        align="left"
+      />
       {['Where do outlets disagree?', 'What is still unconfirmed?'].map((q) => (
         <button
           key={q}

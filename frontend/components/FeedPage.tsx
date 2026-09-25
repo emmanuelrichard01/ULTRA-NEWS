@@ -600,5 +600,6 @@ function cardProps(story: StoryDetail, edition: Edition) {
     framingPreview: story.framing_preview,
     recentOutlets: story.recent_outlets,
     showImage: edition.showImages,
+    videoOutlets: story.video_outlets,
   };
 }

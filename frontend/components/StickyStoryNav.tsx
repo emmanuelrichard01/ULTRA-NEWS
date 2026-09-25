@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 import { AskSparkle } from "./AskTrigger";
 import { useAsk } from "./AskProvider";
 import CorroborationMeter from "./CorroborationMeter";
+import ShareMenu from "./ShareMenu";
+import { storyEvidence } from "@/lib/share";
 import { describeCorroboration } from "@/lib/corroboration";
 
 /**
@@ -34,7 +36,6 @@ interface StickyStoryNavProps {
 export default function StickyStoryNav({ title, sourceCount, slug }: StickyStoryNavProps) {
   const { open } = useAsk();
   const [isVisible, setIsVisible] = useState(false);
-  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     const onScroll = () => setIsVisible(window.scrollY > 320);
@@ -44,36 +45,6 @@ export default function StickyStoryNav({ title, sourceCount, slug }: StickyStory
   }, []);
 
   const descriptor = describeCorroboration(sourceCount);
-
-  /**
-   * Share the page's actual URL.
-   *
-   * This used to receive a hardcoded `https://ultra-news.demo/story/...`, so
-   * every shared link pointed at a domain that doesn't exist. Reading
-   * window.location at click time is correct on any host, in any environment.
-   */
-  const handleShare = async () => {
-    const url = window.location.href;
-
-    if (navigator.share) {
-      try {
-        await navigator.share({ title, url });
-        return;
-      } catch {
-        // User dismissed the sheet, or the gesture wasn't trusted — fall through
-        // to clipboard rather than leaving the click with no effect.
-      }
-    }
-
-    try {
-      await navigator.clipboard.writeText(url);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // Clipboard blocked (insecure origin or denied permission). Say nothing
-      // rather than firing an alert() that blocks the page.
-    }
-  };
 
   return (
     <div
@@ -113,13 +84,17 @@ export default function StickyStoryNav({ title, sourceCount, slug }: StickyStory
               <span className="sm:hidden">Ask</span>
             </button>
           )}
-          <button
-            onClick={handleShare}
-            tabIndex={isVisible ? 0 : -1}
-            className="pill pill-outline shrink-0 !px-3 !py-1.5 text-[12px] text-[var(--foreground-muted)]"
-          >
-            {copied ? "Copied" : "Share"}
-          </button>
+          {slug && (
+            <ShareMenu
+              path={`/story/${slug}`}
+              title={title}
+              evidence={storyEvidence(sourceCount)}
+              cardPath={`/story/${slug}/opengraph-image`}
+              variant="compact"
+              label=""
+              tabIndex={isVisible ? 0 : -1}
+            />
+          )}
         </div>
         {/* Reading progress, driven by the page's scroll timeline rather than
             a scroll listener. */}

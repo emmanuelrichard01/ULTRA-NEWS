@@ -1,6 +1,7 @@
 import { formatDistanceToNow } from 'date-fns';
 
 import type { StoryArticle } from '@/lib/types';
+import { PlayIcon } from '@/components/icons';
 
 /**
  * SourceLedger — every article behind the story, grouped by outlet.
@@ -76,6 +77,18 @@ export default function SourceLedger({ articles }: { articles: StoryArticle[] })
                   >
                     {formatDistanceToNow(new Date(article.published_date), { addSuffix: true })}
                   </time>
+                  {/* Video plays on the publisher's page, in their player — never here. */}
+                  {article.video_url && (
+                    <a
+                      href={article.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="ml-2.5 inline-flex items-center gap-1 text-[11px] font-medium text-[var(--foreground-muted)] underline-offset-2 hover:text-[var(--accent)] hover:underline"
+                    >
+                      <PlayIcon size={8} />
+                      Watch at {article.source.name}
+                    </a>
+                  )}
                 </li>
               ))}
             </ul>
