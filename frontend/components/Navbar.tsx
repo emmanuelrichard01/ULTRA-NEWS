@@ -349,8 +349,7 @@ function TodayLine() {
           ? now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
           : ' '}
       </p>
-      <p className="mt-0.5 flex items-center gap-1.5 text-[12px] text-[var(--foreground-subtle)]">
-        <span className="live-dot" aria-hidden="true" />
+      <p className="mt-0.5 text-[12px] text-[var(--foreground-subtle)]">
         Live wire · independent outlets, counted
       </p>
     </div>

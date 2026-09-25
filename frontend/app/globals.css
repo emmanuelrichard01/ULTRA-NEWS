@@ -700,11 +700,19 @@ a {
 }
 
 /* --------------------------------------------
-   Breaking ticker
+   The wire (LiveTicker)
    -------------------------------------------- */
-.ticker-bar {
-  border-left: 3px solid var(--wire-red);
-  background: color-mix(in srgb, var(--wire-red) 6%, var(--background));
+/* Spotlight: pointing at one headline dims the rest, so a moving strip is
+   readable where attention actually is. Hover-capable pointers only; on touch
+   there is no hover to leave, and the dimming would stick. */
+@media (hover: hover) {
+  .wire-list:hover .wire-item {
+    opacity: 0.38;
+  }
+  .wire-list:hover .wire-item:hover,
+  .wire-list .wire-item:focus-within {
+    opacity: 1;
+  }
 }
 
 /* --------------------------------------------
