@@ -62,7 +62,8 @@ export default function FramingMatrix({ articles }: FramingMatrixProps) {
 
   return (
     <section aria-labelledby="framing-heading" className="border-t border-[var(--border)] py-12">
-      <h2 id="framing-heading" className="text-display-md font-display text-[var(--foreground)]">
+      <p className="eyebrow mb-3">Evidence · word choice</p>
+      <h2 id="framing-heading" className="text-display-lg font-display text-[var(--foreground)]">
         How outlets framed it
       </h2>
       <p className="text-body-sm measure mb-8 mt-1.5 text-[var(--foreground-muted)]">

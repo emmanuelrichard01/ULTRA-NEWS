@@ -2,6 +2,8 @@ import Link from 'next/link';
 
 import CorroborationMeter from '@/components/CorroborationMeter';
 import CategoryPill from '@/components/CategoryPill';
+import NewsImage from '@/components/NewsImage';
+import AskAboutStory from './AskAboutStory';
 import { describeCorroboration } from '@/lib/corroboration';
 import type { StoryDetailFull } from '@/lib/types';
 
@@ -22,9 +24,11 @@ interface StoryMastheadProps {
   story: StoryDetailFull;
   outletNames: string[];
   brokenBy?: { name: string; at: string } | null;
+  /** The first outlet photograph in the cluster, credited to that outlet. */
+  image?: { url: string; credit: string } | null;
 }
 
-export default function StoryMasthead({ story, outletNames, brokenBy }: StoryMastheadProps) {
+export default function StoryMasthead({ story, outletNames, brokenBy, image }: StoryMastheadProps) {
   const outlets = story.independent_count;
   const descriptor = describeCorroboration(outlets);
   const firstSeen = new Date(story.first_seen_at);
@@ -33,16 +37,33 @@ export default function StoryMasthead({ story, outletNames, brokenBy }: StoryMas
     <header className="border-b border-[var(--border)] pb-10">
       {/* Back link sits above everything — an escape hatch you find before you
           need it, not one buried under the article you're trying to leave. */}
-      <nav className="mb-8">
-        <Link
-          href="/"
-          className="text-body-sm inline-flex items-center gap-1.5 text-[var(--foreground-muted)] transition-colors hover:text-[var(--foreground)]"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="m15 18-6-6 6-6" />
-          </svg>
-          Back to the wire
-        </Link>
+      <nav aria-label="Breadcrumb" className="mb-8">
+        <ol className="flex items-center gap-2 text-[13px] text-[var(--foreground-subtle)]">
+          <li>
+            <Link
+              href="/"
+              className="group inline-flex items-center gap-1.5 text-[var(--foreground-muted)] transition-colors hover:text-[var(--foreground)]"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="transition-transform duration-300 group-hover:-translate-x-0.5">
+                <path d="m15 18-6-6 6-6" />
+              </svg>
+              The Wire
+            </Link>
+          </li>
+          {story.categories[0] && (
+            <>
+              <li aria-hidden="true">/</li>
+              <li>
+                <Link
+                  href={`/${story.categories[0]}`}
+                  className="capitalize text-[var(--foreground-muted)] transition-colors hover:text-[var(--foreground)]"
+                >
+                  {story.categories[0]}
+                </Link>
+              </li>
+            </>
+          )}
+        </ol>
       </nav>
 
       <div className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -59,7 +80,7 @@ export default function StoryMasthead({ story, outletNames, brokenBy }: StoryMas
         </time>
       </div>
 
-      <h1 className="text-display-2xl font-display text-balance leading-[1.04] text-[var(--foreground)]">
+      <h1 className="text-display-2xl font-display animate-fade-in-up text-balance text-[var(--foreground)]">
         {story.title}
       </h1>
 
@@ -95,6 +116,26 @@ export default function StoryMasthead({ story, outletNames, brokenBy }: StoryMas
           </p>
         </div>
       </div>
+      <div className="mt-8">
+        <AskAboutStory slug={story.slug} title={story.title} />
+      </div>
+
+      {image && (
+        <figure className="mt-10">
+          <div className="media-frame aspect-[16/9] w-full">
+            <NewsImage
+              src={image.url}
+              alt=""
+              priority
+              showFallbackText={false}
+              className="absolute inset-0 h-full w-full object-cover"
+            />
+          </div>
+          <figcaption className="font-data mt-2.5 text-[11px] text-[var(--foreground-subtle)]">
+            Image via {image.credit}. Ultra News links to reporting; it does not republish it.
+          </figcaption>
+        </figure>
+      )}
     </header>
   );
 }

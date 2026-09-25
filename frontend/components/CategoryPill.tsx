@@ -21,7 +21,7 @@ interface CategoryPillProps {
 }
 
 const SIZES = {
-  xs: 'px-1.5 py-[3px] text-[10px]',
+  xs: 'px-2 py-[3px] text-[10px]',
   sm: 'px-2.5 py-1.5 text-[11px]',
   md: 'px-3 py-1.5 text-[12px]',
 } as const;
@@ -37,7 +37,7 @@ export default function CategoryPill({
   const display = CATEGORY_MAP[label]?.displayName ?? label;
 
   const className = [
-    'inline-flex shrink-0 items-center rounded-[var(--radius-chip)] border',
+    'inline-flex shrink-0 items-center rounded-[var(--radius-pill)] border',
     'font-data font-medium uppercase tracking-[0.07em] whitespace-nowrap',
     'transition-colors duration-150',
     SIZES[size],

@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import Link from 'next/link';
 
 import StoryMasthead from '@/components/story/StoryMasthead';
 import CorroborationTimeline from '@/components/story/CorroborationTimeline';
@@ -9,10 +8,15 @@ import FramingMatrix from '@/components/story/FramingMatrix';
 import SourceLedger from '@/components/story/SourceLedger';
 import IntelligenceBrief from '@/components/IntelligenceBrief';
 import StickyStoryNav from '@/components/StickyStoryNav';
-import CorroborationMeter from '@/components/CorroborationMeter';
+import StoryRail, { type RailSection } from '@/components/story/StoryRail';
+import { KeyFacts, StoryUnfolding } from '@/components/story/BriefSections';
+import { groupByOutlet } from '@/lib/outlets';
+import JsonLd, { breadcrumbList } from '@/components/JsonLd';
+import { cleanExcerpt } from '@/lib/text';
+import { StoryTile } from '@/components/cards';
 import { fetchStory, fetchRelatedStories, fetchStories } from '@/lib/api';
 import { IS_INDEXABLE, absoluteUrl } from '@/lib/site';
-import type { StoryDetail, StoryDetailFull } from '@/lib/types';
+import { CATEGORY_MAP, type StoryDetail, type StoryDetailFull } from '@/lib/types';
 
 /**
  * Story page.
@@ -40,16 +44,28 @@ interface StoryPageProps {
 export async function generateMetadata({ params }: StoryPageProps): Promise<Metadata> {
   const { storyId } = await params;
   const story = await fetchStory(storyId);
-  if (!story) return { title: 'Story not found' };
+  if (!story) return { title: 'Story not found', robots: { index: false } };
 
   const outlets = story.independent_count;
-  const description =
-    story.summary ||
-    `Covered by ${outlets} independent ${outlets === 1 ? 'outlet' : 'outlets'}.`;
+  const names = [...new Set((story.articles ?? []).map((a) => a.source.name))];
+  const body = cleanExcerpt(story.ai_summary?.consensus_lead || story.summary || '', story.title);
+
+  /**
+   * The snippet leads with the evidence. A search result for a news event is
+   * one of dozens saying the same thing; the only thing this page can add in
+   * 160 characters is how many independent newsrooms stand behind it.
+   */
+  const evidence =
+    outlets >= 2
+      ? `Corroborated by ${outlets} independent outlets${names.length ? `, including ${names.slice(0, 2).join(' and ')}` : ''}.`
+      : `Reported by ${names[0] ?? 'one outlet'}; not yet independently confirmed.`;
+  const description = truncate(`${evidence} ${body}`.trim(), 160);
+  const categories = story.categories ?? [];
 
   return {
     title: story.title,
     description,
+    keywords: [...categories, ...names.slice(0, 6), 'corroborated news'],
     // Story pages are reachable with query strings and from several feeds;
     // without a canonical those variants compete with each other.
     alternates: { canonical: `/story/${storyId}` },
@@ -60,10 +76,17 @@ export async function generateMetadata({ params }: StoryPageProps): Promise<Meta
       url: absoluteUrl(`/story/${storyId}`),
       publishedTime: story.first_seen_at,
       modifiedTime: story.last_updated_at,
+      section: categories[0] ? CATEGORY_MAP[categories[0]]?.displayName ?? categories[0] : 'News',
+      tags: categories,
     },
     twitter: { card: 'summary_large_image', title: story.title, description },
-    other: { 'article:section': story.categories?.[0] || 'News' },
   };
+}
+
+/** Cut at a word boundary with an ellipsis, never mid-word. */
+function truncate(text: string, max: number): string {
+  if (text.length <= max) return text;
+  return text.slice(0, max - 1).replace(/\s+\S*$/, '').replace(/[,;:.]$/, '') + '…';
 }
 
 /**
@@ -80,25 +103,53 @@ export async function generateMetadata({ params }: StoryPageProps): Promise<Meta
  * accurate and the most useful thing a crawler can learn here.
  */
 function storyStructuredData(story: StoryDetailFull, storyId: string) {
+  const url = absoluteUrl(`/story/${storyId}`);
+  const category = story.categories?.[0];
+  const articles = (story.articles ?? []).slice(0, 20);
+
   return {
     '@context': 'https://schema.org',
-    '@type': 'CollectionPage',
-    '@id': absoluteUrl(`/story/${storyId}#page`),
-    url: absoluteUrl(`/story/${storyId}`),
-    name: story.title,
-    description: story.summary,
-    datePublished: story.first_seen_at,
-    dateModified: story.last_updated_at,
-    inLanguage: 'en',
-    isPartOf: { '@id': absoluteUrl('/#website') },
-    about: (story.categories ?? []).map((c) => ({ '@type': 'Thing', name: c })),
-    hasPart: (story.articles ?? []).slice(0, 20).map((article) => ({
-      '@type': 'NewsArticle',
-      headline: article.title,
-      url: article.url,
-      datePublished: article.published_date,
-      publisher: { '@type': 'Organization', name: article.source.name },
-    })),
+    '@graph': [
+      {
+        '@type': 'CollectionPage',
+        '@id': `${url}#page`,
+        url,
+        name: story.title,
+        description: story.ai_summary?.consensus_lead || story.summary,
+        datePublished: story.first_seen_at,
+        dateModified: story.last_updated_at,
+        inLanguage: 'en',
+        isPartOf: { '@id': absoluteUrl('/#website') },
+        breadcrumb: { '@id': `${url}#breadcrumb` },
+        about: (story.categories ?? []).map((c) => ({ '@type': 'Thing', name: CATEGORY_MAP[c]?.displayName ?? c })),
+        // The page IS a list of other newsrooms' articles — ItemList states that
+        // shape directly, in the order they published.
+        mainEntity: {
+          '@type': 'ItemList',
+          numberOfItems: articles.length,
+          itemListOrder: 'https://schema.org/ItemListOrderAscending',
+          itemListElement: articles.map((article, i) => ({
+            '@type': 'ListItem',
+            position: i + 1,
+            item: {
+              '@type': 'NewsArticle',
+              headline: article.title,
+              url: article.url,
+              datePublished: article.published_date,
+              publisher: { '@type': 'Organization', name: article.source.name },
+            },
+          })),
+        },
+      },
+      {
+        ...breadcrumbList([
+          ['The Wire', '/'],
+          ...(category ? ([[CATEGORY_MAP[category]?.displayName ?? category, `/${category}`]] as [string, string][]) : []),
+          [story.title, `/story/${storyId}`],
+        ]),
+        '@id': `${url}#breadcrumb`,
+      },
+    ],
   };
 }
 
@@ -107,41 +158,18 @@ function RelatedStories({ stories }: { stories: StoryDetail[] }) {
 
   return (
     <section aria-labelledby="related-heading" className="border-t border-[var(--border)] py-12">
-      <h2 id="related-heading" className="text-display-md font-display mb-6 text-[var(--foreground)]">
+      <h2 id="related-heading" className="text-display-lg font-display mb-8 text-[var(--foreground)]">
         Related coverage
       </h2>
-      <ul className="grid gap-x-8 gap-y-6 sm:grid-cols-2">
-        {stories.map((story) => (
-          <li key={story.slug} className="group relative">
-            <div className="mb-2">
-              <CorroborationMeter outlets={story.independent_count} size="sm" />
-            </div>
-            <h3 className="text-body-md font-display leading-snug text-[var(--foreground)]">
-              <Link
-                href={`/story/${story.slug}`}
-                className="transition-colors after:absolute after:inset-0 after:content-[''] hover:text-[var(--accent)]"
-              >
-                {story.title}
-              </Link>
-            </h3>
-          </li>
+      <div className="grid gap-x-6 gap-y-10 sm:grid-cols-2">
+        {stories.slice(0, 4).map((story) => (
+          <StoryTile key={story.slug} story={story} showExcerpt={false} />
         ))}
-      </ul>
+      </div>
     </section>
   );
 }
 
-/**
- * Cacheable at the edge, purged precisely rather than on a timer.
- *
- * The page was rendered on demand for every visit. It does not need to be: the
- * backend already calls the revalidate webhook when a cluster actually changes,
- * and `fetchStory` tags its request `story:<slug>`, so `revalidateTag` drops
- * exactly this page the moment its corroboration count moves.
- *
- * The interval below is therefore a backstop for a missed webhook, not the
- * mechanism — which is why it can be generous without making anything stale.
- */
 export const revalidate = 300;
 
 /**
@@ -194,16 +222,51 @@ export default async function StoryPage({ params }: StoryPageProps) {
   const outletNames = [...new Set(chronological.map((a) => a.source.name))];
   const first = chronological[0];
   const brokenBy = first ? { name: first.source.name, at: first.published_date } : null;
+  const pictured = chronological.find((a) => a.image_url);
+  const image = pictured?.image_url ? { url: pictured.image_url, credit: pictured.source.name } : null;
+
+  const brief = story.ai_summary;
+  const keyFacts = brief?.key_facts ?? [];
+  const unfolding = brief?.timeline ?? [];
+  const outletGroups = groupByOutlet(articles);
+
+  /**
+   * The contents, built from what this story actually has. A section that
+   * will render nothing gets no entry — a table of contents linking to
+   * nothing is worse than none.
+   */
+  const sections: RailSection[] = [
+    { id: 'brief', label: brief?.synthesis_type === 'llm' ? 'What the sources say' : 'Lead reporting' },
+    ...(keyFacts.length > 0 ? [{ id: 'facts', label: 'Key facts' }] : []),
+    ...(unfolding.length >= 2 ? [{ id: 'unfolding', label: 'How it unfolded' }] : []),
+    { id: 'corroboration', label: 'How it was corroborated' },
+    ...(outletGroups.length >= 2 ? [{ id: 'cadence', label: 'Pickup pattern' }] : []),
+    ...(outletGroups.length >= 2 ? [{ id: 'framing', label: 'How outlets framed it' }] : []),
+    { id: 'sources', label: 'Every source' },
+    ...(related.length > 0 ? [{ id: 'related', label: 'Related coverage' }] : []),
+  ];
+
+  /**
+   * What "Listen" reads: the brief as printed, with its caveats. Discrepancies
+   * are read out too — a listener cannot glance at the amber box.
+   */
+  const listenText = [
+    story.title + '.',
+    brief?.consensus_lead || story.summary || '',
+    keyFacts.length > 0 ? 'Key facts. ' + keyFacts.map((f) => f.fact).join(' ') : '',
+    brief?.discrepancies?.length ? 'Where outlets disagree. ' + brief.discrepancies.join(' ') : '',
+    brief?.open_questions?.length ? 'Still unanswered. ' + brief.open_questions.join(' ') : '',
+    `This story is covered by ${story.independent_count} independent ${story.independent_count === 1 ? 'outlet' : 'outlets'}.`,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    // Citation markers read aloud as "open bracket one" otherwise.
+    .replace(/\[\d+\]/g, '');
 
   return (
-    <article className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-6xl">
       {IS_INDEXABLE && (
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{
-            __html: JSON.stringify(storyStructuredData(story, storyId)),
-          }}
-        />
+        <JsonLd data={storyStructuredData(story, storyId)} />
       )}
       {/*
         One structured-data graph, not two.
@@ -216,23 +279,69 @@ export default async function StoryPage({ params }: StoryPageProps) {
         arbitrarily. See storyStructuredData above for why CollectionPage is
         the honest one.
       */}
-      <StickyStoryNav title={story.title} sourceCount={story.independent_count} />
+      <StickyStoryNav title={story.title} sourceCount={story.independent_count} slug={story.slug} />
 
-      <StoryMasthead story={story} outletNames={outletNames} brokenBy={brokenBy} />
+      {/*
+        Two columns from lg: the reading column at a comfortable measure, and a
+        sticky rail with the evidence at a glance, the actions and the
+        contents. Below lg the rail's content is either inline (Listen, Ask) or
+        not needed (a contents list for a single-column scroll).
+      */}
+      <div className="grid gap-12 lg:grid-cols-[minmax(0,1fr)_17.5rem] xl:gap-16">
+        <article className="min-w-0 max-w-3xl">
+          <StoryMasthead story={story} outletNames={outletNames} brokenBy={brokenBy} image={image} />
 
-      <IntelligenceBrief
-        aiSummary={story.ai_summary}
-        synthesisStatus={story.synthesis_status}
-        sourceCount={story.source_count}
-        independentCount={story.independent_count}
-        fallbackSummary={story.summary}
-      />
+          <div id="brief" className="scroll-mt-[calc(var(--header-h)+4rem)]">
+            <IntelligenceBrief
+              aiSummary={story.ai_summary}
+              synthesisStatus={story.synthesis_status}
+              sourceCount={story.source_count}
+              independentCount={story.independent_count}
+              fallbackSummary={story.summary}
+              slug={story.slug}
+              title={story.title}
+              listenText={listenText}
+            />
+          </div>
 
-      <CorroborationTimeline articles={articles} />
-      <CoverageCadence articles={articles} />
-      <FramingMatrix articles={articles} />
-      <SourceLedger articles={articles} />
-      <RelatedStories stories={related} />
-    </article>
+          <KeyFacts facts={keyFacts} independentCount={story.independent_count} />
+          <StoryUnfolding timeline={unfolding} />
+
+          <div id="corroboration" className="scroll-mt-[calc(var(--header-h)+4rem)]">
+            <CorroborationTimeline articles={articles} />
+          </div>
+          <div id="cadence" className="scroll-mt-[calc(var(--header-h)+4rem)]">
+            <CoverageCadence articles={articles} />
+          </div>
+          <div id="framing" className="scroll-mt-[calc(var(--header-h)+4rem)]">
+            <FramingMatrix articles={articles} />
+          </div>
+          <div id="sources" className="scroll-mt-[calc(var(--header-h)+4rem)]">
+            <SourceLedger articles={articles} />
+          </div>
+          <div id="related" className="scroll-mt-[calc(var(--header-h)+4rem)]">
+            <RelatedStories stories={related} />
+          </div>
+        </article>
+
+        <aside className="hidden lg:block">
+          {/* Offset clears the section bar AND the story bar that slides in
+              beneath it once the masthead scrolls away (~3rem). */}
+          <div className="scroll-slim sticky top-[calc(var(--header-h)+4.25rem)] max-h-[calc(100vh-var(--header-h)-6rem)] overflow-y-auto pb-8">
+            <StoryRail
+              slug={story.slug}
+              title={story.title}
+              independentCount={story.independent_count}
+              articleCount={story.source_count}
+              firstSeenAt={story.first_seen_at}
+              lastUpdatedAt={story.last_updated_at}
+              brokenBy={brokenBy?.name}
+              sections={sections}
+              listenText={listenText}
+            />
+          </div>
+        </aside>
+      </div>
+    </div>
   );
 }

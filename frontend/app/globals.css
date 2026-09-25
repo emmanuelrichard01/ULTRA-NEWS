@@ -5,115 +5,126 @@
    ULTRA-NEWS — THE WIRE ROOM
    Design System & Token Layer
 
-   Visual language: the printed broadsheet, rendered for a screen.
-   Ink on paper, hairline rules, generous measure, one accent colour.
-   Colour is functional — it encodes corroboration state, nothing else.
+   Visual language: a modern editorial portal. Condensed display serif over a
+   quiet grotesque, hairline rules, soft-cornered media, one ink colour and one
+   accent. Colour stays functional — it encodes corroboration state, nothing
+   else — so the photography is what carries the page's colour.
    ============================================ */
 
 /* --------------------------------------------
    1. Palette
    -------------------------------------------- */
 :root {
-  /* Core surfaces — warm, paper-like, never stark white */
-  --ink: #14161d; /* Blue-black primary text, not flat #000 */
-  --paper: #faf8f4; /* Warm off-white newsprint */
-  --slate: #5a6371; /* Secondary text, metadata */
+  /* Core surfaces. The old ground was a warm newsprint beige, which read as
+     "vintage" next to publisher photography and muddied every image's whites.
+     This is a near-neutral paper: warm enough not to glare, clean enough that
+     photographs sit on it the way they would in a modern magazine. */
+  --ink: #111214;
+  --paper: #fbfaf8;
+  --slate: #5b616b;
 
   /* Functional signal colours — corroboration state only */
-  --signal-amber: #b47318; /* "Developing" — 2 independent publishers */
-  --verified-teal: #15507a; /* "Corroborated" — 3+ independent publishers */
-  --wire-red: #a83422; /* Breaking / urgent — spend sparingly */
+  --signal-amber: #b0701a; /* 2 independent publishers */
+  --verified-teal: #17557f; /* 3+ independent publishers */
+  --wire-red: #b3311d; /* Live / breaking — spend sparingly */
 
   /* Derived semantic tokens */
   --background: var(--paper);
   --foreground: var(--ink);
   --foreground-muted: var(--slate);
-  --foreground-subtle: #858d9a; /* Tertiary — timestamps, captions */
+  --foreground-subtle: #8a8f98;
 
   --accent: var(--verified-teal);
   --accent-secondary: var(--signal-amber);
 
-  /* Surfaces: three levels, deliberately close together.
-     --surface and --primary were referenced across the app but never defined,
-     so every `bg-[var(--surface)]` silently resolved to nothing. */
-  --surface: #f3f0ea; /* Cards, panels, inset controls */
-  --surface-elevated: #ffffff; /* Raised above the page */
-  --surface-sunken: #ece8e0; /* Wells, track backgrounds */
+  --surface: #f3f2ee;
+  --surface-elevated: #ffffff;
+  --surface-sunken: #eceae5;
+  /* The inverse ground — dark footer, primary pill buttons, image scrims. */
+  --inverse: #111214;
+  --inverse-foreground: #f5f4f0;
 
-  --border: #ddd8ce; /* Hairline rules */
-  --border-strong: #c3bcae; /* Emphasis rules, active states */
-  --border-hover: #a9a294;
+  --border: #e4e2dc;
+  --border-strong: #cfccc4;
+  --border-hover: #b3afa6;
 
   /* --------------------------------------------
-     2. Typography scale — a fifth-based modular scale
+     2. Typography
      -------------------------------------------- */
-  --measure: 68ch; /* Optimal reading width for body copy */
+  --measure: 68ch;
 
   /* --------------------------------------------
      3. Shape
+
+     Soft rather than sharp. The 4px corners belonged to the broadsheet idiom;
+     the inspiration for this pass is the modern portal, where media sits in
+     12-16px frames and controls are pills. Chips stay tighter than cards so
+     the hierarchy survives.
      -------------------------------------------- */
-  --radius-card: 4px;
-  --radius-chip: 3px;
+  --radius-card: 14px;
+  --radius-media: 12px;
+  --radius-chip: 8px;
   --radius-pill: 999px;
 
   /* --------------------------------------------
-     3b. Feed geometry
+     3b. Page geometry
      -------------------------------------------- */
-
-  /* The Wire's sidebar. Only the landing edition runs two columns — the ranked
-     editions are a single ordering and a rail beside them would compete with
-     the ranking rather than add to it. */
-  --sidebar-width: 19rem; /* 304px */
+  --sidebar-width: 20rem;
+  /* The sticky section bar. Everything that sticks beneath it (date sentinels,
+     story nav) offsets by this rather than by a hardcoded h-14. */
+  --header-h: 3rem;
+  --page-max: 80rem;
 
   /* --------------------------------------------
      4. Elevation — light and restrained
      -------------------------------------------- */
-  --shadow-sm: 0 1px 2px rgb(20 22 29 / 0.04);
-  --shadow-md: 0 2px 8px rgb(20 22 29 / 0.06), 0 1px 2px rgb(20 22 29 / 0.04);
-  --shadow-lg: 0 8px 28px rgb(20 22 29 / 0.10), 0 2px 6px rgb(20 22 29 / 0.05);
+  --shadow-sm: 0 1px 2px rgb(17 18 20 / 0.04);
+  --shadow-md: 0 4px 14px -4px rgb(17 18 20 / 0.08), 0 1px 2px rgb(17 18 20 / 0.04);
+  --shadow-lg: 0 18px 48px -12px rgb(17 18 20 / 0.18), 0 2px 6px rgb(17 18 20 / 0.05);
 
   /* --------------------------------------------
      5. Motion
      -------------------------------------------- */
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
-  --duration-fast: 120ms;
-  --duration-normal: 200ms;
-  --duration-slow: 400ms;
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --duration-fast: 140ms;
+  --duration-normal: 220ms;
+  --duration-slow: 420ms;
+  --duration-media: 900ms;
 }
 
 /* --- Dark mode: not an inversion, a separate composition --- */
 .dark {
-  --ink: #e8e6e1;
-  --paper: #0f1115;
-  --slate: #9aa2b0;
+  --ink: #ecebe7;
+  --paper: #0c0d0f;
+  --slate: #a0a5ae;
 
-  /* Signal colours lifted for contrast against a dark ground */
-  --signal-amber: #e5a54b;
-  --verified-teal: #5b9dd9;
-  --wire-red: #e2705c;
+  --signal-amber: #e3a650;
+  --verified-teal: #6aa8df;
+  --wire-red: #ec7560;
 
   --background: var(--paper);
   --foreground: var(--ink);
   --foreground-muted: var(--slate);
-  --foreground-subtle: #6b7280;
+  --foreground-subtle: #6f747d;
 
   --accent: var(--verified-teal);
   --accent-secondary: var(--signal-amber);
 
-  --surface: #171a21;
-  --surface-elevated: #1d212a;
-  --surface-sunken: #12151b;
+  --surface: #141518;
+  --surface-elevated: #1a1c20;
+  --surface-sunken: #0f1012;
+  --inverse: #ecebe7;
+  --inverse-foreground: #0c0d0f;
 
-  /* Borders were #1e2028 on a #0e1015 ground — effectively invisible.
-     These clear 3:1 against the background at every level. */
-  --border: #2b3039;
-  --border-strong: #3d434f;
-  --border-hover: #4d5462;
+  --border: #25272c;
+  --border-strong: #363941;
+  --border-hover: #4a4d56;
 
-  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
-  --shadow-md: 0 2px 8px rgb(0 0 0 / 0.35), 0 1px 2px rgb(0 0 0 / 0.25);
-  --shadow-lg: 0 8px 28px rgb(0 0 0 / 0.45), 0 2px 6px rgb(0 0 0 / 0.3);
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.35);
+  --shadow-md: 0 4px 14px -4px rgb(0 0 0 / 0.5), 0 1px 2px rgb(0 0 0 / 0.3);
+  --shadow-lg: 0 18px 48px -12px rgb(0 0 0 / 0.7), 0 2px 6px rgb(0 0 0 / 0.35);
 }
 
 /* --------------------------------------------
@@ -137,17 +148,23 @@
   --color-surface: var(--surface);
   --color-surface-elevated: var(--surface-elevated);
   --color-surface-sunken: var(--surface-sunken);
+  --color-inverse: var(--inverse);
+  --color-inverse-foreground: var(--inverse-foreground);
 
-  --font-display: var(--font-fraunces);
+  /* These feed Tailwind's `font-*` utilities, which inline the value at the
+     element. Hand-written rules below must NOT reference --font-display and
+     friends: those are declared on :root, next/font declares --font-instrument
+     on <body>, and a custom property resolves where it is declared — so at
+     :root the reference is empty and the rule silently falls back to the
+     system font. They name the next/font variables directly instead. */
+  --font-display: var(--font-instrument);
   --font-body: var(--font-geist);
   --font-mono: var(--font-ibm-plex-mono);
-  /* `font-serif` was used throughout the app but never mapped, so it fell back
-     to browser Times next to Fraunces headings — two serifs on one card. */
-  --font-serif: var(--font-fraunces);
+  --font-serif: var(--font-instrument);
   --font-sans: var(--font-geist);
 
-  --radius-card: 4px;
-  --radius-chip: 3px;
+  --radius-card: 14px;
+  --radius-chip: 8px;
 }
 
 /* --------------------------------------------
@@ -156,12 +173,14 @@
 html {
   scroll-behavior: smooth;
   -webkit-text-size-adjust: 100%;
+  /* Anchor jumps and focus scrolling clear the sticky section bar. */
+  scroll-padding-top: calc(var(--header-h) + 1rem);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-body), system-ui, sans-serif;
+  font-family: var(--font-geist), system-ui, sans-serif;
   font-synthesis-weight: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -171,50 +190,80 @@ body {
    Typography roles
    -------------------------------------------- */
 
-/* Display: Fraunces — editorial headlines */
+/* Display: Instrument Serif — a condensed editorial serif.
+
+   Fraunces was a warm, wide, soft serif: right for a broadsheet pastiche, wrong
+   for the portal this pass is modelled on, where headlines are tall and narrow
+   and a lead can run to three lines without dominating the fold. Instrument
+   Serif ships one weight, so nothing here asks for bold — the size does the
+   work, as it does in print. */
 .font-display {
-  font-family: var(--font-display), ui-serif, Georgia, serif;
-  font-weight: 600;
-  letter-spacing: -0.02em;
+  font-family: var(--font-instrument), ui-serif, Georgia, serif;
+  font-weight: 400;
+  letter-spacing: -0.012em;
+  font-feature-settings: "kern", "liga", "onum" 0;
 }
 
-/* Data: IBM Plex Mono — timestamps, counts, machine-verified facts.
-   Deliberately restrained: this is an accent voice, not the body voice. */
+/* Small headlines switch to the grotesque.
+
+   A condensed hairline serif below ~17px loses its contrast strokes on
+   ordinary screens and turns spidery. The reference layouts do the same thing:
+   the serif carries leads and section heads, and dense lists (Most Read,
+   trending rails) run in a medium sans. Doing it here, by pairing, means every
+   existing `font-display text-body-*` headline in the app gets the right face
+   without touching the component. */
+.font-display.text-body-sm,
+.font-display.text-body-md,
+.font-display.text-body-lg {
+  font-family: var(--font-geist), system-ui, sans-serif;
+  font-weight: 500;
+  letter-spacing: -0.011em;
+}
+
+/* Data: IBM Plex Mono — timestamps, counts, machine-verified facts. */
 .font-data {
-  font-family: var(--font-mono), ui-monospace, monospace;
+  font-family: var(--font-ibm-plex-mono), ui-monospace, monospace;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.01em;
 }
 
-/* --- Fluid editorial type scale --- */
+/* --- Fluid editorial type scale ---
+   Sizes are ~15% larger than the Fraunces scale they replace: a condensed face
+   sets narrower, so matching the old line lengths needs a bigger size. */
+.text-display-3xl {
+  font-size: clamp(3.25rem, 7vw + 1rem, 6.5rem);
+  line-height: 0.95;
+  letter-spacing: -0.028em;
+}
+
 .text-display-2xl {
-  font-size: clamp(2.75rem, 5vw + 1rem, 4.5rem);
-  line-height: 1.02;
-  letter-spacing: -0.035em;
-}
-
-.text-display-xl {
-  font-size: clamp(2rem, 3.5vw + 0.75rem, 3rem);
-  line-height: 1.06;
-  letter-spacing: -0.03em;
-}
-
-.text-display-lg {
-  font-size: clamp(1.5rem, 2vw + 0.75rem, 2rem);
-  line-height: 1.12;
+  font-size: clamp(2.6rem, 5vw + 1rem, 5rem);
+  line-height: 1;
   letter-spacing: -0.022em;
 }
 
+.text-display-xl {
+  font-size: clamp(2.2rem, 3.6vw + 0.9rem, 3.5rem);
+  line-height: 1.02;
+  letter-spacing: -0.02em;
+}
+
+.text-display-lg {
+  font-size: clamp(1.75rem, 2.2vw + 0.8rem, 2.35rem);
+  line-height: 1.08;
+  letter-spacing: -0.015em;
+}
+
 .text-display-md {
-  font-size: clamp(1.25rem, 1.2vw + 0.75rem, 1.5rem);
-  line-height: 1.2;
-  letter-spacing: -0.018em;
+  font-size: clamp(1.4rem, 1.2vw + 0.85rem, 1.72rem);
+  line-height: 1.14;
+  letter-spacing: -0.01em;
 }
 
 .text-display-sm {
-  font-size: 1.0625rem;
-  line-height: 1.3;
-  letter-spacing: -0.012em;
+  font-size: 1.28rem;
+  line-height: 1.2;
+  letter-spacing: -0.006em;
 }
 
 .text-body-lg {
@@ -232,10 +281,9 @@ body {
   line-height: 1.55;
 }
 
-/* Metadata label: the one place small-caps mono is appropriate.
-   Floor of 11px — the old 8-9px `tracking-widest` labels were unreadable. */
+/* Metadata label. Floor of 11px — the old 8-9px labels were unreadable. */
 .text-label {
-  font-family: var(--font-mono), ui-monospace, monospace;
+  font-family: var(--font-ibm-plex-mono), ui-monospace, monospace;
   font-size: 0.6875rem;
   line-height: 1.3;
   letter-spacing: 0.08em;
@@ -245,7 +293,7 @@ body {
 }
 
 .text-caption {
-  font-family: var(--font-mono), ui-monospace, monospace;
+  font-family: var(--font-ibm-plex-mono), ui-monospace, monospace;
   font-size: 0.75rem;
   line-height: 1.45;
   letter-spacing: 0.01em;
@@ -255,6 +303,33 @@ body {
 /* Constrain body copy to a readable measure */
 .measure {
   max-width: var(--measure);
+}
+
+/* --------------------------------------------
+   Browser surfaces
+
+   The parts of a page nobody draws still ship: the text caret, native
+   checkboxes and range inputs, link underlines, placeholder text and the
+   page scrollbar all default to the browser's palette, not this one.
+   -------------------------------------------- */
+html {
+  accent-color: var(--accent);
+  scrollbar-color: color-mix(in srgb, var(--foreground) 22%, transparent) transparent;
+}
+
+input,
+textarea {
+  caret-color: var(--accent);
+}
+
+::placeholder {
+  color: var(--foreground-subtle);
+  opacity: 1;
+}
+
+a {
+  text-underline-offset: 0.2em;
+  text-decoration-thickness: from-font;
 }
 
 /* --------------------------------------------
@@ -706,6 +781,387 @@ body {
   background: color-mix(in srgb, var(--foreground) 20%, transparent);
 }
 
+/* In `@layer components`, not unlayered. Unlayered CSS outranks every
+   Tailwind layer, so `.pill { display: inline-flex }` silently beat `hidden`
+   and `.media-frame { position: relative }` beat `absolute` — the second
+   collapsed every overlay card's image frame to zero height. Inside the
+   components layer, utilities on the same element win, as they should. */
+@layer components {
+/* ============================================
+   Editorial micro-interactions
+
+   A small, fixed vocabulary, used the same way everywhere, so a reader learns
+   it once: headlines underline themselves, media drifts closer, sections rise
+   into place, controls respond with a spring. Nothing moves that the reader did
+   not cause, except the ticker — and that pauses under the pointer.
+   ============================================ */
+
+/* --- Headline underline sweep ---
+   A 1px rule draws in from the left under the headline of whichever card the
+   pointer is over. Background-image rather than text-decoration so it can
+   animate, and so it follows every line of a wrapped headline: the link is
+   inline, and an inline box's background is painted per line fragment. */
+.headline-link {
+  background-image: linear-gradient(currentColor, currentColor);
+  background-repeat: no-repeat;
+  background-position: 0 100%;
+  background-size: 0% 1px;
+  transition: background-size 520ms var(--ease-out), color var(--duration-normal) var(--ease-out);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+.group:hover .headline-link,
+.headline-link:hover,
+.headline-link:focus-visible {
+  background-size: 100% 1px;
+}
+
+/* On an image overlay the rule is paper-coloured, and slightly heavier so it
+   survives a busy photograph. */
+.headline-link-inverse {
+  background-image: linear-gradient(rgb(255 255 255 / 0.85), rgb(255 255 255 / 0.85));
+  background-size: 0% 1.5px;
+}
+.group:hover .headline-link-inverse {
+  background-size: 100% 1.5px;
+}
+
+/* --- Media drift ---
+   Slow and small: 4.5% over 900ms reads as the photograph leaning in, not as
+   a zoom. Anything faster looks like a hover effect; this looks like depth. */
+.media-frame {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-media);
+  background: var(--surface-sunken);
+  isolation: isolate;
+}
+
+.media-frame img {
+  transition: transform var(--duration-media) var(--ease-out),
+    opacity 500ms var(--ease-out), filter var(--duration-media) var(--ease-out);
+}
+
+.group:hover .media-frame img {
+  transform: scale(1.045);
+}
+
+/* A hairline inner edge, so a white-background publisher image does not bleed
+   into the paper ground and lose its frame. */
+.media-frame::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.06);
+  pointer-events: none;
+  z-index: 2;
+}
+.dark .media-frame::after {
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.06);
+}
+
+/* Scrim for headlines set over photographs. Weighted to the bottom third,
+   where the type sits, so the upper image stays clear. */
+.media-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(
+    to top,
+    rgb(8 9 11 / 0.88) 0%,
+    rgb(8 9 11 / 0.55) 32%,
+    rgb(8 9 11 / 0.08) 62%,
+    transparent 78%
+  );
+  pointer-events: none;
+}
+
+/* --- Card lift ---
+   Bordered cards rise a pixel and gain shadow. Used only where a card has a
+   visible container — lifting borderless text would read as a layout shift. */
+.card-lift {
+  transition: transform var(--duration-normal) var(--ease-out),
+    box-shadow var(--duration-normal) var(--ease-out),
+    border-color var(--duration-normal) var(--ease-out);
+}
+.card-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--border-strong);
+}
+
+/* --- Scroll reveal ---
+   Sections rise 14px and fade in as they enter the viewport, driven by the
+   scroll timeline — no JavaScript, no observer, no layout thrash. Browsers
+   without scroll-driven animations simply show the section, which is the
+   correct degraded state: the effect is decoration on a finished page. */
+@supports (animation-timeline: view()) {
+  .reveal {
+    animation: reveal-rise linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 38%;
+  }
+}
+
+@keyframes reveal-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* --- Staggered entrance for grids on first paint --- */
+.stagger > * {
+  animation: fade-in-up var(--duration-slow) var(--ease-out) both;
+}
+.stagger > *:nth-child(2) { animation-delay: 60ms; }
+.stagger > *:nth-child(3) { animation-delay: 120ms; }
+.stagger > *:nth-child(4) { animation-delay: 180ms; }
+.stagger > *:nth-child(5) { animation-delay: 240ms; }
+.stagger > *:nth-child(6) { animation-delay: 300ms; }
+
+/* --- Eyebrow ---
+   The section kicker from the reference layouts: a three-line glyph and a
+   small-caps label above a large serif heading. The glyph is drawn in CSS so
+   it inherits colour and needs no icon import. */
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-family: var(--font-ibm-plex-mono), ui-monospace, monospace;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--foreground-muted);
+}
+.eyebrow::before {
+  content: '';
+  width: 13px;
+  height: 10px;
+  flex-shrink: 0;
+  background:
+    linear-gradient(currentColor, currentColor) 0 0 / 3px 1.5px no-repeat,
+    linear-gradient(currentColor, currentColor) 5px 0 / 8px 1.5px no-repeat,
+    linear-gradient(currentColor, currentColor) 0 50% / 3px 1.5px no-repeat,
+    linear-gradient(currentColor, currentColor) 5px 50% / 8px 1.5px no-repeat,
+    linear-gradient(currentColor, currentColor) 0 100% / 3px 1.5px no-repeat,
+    linear-gradient(currentColor, currentColor) 5px 100% / 8px 1.5px no-repeat;
+}
+
+/* --- Pill buttons --- */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: var(--radius-pill);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  transition: background-color var(--duration-normal) var(--ease-out),
+    color var(--duration-normal) var(--ease-out),
+    border-color var(--duration-normal) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-normal) var(--ease-out);
+}
+.pill:active {
+  transform: scale(0.97);
+}
+.pill-solid {
+  background: var(--inverse);
+  color: var(--inverse-foreground);
+  padding: 0.7rem 1.1rem;
+}
+.pill-solid:hover {
+  box-shadow: 0 6px 18px -6px color-mix(in srgb, var(--inverse) 60%, transparent);
+}
+.pill-outline {
+  border: 1px solid var(--border-strong);
+  color: var(--foreground);
+  padding: 0.6rem 1rem;
+}
+.pill-outline:hover {
+  border-color: var(--foreground);
+}
+
+/* Arrow that nudges forward on hover — the "See all →" affordance. */
+.nudge-arrow {
+  transition: transform var(--duration-normal) var(--ease-spring);
+}
+.group:hover .nudge-arrow,
+a:hover > .nudge-arrow,
+button:hover > .nudge-arrow {
+  transform: translateX(3px);
+}
+
+/* --- Serif numerals for ranked lists ("01", "02") --- */
+.rank-numeral {
+  font-family: var(--font-instrument), ui-serif, Georgia, serif;
+  font-style: italic;
+  font-size: 1.75rem;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--foreground-subtle);
+  font-variant-numeric: lining-nums tabular-nums;
+  transition: color var(--duration-normal) var(--ease-out);
+}
+.group:hover .rank-numeral {
+  color: var(--foreground);
+}
+
+/* --- Live dot --- */
+.live-dot {
+  position: relative;
+  display: inline-flex;
+  width: 7px;
+  height: 7px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--wire-red);
+}
+.live-dot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: inherit;
+  animation: live-pulse 2.2s var(--ease-out) infinite;
+}
+@keyframes live-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.55;
+  }
+  70%,
+  100% {
+    transform: scale(2.8);
+    opacity: 0;
+  }
+}
+
+/* --- Ticker ---
+   Edges fade rather than clip, so headlines slide in from nowhere instead of
+   appearing cut in half at the container wall. */
+.ticker-mask {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 4%, #000 96%, transparent);
+  mask-image: linear-gradient(to right, transparent, #000 4%, #000 96%, transparent);
+}
+
+/* --- Streaming caret ---
+   Sits at the end of an answer while tokens are still arriving. Steps rather
+   than a fade, like a terminal cursor, so it reads as "still writing" and not
+   as a loading shimmer. */
+.stream-caret::after {
+  content: '';
+  display: inline-block;
+  width: 0.5em;
+  height: 1.05em;
+  margin-left: 2px;
+  vertical-align: -0.16em;
+  border-radius: 1px;
+  background: var(--accent);
+  animation: caret-blink 1s steps(2, start) infinite;
+}
+@keyframes caret-blink {
+  to {
+    visibility: hidden;
+  }
+}
+
+/* --- Citation marker ---
+   Inline `[2]` in an Ask answer, rendered as a small numbered chip. */
+.cite-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  padding: 0 0.3rem;
+  margin: 0 0.1rem;
+  border-radius: 6px;
+  vertical-align: 0.12em;
+  font-family: var(--font-ibm-plex-mono), ui-monospace, monospace;
+  font-size: 0.65rem;
+  font-weight: 600;
+  line-height: 1;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+  transition: background-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out), transform var(--duration-fast) var(--ease-spring);
+}
+.cite-chip:hover,
+.cite-chip[data-active='true'] {
+  background: var(--accent);
+  color: var(--background);
+  transform: translateY(-1px);
+}
+
+/* --- Reading progress (story page) --- */
+.read-progress {
+  transform-origin: 0 50%;
+  transform: scaleX(0);
+}
+@supports (animation-timeline: scroll()) {
+  .read-progress {
+    animation: read-grow linear both;
+    animation-timeline: scroll(root block);
+  }
+}
+@keyframes read-grow {
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* --- Sliding tab indicator ---
+   Topic list in "Browse by topic": the active row's marker slides in from
+   the left and the label shifts to meet it. */
+.topic-row {
+  position: relative;
+  transition: color var(--duration-normal) var(--ease-out),
+    padding-left var(--duration-slow) var(--ease-out);
+}
+.topic-row::before {
+  content: '//';
+  color: var(--foreground-subtle);
+  position: absolute;
+  left: 0;
+  opacity: 0;
+  transform: translateX(-8px);
+  transition: opacity var(--duration-normal) var(--ease-out),
+    transform var(--duration-slow) var(--ease-out);
+}
+/* The marker belongs to the vertical list; the mobile row of pills marks
+   selection with its border instead. */
+@media (min-width: 1024px) {
+  .topic-row[aria-selected='true'] {
+    padding-left: 1.6em;
+  }
+  .topic-row[aria-selected='true']::before {
+    opacity: 1;
+    transform: none;
+  }
+}
+} /* end @layer components */
+
+/* Equaliser bars for "Listen to brief" while speech is playing. */
+@keyframes eq {
+  0%,
+  100% {
+    transform: scaleY(0.35);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
 /* --------------------------------------------
    Reduced motion
    -------------------------------------------- */
@@ -715,8 +1171,16 @@ body {
   }
 
   .animate-marquee,
-  .skeleton::after {
+  .skeleton::after,
+  .live-dot::after,
+  .stream-caret::after,
+  .reveal,
+  .stagger > * {
     animation: none;
+  }
+
+  .group:hover .media-frame img {
+    transform: none;
   }
 
   /* The blanket rule below collapses every animation to 0.01ms, which would

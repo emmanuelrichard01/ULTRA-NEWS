@@ -9,17 +9,19 @@ import { useInView } from "react-intersection-observer";
 import StoryCard from "@/components/StoryCard";
 import StoryCardSkeleton from "@/components/StoryCardSkeleton";
 import TopicFilter from "@/components/TopicFilter";
-import LeadCarousel from "@/components/LeadCarousel";
-import UnconfirmedPanel from "@/components/UnconfirmedPanel";
 import EditionBar from "@/components/EditionBar";
+import FrontPage from "@/components/FrontPage";
+import { OverlayCard } from "@/components/cards";
 import { useAsk } from "@/components/AskProvider";
-import MovingFastest from "@/components/MovingFastest";
+import TopicInsights from "@/components/TopicInsights";
+import WireRail from "@/components/WireRail";
 import WireStatus from "@/components/WireStatus";
 import { fetchStories } from "@/lib/api";
 import type { PaginatedResponse, StoryDetail } from "@/lib/types";
 import { CATEGORY_MAP } from "@/lib/types";
 import { CORROBORATION_FILTERS } from "@/lib/corroboration";
 import type { Edition } from "@/lib/editions";
+import { ArrowDown } from '@/components/icons';
 
 /**
  * FeedPage — renders one edition.
@@ -61,6 +63,11 @@ interface FeedPageProps {
   leadStories?: StoryDetail[];
   /** Sidebar ranking, for the editions that carry one. */
   momentumStories?: StoryDetail[];
+  /**
+   * The front page's topic browser, seeded server-side so the block is
+   * complete in the first HTML. Present only on The Wire's root route.
+   */
+  frontPage?: { initialTopic: string; initialTopicStories: StoryDetail[] };
 }
 
 /** Date sentinels break the feed into scannable runs, as a broadsheet would. */
@@ -93,6 +100,7 @@ export default function FeedPage({
   initialStories,
   leadStories: serverLeads = [],
   momentumStories = [],
+  frontPage,
 }: FeedPageProps) {
   const searchParams = useSearchParams();
   const initialCursor = searchParams.get("cursor") ?? undefined;
@@ -206,6 +214,13 @@ export default function FeedPage({
       ? serverLeads
       : stories.slice(0, 1);
 
+  /**
+   * The editorial front page: The Wire, unfiltered, first page, with leads.
+   * Anything else — a filter, a topic, a cursor — is a question about the
+   * feed, and gets the feed.
+   */
+  const isFront = Boolean(frontPage) && leadStories.length > 0 && !category;
+
   // Matched by slug rather than by position. The Record's lead is row one and
   // slicing would do; The Wire's arrive from a separate query and sit at
   // whatever chronological positions they belong to, so a positional slice
@@ -246,70 +261,34 @@ export default function FeedPage({
 
   const showFilters = availableFilters.length > 1;
   const showSidebar = edition.showSidebar && !titleOverride;
-
-  /**
-   * The unconfirmed column, drawn from the feed already on the page.
-   *
-   * No extra request: The Wire's first page is ordered by recency and is
-   * overwhelmingly single-source, so the stories this panel wants are the ones
-   * already loaded. It is also only meaningful where single-source stories can
-   * appear at all — Developing and The Record both enforce a floor above one,
-   * so there is nothing for it to show there.
-   */
-  const unconfirmedStories = stories.filter((s) => s.independent_count <= 1);
-  const showUnconfirmed =
-    edition.showUnconfirmed && isDefaultView && unconfirmedStories.length >= 3;
+  // Only the ranked editions keep a lead block above their list; the front
+  // page renders its own.
+  const showLeadBlock = leadStories.length > 0 && !isFront;
 
   const feedColumn = (
     <div className="min-w-0 flex-1">
       {/*
-        The lead block: what has been confirmed, beside what has not.
-
-        The pairing is the argument. On the left, the most recent reporting a
-        second newsroom has stood up; on the right, the most recent reporting
-        nobody has. Same wire, same hour, split by the only question this
-        product exists to answer — so a first-time visitor sees what Ultra News
-        is before reading a line of explanation.
-
-        Side by side from xl, stacked below it: at narrower widths the panel
-        would squeeze the hero's overlaid headline into a column too narrow to
-        set display type in.
+        Ranked editions promote their strongest rows into a lead block: the
+        first as a full-bleed photograph, up to three more as tiles. The ranks
+        in the list beneath start after them.
       */}
-      {leadStories.length > 0 && (
-        <div
-          className={`mb-8 border-b border-[var(--border)] pb-8 ${
-            showUnconfirmed ? 'grid gap-6 xl:grid-cols-[1fr_17rem]' : ''
-          }`}
-        >
-          <LeadCarousel
-            stories={leadStories}
-            kicker={edition.leadKicker}
+      {showLeadBlock && (
+        <section aria-label="Lead stories" className="mb-10 space-y-4">
+          <OverlayCard
+            story={leadStories[0]}
+            size="hero"
+            priority
             timeField={edition.timeField}
             timePrefix={edition.timePrefix}
-            // Without the companion panel the lead has the whole column, and
-            // needs a wider crop to stay a picture rather than a wall.
-            layout={showUnconfirmed ? 'column' : 'wide'}
           />
-
-          {/*
-            The panel matches the hero's height rather than setting its own.
-
-            A grid row is as tall as its tallest item, so with both in normal
-            flow whichever had more content won — and it was the panel, leaving
-            the hero's column short and a bordered card hanging 30-odd pixels
-            below it. Taking the panel out of flow at xl (absolute inside a
-            stretched cell) means it contributes no height: the hero sizes the
-            row, and the panel fills exactly that. Below xl the two stack, so
-            the child returns to normal flow and sizes itself.
-          */}
-          {showUnconfirmed && (
-            <div className="relative">
-              <div className="xl:absolute xl:inset-0">
-                <UnconfirmedPanel stories={unconfirmedStories} />
-              </div>
+          {leadStories.length > 1 && (
+            <div className="stagger grid gap-4 sm:grid-cols-3">
+              {leadStories.slice(1, 4).map((story) => (
+                <OverlayCard key={story.slug} story={story} />
+              ))}
             </div>
           )}
-        </div>
+        </section>
       )}
 
       {groups ? (
@@ -323,9 +302,9 @@ export default function FeedPage({
               and the heading that did say so scrolled off long before. Sticking
               it keeps the answer on screen for exactly as long as it is true.
 
-              Offset to clear the site header, which is itself sticky at h-14.
+              Offset to clear the sticky section bar (--header-h).
             */}
-            <h2 className="section-rule text-label sticky top-14 z-20 -mx-2 mb-1 bg-[var(--background)]/95 px-2 py-2 text-[var(--foreground-subtle)] backdrop-blur supports-[backdrop-filter]:bg-[var(--background)]/80">
+            <h2 className="section-rule text-label sticky top-[var(--header-h)] z-20 -mx-2 mb-1 bg-[var(--background)]/95 px-2 py-2.5 text-[var(--foreground-subtle)] backdrop-blur supports-[backdrop-filter]:bg-[var(--background)]/80">
               {group.sentinel}
             </h2>
             {group.stories.map((story) => (
@@ -344,7 +323,7 @@ export default function FeedPage({
             variant="standard"
             // The leads hold the top positions in a ranked edition, so the
             // list beneath them starts after however many were promoted.
-            rank={edition.showRanks ? i + 1 + leadStories.length : undefined}
+            rank={edition.showRanks ? i + 1 + (showLeadBlock ? Math.min(leadStories.length, 4) : 0) : undefined}
             {...cardProps(story, edition)}
           />
         ))
@@ -353,18 +332,39 @@ export default function FeedPage({
   );
 
   return (
-    <div className={`mx-auto ${showSidebar ? "max-w-6xl" : "max-w-5xl"}`}>
+    <div className={`mx-auto ${isFront ? "max-w-[var(--page-max)]" : showSidebar ? "max-w-6xl" : "max-w-5xl"}`}>
+      {isFront && frontPage && (
+        <>
+          <h1 className="sr-only">Ultra News — The Wire</h1>
+          <FrontPage
+            leads={leadStories}
+            momentum={momentumStories}
+            feed={stories}
+            initialTopic={frontPage.initialTopic}
+            initialTopicStories={frontPage.initialTopicStories}
+          />
+        </>
+      )}
+
+      <div className={isFront ? "mt-16 sm:mt-20" : ""}>
       <EditionBar
         current={edition}
         titleOverride={titleOverride}
+        heading={isFront ? "Latest on the wire" : undefined}
+        asSection={isFront}
         orientation={orientation}
         status={
           edition.showStatus && stories.length > 0 ? (
             <WireStatus stories={stories} totalCount={totalCount} />
           ) : null
         }
-        onAsk={openAsk}
+        onAsk={() => openAsk()}
       />
+
+      {/* A topic page describes its beat before listing it. */}
+      {category && isDefaultView && !initialCursor && (
+        <TopicInsights category={category} stories={stories} totalCount={totalCount} />
+      )}
 
       {/* --------------------------------------------------------- controls
         One row, and every control on it names what it does.
@@ -401,7 +401,7 @@ export default function FeedPage({
               role="group"
               aria-labelledby="corroboration-legend"
               aria-label="Filter by corroboration level"
-              className="inline-flex rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-1"
+              className="inline-flex rounded-[var(--radius-pill)] border border-[var(--border)] bg-[var(--surface)] p-1"
             >
               {availableFilters.map((f) => {
                 const isActive = effectiveMinSources === f.minSources;
@@ -411,7 +411,7 @@ export default function FeedPage({
                     onClick={() => setMinSources(f.minSources)}
                     aria-pressed={isActive}
                     title={f.hint}
-                    className={`text-label flex items-center gap-2 rounded-[var(--radius-chip)] px-3 py-1.5 transition-colors ${
+                    className={`text-label flex items-center gap-2 rounded-[var(--radius-pill)] px-3 py-1.5 transition-all duration-200 ${
                       isActive
                         ? "bg-[var(--foreground)] text-[var(--background)]"
                         : "text-[var(--foreground-muted)] hover:text-[var(--foreground)]"
@@ -479,7 +479,7 @@ export default function FeedPage({
       */}
       {!data && queryStatus !== "error" && (
         <div>
-          {edition.showLead && <StoryCardSkeleton variant="lead" />}
+          {edition.showLead && <div className="skeleton mb-8 aspect-[16/10] w-full rounded-[var(--radius-card)]" />}
           {Array.from({ length: 6 }).map((_, i) => (
             <StoryCardSkeleton key={i} variant="standard" />
           ))}
@@ -536,8 +536,8 @@ export default function FeedPage({
                 the bottom of the ranking and the "all developing" link under
                 it, which was the point of the panel.
               */}
-              <aside className="scroll-slim w-full shrink-0 self-start lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:w-[var(--sidebar-width)]">
-                <MovingFastest stories={momentumStories} />
+              <aside className="scroll-slim w-full shrink-0 self-start lg:sticky lg:top-[calc(var(--header-h)+1.5rem)] lg:max-h-[calc(100vh-var(--header-h)-3rem)] lg:overflow-y-auto lg:w-[var(--sidebar-width)]">
+                <WireRail leads={serverLeads.length > 0 ? serverLeads : momentumStories} />
               </aside>
             </div>
           ) : (
@@ -556,9 +556,10 @@ export default function FeedPage({
               <>
                 <button
                   onClick={() => fetchNextPage()}
-                  className="text-label rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] px-5 py-3 text-[var(--foreground)] transition-colors hover:border-[var(--border-hover)]"
+                  className="pill pill-outline group"
                 >
                   Load more stories
+                  <ArrowDown className="transition-transform duration-300 group-hover:translate-y-0.5" />
                 </button>
                 <span className="font-data text-[11px] tabular-nums text-[var(--foreground-subtle)]">
                   {stories.length} of {totalCount.toLocaleString()}
@@ -574,6 +575,7 @@ export default function FeedPage({
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

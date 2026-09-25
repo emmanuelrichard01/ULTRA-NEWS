@@ -40,6 +40,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }));
 
   const staticPages: MetadataRoute.Sitemap = [
+    { path: '/briefing', priority: 0.8, changeFrequency: 'hourly' as const },
     { path: '/about', priority: 0.6, changeFrequency: 'monthly' as const },
     { path: '/rss', priority: 0.5, changeFrequency: 'weekly' as const },
     { path: '/subscribe', priority: 0.3, changeFrequency: 'yearly' as const },
@@ -65,18 +66,28 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
    */
   let stories: MetadataRoute.Sitemap = [];
   try {
-    const first = await fetchStories({ sort: 'latest', limit: 50 });
+    const [first, record] = await Promise.all([
+      fetchStories({ sort: 'latest', limit: 50 }),
+      // The best-corroborated stories can be older than two pages of the
+      // feed, and they are exactly the pages worth a crawler's time.
+      fetchStories({ sort: 'significance', minSources: 3, limit: 50 }),
+    ]);
     const second = first.next_cursor
       ? await fetchStories({ sort: 'latest', limit: 50, cursor: first.next_cursor })
       : { items: [] };
 
-    stories = [...first.items, ...second.items].map((story) => ({
-      url: absoluteUrl(`/story/${story.slug}`),
-      lastModified: new Date(story.last_updated_at),
-      changeFrequency: 'daily' as const,
-      // Corroborated stories are the ones worth surfacing first.
-      priority: story.independent_count >= 3 ? 0.8 : 0.6,
-    }));
+    const seen = new Set<string>();
+    stories = [...record.items, ...first.items, ...second.items]
+      .filter((story) => (seen.has(story.slug) ? false : (seen.add(story.slug), true)))
+      .map((story) => ({
+        url: absoluteUrl(`/story/${story.slug}`),
+        lastModified: new Date(story.last_updated_at),
+        changeFrequency: 'daily' as const,
+        // Weighted by evidence: corroborated first, lone reports last.
+        priority: story.independent_count >= 3 ? 0.8 : story.independent_count === 2 ? 0.6 : 0.4,
+        // Image sitemap entries: the lead photograph, as publishers expose it.
+        ...(story.image_url ? { images: [story.image_url] } : {}),
+      }));
   } catch {
     // A sitemap missing its stories is worth serving; a 500 is not. fetchStories
     // already swallows its own errors and returns an empty page, so this is a

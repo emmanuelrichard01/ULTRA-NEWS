@@ -29,8 +29,27 @@ import AskWireModal from './AskWireModal';
  * mounted last winning. One provider, one dialog, one listener.
  */
 
+/**
+ * What a caller can hand the dialog when opening it.
+ *
+ *   query  asked immediately — a suggestion chip, a "what's the latest on…"
+ *          link. Opening with a question and making the reader press Ask again
+ *          would be a confirmation step for something they already chose.
+ *   story  scopes the question to one story ("Ask about this story"). The
+ *          backend then grounds the answer in that story's whole cluster first.
+ */
+export interface AskOptions {
+  query?: string;
+  story?: { slug: string; title: string };
+}
+
+export interface AskRequest {
+  id: number;
+  options: AskOptions;
+}
+
 interface AskContextValue {
-  open: () => void;
+  open: (options?: AskOptions) => void;
   close: () => void;
   isOpen: boolean;
 }
@@ -47,8 +66,13 @@ export function useAsk(): AskContextValue {
 
 export function AskProvider({ children }: { children: React.ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
+  // Bumped on every open, so re-opening with the same options still re-runs.
+  const [request, setRequest] = useState<AskRequest>({ id: 0, options: {} });
 
-  const open = useCallback(() => setIsOpen(true), []);
+  const open = useCallback((options: AskOptions = {}) => {
+    setRequest((r) => ({ id: r.id + 1, options }));
+    setIsOpen(true);
+  }, []);
   const close = useCallback(() => setIsOpen(false), []);
 
   useEffect(() => {
@@ -67,7 +91,7 @@ export function AskProvider({ children }: { children: React.ReactNode }) {
   return (
     <AskContext.Provider value={value}>
       {children}
-      <AskWireModal isOpen={isOpen} onClose={close} />
+      <AskWireModal isOpen={isOpen} onClose={close} request={request} />
     </AskContext.Provider>
   );
 }

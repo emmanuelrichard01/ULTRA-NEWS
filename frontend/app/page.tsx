@@ -23,8 +23,10 @@ import { fetchStories, fetchLeadStories, fetchMomentumStories } from '@/lib/api'
  *             the hero off the top of the feed would hand it to whatever landed
  *             most recently, which on this corpus is almost always a single
  *             unconfirmed report.
- *   momentum  the sidebar ranking, from the momentum column rather than the
- *             velocity score that made the old panel render empty every time.
+ *   momentum  the "Moving fastest" ranking, from the momentum column rather
+ *             than the velocity score that made the old panel render empty.
+ *   topic     the first beat in "Browse by topic", so that block is complete
+ *             in the HTML too; the other beats load on hover.
  *
  * Query params are still honoured — FeedPage reads them with
  * `useSearchParams()` inside the Suspense boundary below, which keeps the
@@ -32,13 +34,18 @@ import { fetchStories, fetchLeadStories, fetchMomentumStories } from '@/lib/api'
  */
 export const revalidate = 60;
 
+const FIRST_TOPIC = 'world';
+
 export default async function Home() {
   const edition = EDITIONS_BY_SLUG[''];
 
-  const [initialStories, leadStories, momentumStories] = await Promise.all([
+  const [initialStories, leadStories, momentumStories, topicStories] = await Promise.all([
     fetchStories({ sort: edition.sort, minSources: edition.minSources }),
-    fetchLeadStories({ limit: 5 }),
+    // Four lead slots on the bento (one hero, three tiles); the spares feed
+    // the ticker and the "Independently confirmed" column.
+    fetchLeadStories({ limit: 9 }),
     fetchMomentumStories({ limit: 8 }),
+    fetchStories({ category: FIRST_TOPIC, limit: 4, sort: 'latest' }),
   ]);
 
   return (
@@ -48,6 +55,7 @@ export default async function Home() {
         initialStories={initialStories}
         leadStories={leadStories}
         momentumStories={momentumStories}
+        frontPage={{ initialTopic: FIRST_TOPIC, initialTopicStories: topicStories.items }}
       />
     </Suspense>
   );

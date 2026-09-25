@@ -58,6 +58,16 @@ state, with nothing surfacing the failure:
 - [x] Outbound RSS per edition (previously advertised, previously 404)
 - [x] Every page rebuilt on a real token system; `not-found`, error and loading
       states; skip link
+- [x] Editorial redesign: condensed display serif, masthead + sticky section
+      bar, magazine front page (lead bento, Moving Fastest, confirmed-vs-not
+      split, topic browser), dark footer, and a shared micro-interaction
+      vocabulary (headline sweep, media drift, scroll reveal) that respects
+      reduced motion
+- [x] Story page: sticky evidence rail (counts, pickup span, scroll-spy
+      contents), listen-to-brief via on-device speech, key facts and timeline
+- [x] Topic insights (corroboration mix, most active newsrooms), searchable
+      and sortable source directory, redesigned About, 404 that suggests
+      stories rather than dead-ending
 
 ### AI
 
@@ -67,6 +77,25 @@ state, with nothing surfacing the failure:
 - [x] Incremental synthesis gated on *new independent outlets* + cooldown
 - [x] Pluggable provider; **keyless is a first-class mode**
 - [x] Model failure degrades to source-derived output
+- [x] **Presets moved off retired models.** Groq shut down both Llama ids the
+      default preset used on 2026-08-16 (Cerebras and OpenRouter's free tier
+      followed); every call 404'd. Now gpt-oss / qwen / gemma chains, with
+      reasoning-model profiles so thinking cannot eat the answer's token budget
+- [x] **Ask actually streams.** It generated the whole answer, then sent one
+      chunk — and a sync generator under ASGI is buffered whole anyway. Now
+      token-by-token through an async generator; first word in about a second
+- [x] **Numbered citations** from answer to story, with the outlet count on each
+- [x] **Ask about this story** — retrieval scoped to one cluster, cached per scope
+- [x] System/data role separation for both Ask and briefs; JSON mode for briefs
+- [x] **Brief validation** — claims attributed to outlets outside the cluster are
+      dropped; primary-source analysis blanked when no primary source exists;
+      `open_questions` surfaces what the coverage leaves unresolved
+- [x] **Conversations in Ask** — follow-ups carry up to three turns; retrieval
+      embeds the previous question with the new one
+- [x] **The Briefing** — an hourly, cited digest of corroborated stories, with a
+      keyless fallback and its own budget
+- [x] **Brief v2** — key facts with their outlets, a dated timeline, and
+      suggested questions, all validated against the cluster
 
 ### Platform
 

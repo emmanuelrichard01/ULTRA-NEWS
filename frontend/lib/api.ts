@@ -9,6 +9,7 @@ import { cache } from 'react';
 
 import type {
   ArticleDetail,
+  Briefing,
   StoryDetail,
   StoryDetailFull,
   PaginatedResponse,
@@ -294,5 +295,27 @@ export async function fetchSources(): Promise<SourceInfo[]> {
     return res.json();
   } catch {
     return [];
+  }
+}
+
+// ==========================================================================
+// Briefing
+// ==========================================================================
+
+/**
+ * Today's corroborated stories, digested. The backend caches it per hour and
+ * per story set, so a five-minute revalidation here is a cache read upstream.
+ */
+export async function fetchBriefing(): Promise<Briefing | null> {
+  try {
+    const res = await fetch(`${API_URL}/api/v1/briefing`, {
+      headers: serverHeaders(),
+      next: { revalidate: 300, tags: ['briefing'] },
+    });
+    if (!res.ok) return null;
+    return res.json();
+  } catch (error) {
+    console.error('[API] fetchBriefing error:', error);
+    return null;
   }
 }

@@ -31,12 +31,18 @@ interface NewsImageProps {
   /**
    * Suppress the typographic fallback, leaving only the surface colour.
    *
-   * For callers that draw their own content over the frame. LeadHero overlays
+   * For callers that draw their own content over the frame. OverlayCard sets
    * a headline and the outlet names onto the image, so a centred "Reported by
    * Al Jazeera English" underneath collided with the headline sitting on top
    * of it — two pieces of text in the same rectangle saying the same thing.
    */
   showFallbackText?: boolean;
+  /**
+   * Ground for the no-image frame. The default is the light sunken surface;
+   * OverlayCard sets white type over the frame, so it passes a dark ground
+   * instead — white headline on #eceae5 was unreadable.
+   */
+  fallbackClassName?: string;
 }
 
 export default function NewsImage({
@@ -47,6 +53,7 @@ export default function NewsImage({
   fallbackText = 'ULTRA',
   fallbackSources = [],
   showFallbackText = true,
+  fallbackClassName = 'bg-[var(--surface-sunken)]',
 }: NewsImageProps) {
   const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -110,7 +117,7 @@ export default function NewsImage({
   if (!src || failed) {
     return (
       <div
-        className="absolute inset-0 flex flex-col items-center justify-center gap-2 overflow-hidden bg-[var(--surface-sunken)] p-6 text-center select-none"
+        className={`absolute inset-0 flex flex-col items-center justify-center gap-2 overflow-hidden p-6 text-center select-none ${fallbackClassName}`}
         aria-hidden="true"
       >
         {!showFallbackText ? null : fallbackSources.length > 0 ? (

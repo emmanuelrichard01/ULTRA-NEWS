@@ -60,6 +60,14 @@ export interface AISummary {
   consensus_lead: string;
   outlet_claims: { source: string; claim: string }[];
   discrepancies: string[];
+  /** What the coverage explicitly leaves unresolved. Absent on older briefs. */
+  open_questions?: string[];
+  /** Concrete facts, each with every outlet in the cluster that states it. */
+  key_facts?: { fact: string; sources: string[] }[];
+  /** Dated developments as the reporting gives them, in order. */
+  timeline?: { when: string; event: string; source: string }[];
+  /** Questions this reporting can answer — each opens a scoped Ask. */
+  suggested_questions?: string[];
   primary_alignment?: string;
   model?: string;
   synthesized_at?: string;
@@ -166,3 +174,32 @@ export const CATEGORY_MAP: Record<string, CategoryInfo> = {
   culture: { slug: 'culture', displayName: 'Culture', description: 'Film, music, art and the cultural conversation.' },
   sports: { slug: 'sports', displayName: 'Sports', description: 'Competition, athletes and the global arena.' },
 };
+
+// ==========================================================================
+// Briefing
+// ==========================================================================
+
+export interface BriefingItem {
+  n: number;
+  slug: string;
+  title: string;
+  summary: string;
+  line?: string;
+  independent_count: number;
+  recent_outlets: number;
+  first_seen_at: string;
+  last_updated_at: string;
+  categories: string[];
+  sources: string[];
+  image_url: string | null;
+}
+
+export interface Briefing {
+  generated_at: string;
+  window_hours: number;
+  synthesis_type: 'llm' | 'extractive';
+  model: string | null;
+  overview: string;
+  items: BriefingItem[];
+  watch: BriefingItem[];
+}

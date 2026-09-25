@@ -1,3 +1,5 @@
+import ListenButton from './story/ListenButton';
+import SuggestedQuestions from './story/SuggestedQuestions';
 import type { AISummary } from '@/lib/types';
 
 /**
@@ -18,6 +20,11 @@ interface IntelligenceBriefProps {
   sourceCount: number;
   independentCount: number;
   fallbackSummary?: string;
+  /** For scoped suggested questions. */
+  slug?: string;
+  title?: string;
+  /** What "Listen" reads — the brief as printed, caveats included. */
+  listenText?: string;
 }
 
 export default function IntelligenceBrief({
@@ -26,6 +33,9 @@ export default function IntelligenceBrief({
   sourceCount,
   independentCount,
   fallbackSummary,
+  slug,
+  title,
+  listenText,
 }: IntelligenceBriefProps) {
   if (synthesisStatus === 'pending') {
     return (
@@ -53,6 +63,7 @@ export default function IntelligenceBrief({
   }
 
   const { consensus_lead, outlet_claims, discrepancies, primary_alignment, model } = aiSummary;
+  const openQuestions = aiSummary.open_questions ?? [];
   const hasDiscrepancies = Boolean(discrepancies?.length);
 
   /**
@@ -69,25 +80,35 @@ export default function IntelligenceBrief({
     model !== 'system-fallback';
 
   return (
-    <section aria-labelledby="brief-heading" className="border-b border-[var(--border)] py-10">
-      <h2 id="brief-heading" className="text-label mb-3 text-[var(--foreground-subtle)]">
-        {isModelWritten ? 'What the sources say' : 'Lead reporting'}
-      </h2>
+    <section aria-labelledby="brief-heading" className="border-b border-[var(--border)] py-12">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <h2 id="brief-heading" className="eyebrow">
+          {isModelWritten ? 'What the sources say' : 'Lead reporting'}
+        </h2>
+        {/* The rail carries Listen on wide screens; this is its home on a phone. */}
+        {listenText && <ListenButton text={listenText} className="lg:hidden" />}
+      </div>
 
-      <p className="text-display-sm measure font-display leading-relaxed text-[var(--foreground)]">
+      {/* The consensus in the serif, scaled to its length: a two-sentence model
+          lead reads as a pull-quote, a long extractive excerpt steps down so it
+          does not become a wall of display type. Formerly set against a rule
+          down the left and the serif
+          at reading size. It is the one paragraph on the page a reader should
+          take away, so it is typeset like one. */}
+      <p className={`measure font-display text-balance text-[var(--foreground)] ${consensus_lead.length > 200 ? "text-display-sm" : "text-display-md"}`}>
         {consensus_lead}
       </p>
 
       <p className="font-data mt-3 text-[11px] text-[var(--foreground-subtle)]">
         {isModelWritten
-          ? `Written by ${model} from ${sourceCount} ${sourceCount === 1 ? 'article' : 'articles'}. Not human-edited — check it against the sources below.`
+          ? `Written by ${model} from ${sourceCount} ${sourceCount === 1 ? 'article' : 'articles'} by ${independentCount} independent ${independentCount === 1 ? 'outlet' : 'outlets'}. Not human-edited — check it against the sources below.`
           : `Taken from the earliest report. No summary has been generated for this story yet.`}
       </p>
 
       {/* Conflicts first — the most valuable thing here, and the easiest to miss
           if buried under a list of things everyone agrees on. */}
       {hasDiscrepancies && (
-        <div className="mt-6 rounded-[var(--radius-card)] border-l-2 border-[var(--accent-secondary)] bg-[var(--accent-secondary)]/8 p-4">
+        <div className="mt-6 rounded-[var(--radius-card)] border border-[var(--accent-secondary)]/25 bg-[var(--accent-secondary)]/8 p-4">
           <h3 className="text-label mb-2 text-[var(--accent-secondary)]">
             Where outlets disagree
           </h3>
@@ -102,8 +123,22 @@ export default function IntelligenceBrief({
         </div>
       )}
 
+      {openQuestions.length > 0 && (
+        <div className="mt-4 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-4">
+          <h3 className="text-label mb-2 text-[var(--foreground-muted)]">Still unanswered</h3>
+          <ul className="text-body-sm space-y-1.5 text-[var(--foreground)]">
+            {openQuestions.map((item, i) => (
+              <li key={i} className="flex gap-2.5">
+                <span aria-hidden="true" className="font-display text-[var(--foreground-subtle)]">?</span>
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {primary_alignment && (
-        <div className="mt-4 rounded-[var(--radius-card)] border-l-2 border-[var(--accent)] bg-[var(--accent)]/6 p-4">
+        <div className="mt-4 rounded-[var(--radius-card)] border border-[var(--accent)]/20 bg-[var(--accent)]/6 p-4">
           <h3 className="text-label mb-1.5 text-[var(--accent)]">
             Against primary sources
           </h3>
@@ -134,6 +169,9 @@ export default function IntelligenceBrief({
         </details>
       )}
 
+      {slug && title && (
+        <SuggestedQuestions questions={aiSummary.suggested_questions ?? []} slug={slug} title={title} />
+      )}
     </section>
   );
 }

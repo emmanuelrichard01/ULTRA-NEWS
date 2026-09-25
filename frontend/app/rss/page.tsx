@@ -1,21 +1,8 @@
 import type { Metadata } from 'next';
 
+import SourceDirectory from '@/components/SourceDirectory';
 import { fetchSources } from '@/lib/api';
-import type { SourceInfo } from '@/lib/types';
-
-/**
- * Sources — the ingest ledger, published.
- *
- * A product that asks readers to trust a corroboration count owes them the list
- * it counts from, including the parts that are failing. So this page shows
- * health honestly rather than as decoration: until recently four feeds — both
- * Tier-1 wire services among them — had been dead for the life of the registry
- * while rendering green, because a fetch failure was indistinguishable from a
- * quiet feed.
- *
- * It also documents the outbound feeds. Those were advertised here for months
- * and returned 404; they exist now.
- */
+import { ArrowRight } from '@/components/icons';
 
 export const metadata: Metadata = {
   title: 'Sources',
@@ -25,36 +12,10 @@ export const metadata: Metadata = {
 
 export const revalidate = 300;
 
-const HEALTH: Record<SourceInfo['health'], { dot: string; label: string; title: string }> = {
-  active: {
-    dot: 'bg-[var(--verified-teal)]',
-    label: 'Healthy',
-    title: 'Fetched successfully within the last 6 hours.',
-  },
-  stale: {
-    dot: 'bg-[var(--signal-amber)]',
-    label: 'Stale',
-    title: 'No successful fetch recently, or recovering from a failure.',
-  },
-  failing: {
-    dot: 'bg-[var(--wire-red)]',
-    label: 'Failing',
-    title: 'Repeated failures, or no successful fetch in over 24 hours.',
-  },
-  pending: {
-    dot: 'bg-[var(--foreground-subtle)]',
-    label: 'Not yet fetched',
-    title: 'Registered but not yet visited by an ingest cycle.',
-  },
-};
-
-const TIER_NAMES: Record<number, string> = {
-  1: 'Wire services',
-  2: 'Major global outlets',
-  3: 'Specialist',
-  4: 'Regional',
-};
-
+/**
+ * Outbound feeds, one per edition. These existed in the backend and were
+ * advertised in the metadata long before any page linked to them.
+ */
 const OUTBOUND_FEEDS = [
   {
     name: 'The Wire',
@@ -73,38 +34,6 @@ const OUTBOUND_FEEDS = [
   },
 ];
 
-function Stat({
-  label,
-  value,
-  note,
-}: {
-  label: string;
-  value: string;
-  note?: string;
-}) {
-  return (
-    <div>
-      <dt className="text-label text-[var(--foreground-subtle)]">{label}</dt>
-      <dd className="font-data mt-1 text-[20px] tabular-nums text-[var(--foreground)]">
-        {value}
-      </dd>
-      {note && (
-        <dd className="mt-0.5 text-[11px] text-[var(--foreground-subtle)]">{note}</dd>
-      )}
-    </div>
-  );
-}
-
-function HealthDot({ health }: { health: SourceInfo['health'] }) {
-  const { dot, label, title } = HEALTH[health] ?? HEALTH.failing;
-  return (
-    <span className="inline-flex items-center gap-1.5" title={title}>
-      <span className={`h-1.5 w-1.5 rounded-full ${dot}`} aria-hidden="true" />
-      <span className="font-data text-[11px] text-[var(--foreground-muted)]">{label}</span>
-    </span>
-  );
-}
-
 export default async function SourcesPage() {
   const sources = await fetchSources();
   const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -112,240 +41,160 @@ export default async function SourcesPage() {
   /*
     Newsrooms, not feeds.
 
-    This counted `new Set(sources.map(s => s.name))` — the rows themselves — so
-    it reported one publisher per feed and the page read "Feeds 41 · Publishers
-    41" however many feeds shared a newsroom. "BBC News" and "BBC World" are two
+    This once counted `new Set(sources.map(s => s.name))` — the rows themselves
+    — so it reported one publisher per feed. "BBC News" and "BBC World" are two
     feeds and one publisher, which is the distinction the entire product rests
     on, stated wrongly on the page that exists to explain what a source is.
   */
-  const publishers = new Set(
-    sources.map((s) => s.publisher_domain || s.name)
-  ).size;
+  const publishers = new Set(sources.map((s) => s.publisher_domain || s.name)).size;
   const healthy = sources.filter((s) => s.health === 'active').length;
   const stale = sources.filter((s) => s.health === 'stale').length;
   const failing = sources.filter((s) => s.health === 'failing').length;
+  const pending = sources.length - healthy - stale - failing;
+  const regions = new Set(sources.map((s) => s.region_label).filter(Boolean)).size;
 
-  // How often a feed is the FIRST to file on a story it belongs to. Already
-  // computed by the backend and never surfaced — and it is the most
-  // interesting thing this page can say, because it separates the newsrooms
-  // that break stories from the ones that follow.
-  const totalBrokenFirst = sources.reduce(
-    (sum, s) => sum + (s.articles_broken_first || 0),
-    0
-  );
+  // How often a feed is the FIRST to file on a story it belongs to — the one
+  // figure here that separates newsrooms that break stories from those that
+  // follow.
+  const totalBrokenFirst = sources.reduce((sum, s) => sum + (s.articles_broken_first || 0), 0);
 
-  const byTier = new Map<number, SourceInfo[]>();
-  sources.forEach((s) => {
-    const tier = s.tier || 4;
-    byTier.set(tier, [...(byTier.get(tier) ?? []), s]);
-  });
+  const healthBar = [
+    { label: 'Healthy', value: healthy, color: 'var(--verified-teal)' },
+    { label: 'Stale', value: stale, color: 'var(--signal-amber)' },
+    { label: 'Failing', value: failing, color: 'var(--wire-red)' },
+    { label: 'Not yet fetched', value: pending, color: 'var(--border-strong)' },
+  ].filter((h) => h.value > 0);
 
   return (
-    <div className="mx-auto max-w-4xl">
-      <header className="border-b-2 border-[var(--foreground)] pb-7">
-        <h1 className="text-display-2xl font-display text-[var(--foreground)]">Sources</h1>
-        <p className="text-body-lg measure mt-3 text-[var(--foreground-muted)]">
-          Every feed we ingest, and how each one is behaving right now. A
-          corroboration count is only as good as the list it counts from, so the
-          list is public — failures included.
-        </p>
+    <div className="mx-auto max-w-6xl">
+      <header className="grid gap-8 border-b border-[var(--border)] pb-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-end">
+        <div>
+          <p className="eyebrow mb-4">The registry · public, failures included</p>
+          <h1 className="text-display-2xl font-display animate-fade-in-up text-[var(--foreground)]">
+            Every source, <span className="italic text-[var(--foreground-muted)]">counted.</span>
+          </h1>
+          <p className="text-body-lg measure mt-4 text-[var(--foreground-muted)]">
+            A corroboration count is only as good as the list it counts from, so
+            the list is public — with how each feed is behaving right now.
+          </p>
+        </div>
+
+        {/*
+          Four figures that each say something different. Health is one tile
+          with a distribution bar, rather than "Healthy 0/41" beside "Failing
+          41" — two tiles restating one fact, which on a stale environment read
+          as a broken site rather than a stale ingest.
+        */}
+        <dl className="grid grid-cols-2 gap-3">
+          <Figure
+            label="Newsrooms"
+            value={publishers}
+            note={
+              publishers < sources.length
+                ? `from ${sources.length} feeds — ${sources.length - publishers} share a newsroom`
+                : `${sources.length} feeds`
+            }
+          />
+          <Figure label="Regions" value={regions} note="geographic independence" />
+          <Figure label="Broke first" value={totalBrokenFirst} note="stories filed before anyone else" />
+          <div className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface-elevated)] p-4">
+            <dt className="text-[12px] text-[var(--foreground-subtle)]">Ingesting</dt>
+            <dd className="font-display mt-1 text-[34px] leading-none text-[var(--foreground)]">
+              {healthy}
+              <span className="text-[20px] text-[var(--foreground-subtle)]">/{sources.length}</span>
+            </dd>
+            <dd className="mt-3 flex h-1.5 overflow-hidden rounded-full bg-[var(--surface-sunken)]" aria-hidden="true">
+              {healthBar.map((h) => (
+                <span
+                  key={h.label}
+                  style={{ width: `${(h.value / Math.max(sources.length, 1)) * 100}%`, backgroundColor: h.color }}
+                />
+              ))}
+            </dd>
+            <dd className="mt-1.5 text-[11px] text-[var(--foreground-subtle)]">
+              {healthBar.map((h) => `${h.value} ${h.label.toLowerCase()}`).join(' · ') || 'no feeds'}
+            </dd>
+          </div>
+        </dl>
       </header>
 
-      {/*
-        Four figures that each say something different.
-
-        This previously ran "Healthy 0/41" beside "Failing 41" — two tiles
-        restating one fact, and on a stale environment they combined into a
-        wall that read as a broken site rather than a stale ingest. Health is
-        now one tile with all three states in one line, and the space that
-        freed goes to the count of stories these feeds broke first, which is
-        the only figure here that says anything about the journalism.
-      */}
-      <dl className="grid grid-cols-2 gap-x-6 gap-y-5 border-b border-[var(--border)] py-7 sm:grid-cols-4">
-        <Stat label="Feeds" value={sources.length.toLocaleString()} />
-        <Stat
-          label="Newsrooms"
-          value={publishers.toLocaleString()}
-          note={
-            publishers < sources.length
-              ? `${sources.length - publishers} feeds share a newsroom`
-              : undefined
-          }
-        />
-        <Stat
-          label="Ingesting"
-          value={`${healthy}/${sources.length}`}
-          note={
-            failing || stale
-              ? [failing && `${failing} failing`, stale && `${stale} stale`]
-                  .filter(Boolean)
-                  .join(' · ')
-              : 'all healthy'
-          }
-        />
-        <Stat
-          label="Broke first"
-          value={totalBrokenFirst.toLocaleString()}
-          note="stories filed before anyone else"
-        />
-      </dl>
-
-      {/* Subscribe */}
-      <section aria-labelledby="feeds-heading" className="border-b border-[var(--border)] py-9">
-        <h2 id="feeds-heading" className="text-display-md font-display text-[var(--foreground)]">
-          Subscribe
-        </h2>
-        <p className="text-body-sm measure mb-5 mt-1 text-[var(--foreground-muted)]">
-          One feed per edition. Every item states how many independent outlets
-          stand behind the story, so corroboration survives into your reader.
-        </p>
-
-        <ul className="divide-y divide-[var(--border)] border-y border-[var(--border)]">
+      <section aria-labelledby="feeds-heading" className="border-b border-[var(--border)] py-12">
+        <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 id="feeds-heading" className="text-display-lg font-display text-[var(--foreground)]">
+              Subscribe by RSS
+            </h2>
+          </div>
+          <p className="text-body-sm max-w-sm text-[var(--foreground-muted)] sm:text-right">
+            Every item states how many independent outlets stand behind the
+            story, so corroboration survives into your reader.
+          </p>
+        </div>
+        <ul className="grid gap-3 sm:grid-cols-3">
           {OUTBOUND_FEEDS.map((feed) => (
-            <li key={feed.path} className="flex flex-wrap items-center justify-between gap-3 py-3.5">
-              <div className="min-w-0">
-                <span className="text-body-md font-display text-[var(--foreground)]">
-                  {feed.name}
-                </span>
-                <p className="text-body-sm text-[var(--foreground-muted)]">{feed.description}</p>
-              </div>
+            <li key={feed.path}>
               <a
                 href={`${apiBase}${feed.path}`}
-                className="text-label shrink-0 rounded-[var(--radius-chip)] border border-[var(--border)] px-3 py-1.5 text-[var(--foreground-muted)] transition-colors hover:border-[var(--border-hover)] hover:text-[var(--foreground)]"
+                className="group card-lift flex h-full flex-col rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface-elevated)] p-5"
               >
-                RSS
+                <span className="flex items-center justify-between">
+                  <span className="font-display text-[26px] leading-tight text-[var(--foreground)]">{feed.name}</span>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true" className="text-[var(--accent-secondary)]">
+                    <path d="M4 11a9 9 0 0 1 9 9M4 4a16 16 0 0 1 16 16" />
+                    <circle cx="5" cy="19" r="1.2" fill="currentColor" />
+                  </svg>
+                </span>
+                <span className="text-body-sm mt-1 text-[var(--foreground-muted)]">{feed.description}</span>
+                <span className="font-data mt-4 inline-flex items-center gap-1.5 text-[11px] text-[var(--foreground-subtle)] group-hover:text-[var(--foreground)]">
+                  RSS feed <ArrowRight className="nudge-arrow" />
+                </span>
               </a>
             </li>
           ))}
         </ul>
       </section>
 
-      {/* Registry */}
-      <section aria-labelledby="registry-heading" className="py-9">
-        <h2 id="registry-heading" className="text-display-md font-display text-[var(--foreground)]">
-          The registry
-        </h2>
-        <p className="text-body-sm measure mt-1 text-[var(--foreground-muted)]">
-          Tiers reflect how much a source contributes to clustering — wire
-          services are syndicated widely and seed most clusters, regional outlets
-          add geographic independence.
-        </p>
-        {/* The columns explained once, in prose, rather than in tooltips nobody
-            on a phone can reach. */}
-        <dl className="text-body-sm measure mb-6 mt-4 space-y-1.5 border-l-2 border-[var(--border-strong)] pl-4 text-[var(--foreground-subtle)]">
+      <section aria-labelledby="registry-heading" className="py-12">
+        <div className="mb-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-end">
           <div>
-            <dt className="inline font-semibold text-[var(--foreground-muted)]">
-              Broke first —{' '}
-            </dt>
-            <dd className="inline">
-              stories where this outlet filed before any other. Original
-              reporting rather than pickup.
-            </dd>
+            <h2 id="registry-heading" className="text-display-lg font-display text-[var(--foreground)]">
+              Who we read, and how it&rsquo;s going
+            </h2>
           </div>
-          <div>
-            <dt className="inline font-semibold text-[var(--foreground-muted)]">
-              Corroborated —{' '}
-            </dt>
-            <dd className="inline">
-              share of this outlet&rsquo;s articles that reached three
-              independent newsrooms.
-            </dd>
-          </div>
-        </dl>
+          {/* The columns explained once, in prose, rather than in tooltips
+              nobody on a phone can reach. */}
+          <dl className="text-body-sm space-y-1.5 border-l border-[var(--border-strong)] pl-4 text-[var(--foreground-subtle)]">
+            <div>
+              <dt className="inline font-semibold text-[var(--foreground-muted)]">Broke first — </dt>
+              <dd className="inline">stories where this outlet filed before any other.</dd>
+            </div>
+            <div>
+              <dt className="inline font-semibold text-[var(--foreground-muted)]">Corroborated — </dt>
+              <dd className="inline">share of its articles that reached three independent newsrooms.</dd>
+            </div>
+          </dl>
+        </div>
 
         {sources.length === 0 ? (
-          <p className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-6 text-body-sm text-[var(--foreground-muted)]">
-            The source registry is empty. Run <code className="font-data">make seed</code> to
-            populate it.
+          <p className="text-body-sm rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-6 text-[var(--foreground-muted)]">
+            The source registry is empty. Run <code className="font-data">make seed</code> to populate it.
           </p>
         ) : (
-          <div className="space-y-8">
-            {[...byTier.entries()]
-              .sort(([a], [b]) => a - b)
-              .map(([tier, tierSources]) => (
-                <div key={tier}>
-                  <h3 className="section-rule text-label mb-3 text-[var(--foreground-subtle)]">
-                    Tier {tier} · {TIER_NAMES[tier] ?? 'Other'}
-                  </h3>
-                  {/*
-                    A table, because this is tabular data and it was being
-                    rendered as a list of bare numbers.
-
-                    Each row used to end with "1,284" and "37%" and a coloured
-                    dot, with nothing on screen saying what any of them counted
-                    — the only explanation lived in `title` attributes, which
-                    never appear on touch, never appear for keyboard users, and
-                    are not read out in most screen-reader modes. Column headers
-                    state it once for every row, cost one line, and make the
-                    numbers sortable by eye.
-                  */}
-                  <div className="overflow-x-auto">
-                    <table className="w-full min-w-[34rem] border-collapse text-left">
-                      <caption className="sr-only">
-                        Tier {tier} sources: articles ingested, stories broken
-                        first, corroboration rate and ingest health
-                      </caption>
-                      <thead>
-                        <tr className="border-y border-[var(--border)]">
-                          <th scope="col" className="text-label py-2 font-semibold text-[var(--foreground-subtle)]">
-                            Outlet
-                          </th>
-                          <th scope="col" className="text-label py-2 text-right font-semibold text-[var(--foreground-subtle)]">
-                            Articles
-                          </th>
-                          <th scope="col" className="text-label py-2 text-right font-semibold text-[var(--foreground-subtle)]">
-                            Broke first
-                          </th>
-                          <th scope="col" className="text-label py-2 text-right font-semibold text-[var(--foreground-subtle)]">
-                            Corroborated
-                          </th>
-                          <th scope="col" className="text-label py-2 pl-4 font-semibold text-[var(--foreground-subtle)]">
-                            Ingest
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {tierSources
-                          .sort((a, b) => b.article_count - a.article_count)
-                          .map((source) => (
-                            <tr
-                              key={source.url}
-                              className="border-b border-[var(--border)] last:border-0"
-                            >
-                              <th scope="row" className="py-2.5 pr-4 font-normal">
-                                <span className="text-body-md text-[var(--foreground)]">
-                                  {source.name}
-                                </span>
-                                <span className="font-data ml-2 text-[11px] text-[var(--foreground-subtle)]">
-                                  {source.region_label}
-                                </span>
-                              </th>
-                              <td className="font-data py-2.5 text-right text-[12px] tabular-nums text-[var(--foreground-muted)]">
-                                {source.article_count.toLocaleString()}
-                              </td>
-                              <td className="font-data py-2.5 text-right text-[12px] tabular-nums text-[var(--foreground-muted)]">
-                                {source.articles_broken_first > 0
-                                  ? source.articles_broken_first.toLocaleString()
-                                  : '—'}
-                              </td>
-                              <td className="font-data py-2.5 text-right text-[12px] tabular-nums text-[var(--foreground-muted)]">
-                                {source.corroboration_rate > 0
-                                  ? `${source.corroboration_rate.toFixed(0)}%`
-                                  : '—'}
-                              </td>
-                              <td className="py-2.5 pl-4">
-                                <HealthDot health={source.health} />
-                              </td>
-                            </tr>
-                          ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              ))}
-          </div>
+          <SourceDirectory sources={sources} />
         )}
       </section>
+    </div>
+  );
+}
+
+function Figure({ label, value, note }: { label: string; value: number; note?: string }) {
+  return (
+    <div className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface-elevated)] p-4">
+      <dt className="text-[12px] text-[var(--foreground-subtle)]">{label}</dt>
+      <dd className="font-display mt-1 text-[34px] leading-none tabular-nums text-[var(--foreground)]">
+        {value.toLocaleString()}
+      </dd>
+      {note && <dd className="mt-2 text-[11px] leading-snug text-[var(--foreground-subtle)]">{note}</dd>}
     </div>
   );
 }

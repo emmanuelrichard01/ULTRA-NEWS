@@ -16,9 +16,9 @@ export const metadata: Metadata = {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="border-t border-[var(--border)] py-9">
+    <section className="border-t border-[var(--border)] py-12">
       <h2 className="text-display-md font-display mb-4 text-[var(--foreground)]">{title}</h2>
-      <div className="text-body-md measure space-y-4 text-[var(--foreground-muted)]">{children}</div>
+      <div className="text-body-lg measure space-y-4 text-[var(--foreground-muted)]">{children}</div>
     </section>
   );
 }
@@ -26,8 +26,8 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 export default function TermsPage() {
   return (
     <div className="mx-auto max-w-3xl">
-      <header className="border-b-2 border-[var(--foreground)] pb-7">
-        <h1 className="text-display-2xl font-display text-[var(--foreground)]">Terms</h1>
+      <header className="border-b border-[var(--border)] pb-10">
+        <h1 className="text-display-2xl font-display animate-fade-in-up text-[var(--foreground)]">Terms</h1>
         <p className="text-body-lg measure mt-3 text-[var(--foreground-muted)]">
           Ultra News is an open-source news aggregator, provided free and without
           warranty. Using it means accepting the terms below.

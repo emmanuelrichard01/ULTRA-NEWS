@@ -142,10 +142,8 @@ export default function StoryCard({
       </span>
     ) : null;
 
-  // The 'lead' variant that used to live here — picture, then kicker, then
-  // headline, then standfirst, stacked — is now LeadHero, which overlays the
-  // same information onto the image and takes roughly half the height. See that
-  // component for why.
+  // Leads are not a StoryCard variant: they are OverlayCard (components/cards),
+  // which sets the headline on the photograph.
 
   // ------------------------------------------------------------- compact
   if (variant === 'compact') {
@@ -158,7 +156,7 @@ export default function StoryCard({
         <h3 className="text-body-md font-display leading-snug text-[var(--foreground)]">
           <Link
             href={href}
-            className="transition-colors after:absolute after:inset-0 after:content-[''] hover:text-[var(--accent)]"
+            className="headline-link after:absolute after:inset-0 after:content-['']"
           >
             {title}
           </Link>
@@ -176,13 +174,31 @@ export default function StoryCard({
   // display-md the same column fits roughly twice as many without the headline
   // ceasing to be the loudest thing in the row.
   return (
-    <article className="group relative border-b border-[var(--border)] py-5">
+    <article className="group relative border-b border-[var(--border)] py-6">
       <div className="flex min-w-0 gap-4 sm:gap-6">
+        {/* Rank as an italic serif numeral in its own gutter, the "Most Read"
+            idiom — the order is the information in a ranked edition, so it
+            earns more than an 11px label. */}
+        {rank !== undefined && (
+          <span className="rank-numeral hidden w-10 shrink-0 pt-1 sm:block" aria-hidden="true">
+            {String(rank).padStart(2, '0')}
+          </span>
+        )}
+
+        {/* Thumbnail leads on wide screens, as in the reference list layouts;
+            on a phone it drops to the right so the headline starts at the
+            margin, where the eye already is. */}
+        {imageUrl && showImage && (
+          <div className="media-frame order-last aspect-square w-20 shrink-0 self-start sm:order-first sm:aspect-[4/3] sm:w-44">
+            <NewsImage src={imageUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+          </div>
+        )}
+
         <div className="min-w-0 flex-1">
           <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
             {rank !== undefined && (
               <span
-                className="font-data text-[11px] tabular-nums text-[var(--foreground-subtle)]"
+                className="font-data text-[11px] tabular-nums text-[var(--foreground-subtle)] sm:hidden"
                 aria-hidden="true"
               >
                 {String(rank).padStart(2, '0')}
@@ -196,10 +212,10 @@ export default function StoryCard({
             {time}
           </div>
 
-          <h3 className="text-display-md text-balance font-display leading-[1.2] text-[var(--foreground)]">
+          <h3 className="text-display-md text-balance font-display text-[var(--foreground)]">
             <Link
               href={href}
-              className="transition-colors after:absolute after:inset-0 after:content-[''] hover:text-[var(--accent)]"
+              className="headline-link after:absolute after:inset-0 after:content-['']"
             >
               {title}
             </Link>
@@ -216,16 +232,6 @@ export default function StoryCard({
             <FramingCompare framings={framingPreview} />
           </div>
         </div>
-
-        {imageUrl && showImage && (
-          <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-[var(--radius-card)] bg-[var(--surface-sunken)] sm:h-24 sm:w-32">
-            <NewsImage
-              src={imageUrl}
-              alt=""
-              className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-            />
-          </div>
-        )}
       </div>
 
       {/* sourceCount is reported separately from the publisher count so "12

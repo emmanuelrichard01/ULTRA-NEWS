@@ -88,7 +88,7 @@ export default function FramingCompare({
   return (
     // z-10 lifts this above the card's stretched link so it stays clickable.
     <div className="relative z-10 mt-3">
-      <div className="border-l-2 border-[var(--border-strong)] pl-3.5">
+      <div className="border-l border-[var(--border-strong)] pl-3.5">
         <p className="text-label mb-1 text-[var(--foreground-subtle)]">
           As {current.source} headlined it
         </p>
@@ -170,7 +170,7 @@ export default function FramingCompare({
       {isExpanded && (
         <div
           id={panelId}
-          className="animate-fade-in-up mt-3 space-y-2.5 border-l-2 border-[var(--border-strong)] pl-3.5"
+          className="animate-fade-in-up mt-3 space-y-2.5 border-l border-[var(--border-strong)] pl-3.5"
         >
           {entries.map((frame) => {
             const marks = marksFor(frame.title, distinctive);

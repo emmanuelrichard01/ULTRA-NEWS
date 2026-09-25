@@ -24,6 +24,8 @@
  * reported the same followers.
  */
 
+import { ArrowRight } from '@/components/icons';
+
 interface SourceChainProps {
   /** Publishers, oldest-first, as returned by the API. */
   sources: string[];
@@ -80,9 +82,7 @@ export default function SourceChain({
 
       {followers.length > 0 && (
         <>
-          <span aria-hidden="true" className="text-[var(--border-strong)]">
-            →
-          </span>
+          <ArrowRight size={12} className="self-center text-[var(--border-strong)]" />
           <span className="text-label text-[var(--foreground-subtle)]">
             then
           </span>

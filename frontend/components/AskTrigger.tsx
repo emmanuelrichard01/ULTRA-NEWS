@@ -53,7 +53,7 @@ export default function AskTrigger({ onClick, className = '' }: AskTriggerProps)
     <button
       type="button"
       onClick={onClick}
-      className={`ai-border group flex shrink-0 items-center gap-2.5 rounded-[var(--radius-card)] bg-[var(--surface)] px-3.5 py-2 text-left transition-colors hover:bg-[var(--surface-elevated)] ${className}`}
+      className={`ai-border group flex shrink-0 items-center gap-2.5 rounded-[var(--radius-pill)] bg-[var(--surface-elevated)] py-2 pl-3.5 pr-2.5 text-left transition-colors hover:bg-[var(--surface-elevated)] ${className}`}
     >
       <AskSparkle className="shrink-0 text-[var(--accent)] transition-transform duration-500 group-hover:rotate-[18deg]" />
 

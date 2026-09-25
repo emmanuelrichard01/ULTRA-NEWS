@@ -65,7 +65,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
         </Link>
       </nav>
 
-      <header className="border-b-2 border-[var(--foreground)] pb-7">
+      <header className="border-b border-[var(--border)] pb-10">
         <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2">
           <span className="font-data text-[13px] font-semibold text-[var(--foreground)]">
             {article.source.name}
@@ -83,13 +83,13 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
           ))}
         </div>
 
-        <h1 className="text-display-xl font-display text-balance text-[var(--foreground)]">
+        <h1 className="text-display-2xl font-display animate-fade-in-up text-balance text-[var(--foreground)]">
           {article.title}
         </h1>
       </header>
 
       {article.image_url && (
-        <div className="relative mt-8 aspect-[16/9] w-full overflow-hidden rounded-[var(--radius-card)] bg-[var(--surface-sunken)]">
+        <div className="media-frame mt-10 aspect-[16/9] w-full">
           <NewsImage
             src={article.image_url}
             alt=""
@@ -108,7 +108,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
         href={article.url}
         target="_blank"
         rel="noopener noreferrer"
-        className="mt-8 inline-flex items-center gap-2 rounded-[var(--radius-card)] bg-[var(--foreground)] px-5 py-3 text-body-sm font-medium text-[var(--background)] transition-opacity hover:opacity-90"
+        className="pill pill-solid group mt-8"
       >
         Read the full article at {article.source.name}
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

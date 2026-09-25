@@ -32,8 +32,8 @@ export default function SubscribePage() {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <header className="border-b-2 border-[var(--foreground)] pb-7">
-        <h1 className="text-display-2xl font-display text-[var(--foreground)]">Subscribe</h1>
+      <header className="border-b border-[var(--border)] pb-10">
+        <h1 className="text-display-2xl font-display animate-fade-in-up text-[var(--foreground)]">Subscribe</h1>
         <p className="text-body-lg measure mt-3 text-[var(--foreground-muted)]">
           One feed per edition. Every item states how many independent outlets
           stand behind the story, so the corroboration count travels with it into
@@ -67,13 +67,13 @@ export default function SubscribePage() {
                 <div className="flex shrink-0 items-center gap-2">
                   <a
                     href={`${apiBase}${path}`}
-                    className="text-label rounded-[var(--radius-chip)] border border-[var(--border)] px-3 py-2 text-[var(--foreground)] transition-colors hover:border-[var(--border-hover)]"
+                    className="pill pill-outline !py-2 text-[12px]"
                   >
                     RSS
                   </a>
                   <Link
                     href={edition.slug ? `/${edition.slug}` : '/'}
-                    className="text-label rounded-[var(--radius-chip)] px-2 py-2 text-[var(--foreground-muted)] transition-colors hover:text-[var(--foreground)]"
+                    className="pill !px-3 !py-2 text-[12px] text-[var(--foreground-muted)] hover:text-[var(--foreground)]"
                   >
                     Read
                   </Link>
@@ -84,7 +84,7 @@ export default function SubscribePage() {
         </ul>
       </section>
 
-      <section className="border-t border-[var(--border)] py-9">
+      <section className="reveal border-t border-[var(--border)] py-12">
         <h2 className="text-display-md font-display mb-3 text-[var(--foreground)]">
           Email digests
         </h2>

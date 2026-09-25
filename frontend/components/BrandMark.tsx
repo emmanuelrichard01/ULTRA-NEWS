@@ -34,7 +34,9 @@ export default function BrandMark({
   markOnly = false,
   className = '',
 }: BrandMarkProps) {
-  const tile = Math.round(size * 1.5);
+  // Beside the wordmark the tile matches the serif's cap height plus a little;
+  // alone it is the whole mark and can be larger.
+  const tile = Math.round(size * (markOnly ? 1.5 : 1.2));
 
   return (
     <span className={`inline-flex items-center gap-2.5 ${className}`}>
@@ -62,10 +64,10 @@ export default function BrandMark({
 
       {!markOnly && (
         <span
-          className="font-display font-semibold tracking-tight text-[var(--foreground)]"
-          style={{ fontSize: `${size}px`, lineHeight: 1 }}
+          className="font-display whitespace-nowrap text-[var(--foreground)]"
+          style={{ fontSize: `${Math.round(size * 1.18)}px`, lineHeight: 1, letterSpacing: '-0.02em' }}
         >
-          Ultra<span className="text-[var(--foreground-subtle)]">News</span>
+          Ultra <span className="italic text-[var(--foreground-muted)]">News</span>
         </span>
       )}
     </span>

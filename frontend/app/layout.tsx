@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Fraunces, IBM_Plex_Mono, Geist } from "next/font/google";
+import { Instrument_Serif, IBM_Plex_Mono, Geist } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
@@ -7,6 +7,7 @@ import Footer from "@/components/Footer";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { ReactQueryProvider } from "@/components/ReactQueryProvider";
 import { AskProvider } from "@/components/AskProvider";
+import { BROWSER_API_URL } from "@/lib/api";
 import {
   IS_INDEXABLE,
   SITE_DESCRIPTION,
@@ -15,10 +16,19 @@ import {
   absoluteUrl,
 } from "@/lib/site";
 
-// V3 Typography — three-role system, all self-hosted via next/font
-const fraunces = Fraunces({
-  variable: "--font-fraunces",
+// The API origin: feeds live there, and every client-side fetch goes there, so
+// the browser is told to open the connection early.
+const API_ORIGIN = BROWSER_API_URL.replace(/\/+$/, "");
+
+// Typography — three roles, all self-hosted via next/font.
+//   display  Instrument Serif: condensed editorial serif for leads and heads
+//   body     Geist: the grotesque for text, UI and small headlines
+//   data     IBM Plex Mono: counts, timestamps, machine-verified facts
+const instrumentSerif = Instrument_Serif({
+  variable: "--font-instrument",
   subsets: ["latin"],
+  weight: "400",
+  style: ["normal", "italic"],
   display: "swap",
 });
 
@@ -61,7 +71,28 @@ export const metadata: Metadata = {
   // home page and gives the rest a base to resolve against.
   alternates: {
     canonical: "/",
-    types: { "application/rss+xml": [{ url: "/rss", title: "Ultra News RSS" }] },
+    // Real feeds, one per edition. This pointed at "/rss" — the HTML Sources
+    // page — so a feed reader or crawler following the site's advertised feed
+    // got a web page instead.
+    types: {
+      "application/rss+xml": [
+        { url: `${API_ORIGIN}/api/v1/feeds/wire.xml`, title: "Ultra News — The Wire" },
+        { url: `${API_ORIGIN}/api/v1/feeds/developing.xml`, title: "Ultra News — Developing" },
+        { url: `${API_ORIGIN}/api/v1/feeds/record.xml`, title: "Ultra News — The Record" },
+      ],
+    },
+  },
+  category: "news",
+  referrer: "strict-origin-when-cross-origin",
+  formatDetection: { telephone: false, email: false, address: false },
+  appleWebApp: { capable: true, title: SITE_NAME, statusBarStyle: "black-translucent" },
+  // Search-console ownership, from the environment so each deployment can
+  // verify itself without a code change. Absent variables emit nothing.
+  verification: {
+    google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || undefined,
+    other: process.env.NEXT_PUBLIC_BING_SITE_VERIFICATION
+      ? { "msvalidate.01": process.env.NEXT_PUBLIC_BING_SITE_VERIFICATION }
+      : undefined,
   },
   // Previews and branch deployments must not be indexed — they would compete
   // with production for the same content. See IS_INDEXABLE.
@@ -85,26 +116,18 @@ export const metadata: Metadata = {
     siteName: SITE_NAME,
     title: "Ultra News — corroborated news, by the numbers",
     description: SITE_DESCRIPTION,
-    images: [
-      {
-        url: "/og-image.png",
-        width: 1200,
-        height: 630,
-        alt: "Ultra News — coverage grouped by event, with the number of independent outlets behind it",
-      },
-    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "Ultra News — corroborated news, by the numbers",
     description: SITE_DESCRIPTION,
     creator: "@emmanuelrichard01",
-    images: ["/og-image.png"],
   },
-  manifest: "/site.webmanifest",
+  // The manifest comes from app/manifest.ts, which Next links automatically.
   icons: {
     icon: [
       { url: '/favicon.ico', sizes: 'any' },
+      { url: '/icon.svg', type: 'image/svg+xml' },
       { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
       { url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
     ],
@@ -122,8 +145,8 @@ export const metadata: Metadata = {
  */
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#faf8f4" },
-    { media: "(prefers-color-scheme: dark)", color: "#0f1115" },
+    { media: "(prefers-color-scheme: light)", color: "#fbfaf8" },
+    { media: "(prefers-color-scheme: dark)", color: "#0c0d0f" },
   ],
   colorScheme: "light dark",
 };
@@ -182,6 +205,10 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full" suppressHydrationWarning>
       <head>
+        {/* Warm the API connection (DNS, TCP, TLS) before the first client
+            fetch — Ask, the topic browser, pagination. */}
+        <link rel="preconnect" href={API_ORIGIN} crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href={API_ORIGIN} />
         {/* Emitted only where it can be crawled. A preview deployment
             advertising itself as the Ultra News organisation is a duplicate
             entity, not a bonus. */}
@@ -194,8 +221,12 @@ export default function RootLayout({
           />
         )}
       </head>
+      {/* min-h-full, never h-full. A sticky element sticks only within its
+          parent, and with body pinned to exactly one viewport the section bar
+          scrolled away after the first screen — leaving the story page's
+          fixed bar floating under an empty gap. */}
       <body
-        className={`${fraunces.variable} ${geist.variable} ${ibmPlexMono.variable} antialiased h-full flex flex-col bg-[var(--background)] text-[var(--foreground)]`}
+        className={`${instrumentSerif.variable} ${geist.variable} ${ibmPlexMono.variable} antialiased min-h-full flex flex-col bg-[var(--background)] text-[var(--foreground)]`}
         style={{ fontFamily: "var(--font-geist), system-ui, sans-serif" }}
         suppressHydrationWarning
       >
@@ -234,7 +265,7 @@ export default function RootLayout({
               {/* Pages set their own max-width — the feed reads at 6xl, articles
                   and the story page at 3xl for a comfortable measure. A single
                   7xl wrapper here forced every page to the widest one. */}
-              <main id="main" className="w-full flex-grow px-4 py-10 sm:px-6 sm:py-12">
+              <main id="main" className="w-full flex-grow px-4 pb-10 pt-8 sm:px-6 sm:pb-12 sm:pt-10">
                 {children}
               </main>
               <Footer />

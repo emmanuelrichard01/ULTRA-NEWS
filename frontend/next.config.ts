@@ -61,6 +61,14 @@ const nextConfig: NextConfig = {
   // Don't advertise the framework version.
   poweredByHeader: false,
 
+  // The social cards (opengraph-image.tsx) read their fonts from disk with
+  // fs, which the bundler cannot trace from an import. Without this, the
+  // font files are missing from the deployed function and every card that is
+  // rendered on demand — story cards are — fails in production only.
+  outputFileTracingIncludes: {
+    '/**': ['./assets/og-fonts/**'],
+  },
+
   async headers() {
     return [
       {

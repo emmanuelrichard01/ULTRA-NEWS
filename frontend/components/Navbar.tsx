@@ -1,7 +1,7 @@
 "use client";
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 
 import BrandMark from './BrandMark';
@@ -12,25 +12,27 @@ import { EDITIONS, editionHref } from '@/lib/editions';
 import { CATEGORY_MAP } from '@/lib/types';
 
 /**
- * Navbar.
+ * Masthead + section bar.
  *
- * Deliberately thin. The three editions are the product's real sections, and
- * they have their own masthead inside the feed — setting them here as well
- * would mean the page named its current section twice, in two type sizes, one
- * above the other. So the header carries only what sits outside the editions,
- * plus the two controls that have to work on every route.
+ * Two bands with two jobs, modelled on the editorial portals in /inspo:
  *
- * Ask is one of them. It used to exist solely on feed pages, because the modal
- * lived in FeedPage; a reader on a story page had no way to ask anything and
- * the advertised ⌘K did nothing. It now comes from AskProvider in the layout,
- * so the control and the shortcut behave identically everywhere.
+ *   Masthead     the date, the nameplate centred, and the one action that
+ *                matters (Ask). It scrolls away with the page — a nameplate is
+ *                for arriving, and pinning 76px of it to every screen would
+ *                spend the fold on branding.
+ *   Section bar  editions and topics, sticky. This is where a reader goes
+ *                next, so it stays. Once the masthead has scrolled off, the
+ *                bar grows a compact brand mark on the left and an Ask button
+ *                on the right, sliding in from the edges — the two things the
+ *                masthead was carrying, handed over rather than lost.
  *
- * What is deliberately absent: a keyword search box. It duplicated Ask while
- * being strictly worse at the same job — keyword search matches article text,
- * whereas Ask retrieves whole story clusters and answers with the corroboration
- * attached. And a "Subscribe" CTA, which was once the most prominent element in
- * the header, styled as the primary action, pointing at a page that opens by
- * explaining that email digests do not exist.
+ * The editions used to live only inside the feed's own header, so on a story
+ * page or a topic page there was no route between them without reaching the
+ * footer. They are the product's real sections, so they lead the bar.
+ *
+ * Deliberately absent, as before: a keyword search box (Ask does that job
+ * strictly better — it retrieves story clusters and answers with their
+ * corroboration) and a "Subscribe" CTA for email digests that do not exist.
  */
 
 const TOPICS = Object.entries(CATEGORY_MAP).map(([slug, info]) => ({
@@ -39,16 +41,17 @@ const TOPICS = Object.entries(CATEGORY_MAP).map(([slug, info]) => ({
   href: `/${slug}`,
 }));
 
-const PRIMARY = [
+const SECONDARY = [
   { name: 'Sources', href: '/rss' },
-  { name: 'About', href: '/about' },
+  { name: 'How it works', href: '/about' },
 ];
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
-  const [topicsOpen, setTopicsOpen] = useState(false);
+  const [stuck, setStuck] = useState(false);
   const pathname = usePathname();
   const { open: openAsk } = useAsk();
+  const mastheadRef = useRef<HTMLDivElement>(null);
 
   // Close the menu on navigation. Adjusting state during render rather than in
   // an effect avoids painting the new route with the menu still open.
@@ -56,118 +59,158 @@ export default function Navbar() {
   if (pathname !== lastPathname) {
     setLastPathname(pathname);
     setIsOpen(false);
-    setTopicsOpen(false);
   }
+
+  // The bar is "stuck" once the masthead has left the viewport. An observer
+  // rather than a scroll listener: it fires twice per crossing, not sixty
+  // times a second.
+  useEffect(() => {
+    const el = mastheadRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(([entry]) => setStuck(!entry.isIntersecting), {
+      threshold: 0,
+    });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
 
   // The mobile sheet covers the page, so the page behind it should not scroll.
   useEffect(() => {
     if (!isOpen) return;
     const previous = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setIsOpen(false);
+    document.addEventListener('keydown', onKey);
     return () => {
       document.body.style.overflow = previous;
+      document.removeEventListener('keydown', onKey);
     };
   }, [isOpen]);
 
-  const isTopicActive = TOPICS.some((t) => t.href === pathname);
-
   return (
-    <header className="sticky top-0 z-50 border-b border-[var(--border)] bg-[var(--background)]/95 backdrop-blur supports-[backdrop-filter]:bg-[var(--background)]/80">
-      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
-        <Link
-          href="/"
-          aria-label="Ultra News — home"
-          className="flex shrink-0 items-center transition-opacity hover:opacity-80"
-        >
-          <BrandMark size={17} />
-        </Link>
+    <>
+      {/* ------------------------------------------------------ masthead */}
+      <div ref={mastheadRef} className="border-b border-[var(--border)]">
+        <div className="mx-auto grid h-16 max-w-[var(--page-max)] grid-cols-[1fr_auto_1fr] items-center gap-4 px-4 sm:h-[76px] sm:px-6">
+          <div className="min-w-0">
+            <TodayLine />
+          </div>
 
-        {/* Desktop nav */}
-        <nav aria-label="Primary" className="hidden items-center gap-6 lg:flex">
-          {PRIMARY.map((item) => {
-            const active = pathname === item.href;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                aria-current={active ? 'page' : undefined}
-                className={`text-body-sm transition-colors ${
-                  active
-                    ? 'text-[var(--foreground)]'
-                    : 'text-[var(--foreground-muted)] hover:text-[var(--foreground)]'
-                }`}
-              >
-                {item.name}
-              </Link>
-            );
-          })}
-
-          {/*
-            Topics. A real menu rather than the previous <details> disclosure,
-            which stayed open when the reader clicked away or pressed Escape —
-            leaving a panel covering the page it had just navigated to. Same
-            behaviour as the feed's TopicFilter, so the two controls that list
-            the same nine topics also dismiss the same way.
-          */}
-          <TopicsMenu
-            isOpen={topicsOpen}
-            setIsOpen={setTopicsOpen}
-            isActive={isTopicActive}
-            pathname={pathname}
-          />
-        </nav>
-
-        {/* Actions */}
-        <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={openAsk}
-            aria-label="Ask the wire room"
-            className="ai-border flex items-center gap-2 rounded-[var(--radius-card)] bg-[var(--surface)] px-2.5 py-1.5 transition-colors hover:bg-[var(--surface-elevated)]"
+          <Link
+            href="/"
+            aria-label="Ultra News — home"
+            className="flex items-center justify-self-start transition-opacity hover:opacity-80 sm:justify-self-center"
           >
-            <AskSparkle className="shrink-0 text-[var(--accent)]" />
-            <span className="text-body-sm hidden text-[var(--foreground-muted)] sm:inline">
-              Ask
-            </span>
-            <kbd className="font-data hidden rounded border border-[var(--border)] bg-[var(--background)] px-1.5 py-0.5 text-[10px] text-[var(--foreground-subtle)] md:inline-block">
-              ⌘K
-            </kbd>
-          </button>
+            {/* Visibility on wrappers: BrandMark sets its own display, and two
+                display utilities on one element resolve by stylesheet order. */}
+            <span className="hidden sm:block"><BrandMark size={26} /></span>
+            <span className="sm:hidden"><BrandMark size={20} /></span>
+          </Link>
 
-          <ThemeToggle />
-
-          <button
-            type="button"
-            onClick={() => setIsOpen(!isOpen)}
-            aria-expanded={isOpen}
-            aria-controls="mobile-menu"
-            aria-label={isOpen ? 'Close menu' : 'Open menu'}
-            className="-mr-2 p-2 text-[var(--foreground)] lg:hidden"
-          >
-            <div className="flex h-4 w-5 flex-col justify-between">
-              <span className={`h-[1.5px] w-full origin-left bg-current transition-transform duration-300 ${isOpen ? 'translate-x-px rotate-45' : ''}`} />
-              <span className={`h-[1.5px] w-full bg-current transition-opacity duration-200 ${isOpen ? 'opacity-0' : ''}`} />
-              <span className={`h-[1.5px] w-full origin-left bg-current transition-transform duration-300 ${isOpen ? 'translate-x-px -rotate-45' : ''}`} />
-            </div>
-          </button>
+          <div className="flex items-center justify-end gap-1.5">
+            <button
+              type="button"
+              onClick={() => openAsk()}
+              aria-label="Ask the wire room"
+              className="pill pill-solid group hidden sm:inline-flex"
+            >
+              <AskSparkle className="shrink-0 transition-transform duration-500 group-hover:rotate-[18deg]" />
+              Ask the wire
+              <kbd className="font-data rounded-[5px] bg-white/15 px-1.5 py-0.5 text-[10px] tracking-wide">
+                ⌘K
+              </kbd>
+            </button>
+            <ThemeToggle />
+          </div>
         </div>
       </div>
 
-      {/*
-        Mobile sheet.
-
-        Carries the editions, which the desktop header does not. On a phone the
-        feed's masthead scrolls away with the page, so without them here a
-        reader partway down a story has no route between editions at all — the
-        desktop equivalent is at least one scroll from the footer.
-      */}
-      <div
-        id="mobile-menu"
-        hidden={!isOpen}
-        className="max-h-[calc(100vh-3.5rem)] overflow-y-auto border-t border-[var(--border)] bg-[var(--background)] px-4 py-6 sm:px-6 lg:hidden"
+      {/* --------------------------------------------------- section bar */}
+      <nav
+        aria-label="Sections"
+        data-stuck={stuck}
+        className="group/bar sticky top-0 z-50 border-b border-[var(--border)] bg-[var(--background)]/90 backdrop-blur-md supports-[backdrop-filter]:bg-[var(--background)]/75"
       >
-        <nav aria-label="Editions">
-          <p className="text-label mb-3 text-[var(--foreground-subtle)]">Editions</p>
+        <div className="mx-auto flex h-[var(--header-h)] max-w-[var(--page-max)] items-center gap-2 px-4 sm:px-6">
+          {/* Compact mark. Collapsed to zero width at rest so it takes no room
+              while the masthead is on screen, then slides in. */}
+          <Link
+            href="/"
+            aria-label="Ultra News — home"
+            tabIndex={stuck ? 0 : -1}
+            aria-hidden={!stuck}
+            className="flex w-0 shrink-0 -translate-x-2 items-center overflow-hidden opacity-0 transition-all duration-300 ease-[var(--ease-out)] group-data-[stuck=true]/bar:mr-2 group-data-[stuck=true]/bar:w-7 group-data-[stuck=true]/bar:translate-x-0 group-data-[stuck=true]/bar:opacity-100"
+          >
+            <BrandMark size={16} markOnly />
+          </Link>
+
+          <ul className="pb-scrollbar flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto">
+            {EDITIONS.map((edition) => (
+              <BarLink
+                key={edition.slug || 'wire'}
+                href={editionHref(edition)}
+                active={pathname === editionHref(edition)}
+                strong
+              >
+                {edition.name}
+              </BarLink>
+            ))}
+            <BarLink href="/briefing" active={pathname === '/briefing'} strong>
+              <span className="flex items-center gap-1.5">
+                <AskSparkle className="h-3 w-3 text-[var(--accent)]" />
+                Briefing
+              </span>
+            </BarLink>
+            <li aria-hidden="true" className="mx-2 h-4 w-px shrink-0 bg-[var(--border-strong)]" />
+            {TOPICS.map((topic) => (
+              <BarLink key={topic.slug} href={topic.href} active={pathname === topic.href}>
+                {topic.name}
+              </BarLink>
+            ))}
+          </ul>
+
+          <div className="flex shrink-0 items-center gap-1 pl-1">
+            {/* On desktop the masthead's Ask pill scrolls away with it; this
+                one arrives as it goes. On mobile it is always here, because
+                the masthead has no room for a labelled button. */}
+            <button
+              type="button"
+              onClick={() => openAsk()}
+              aria-label="Ask the wire room"
+              className="ai-border flex h-8 items-center gap-1.5 rounded-[var(--radius-pill)] bg-[var(--surface)] px-2.5 text-[var(--foreground)] transition-all duration-300 ease-[var(--ease-out)] sm:pointer-events-none sm:translate-x-2 sm:opacity-0 sm:group-data-[stuck=true]/bar:pointer-events-auto sm:group-data-[stuck=true]/bar:translate-x-0 sm:group-data-[stuck=true]/bar:opacity-100"
+              tabIndex={0}
+            >
+              <AskSparkle className="shrink-0 text-[var(--accent)]" />
+              <span className="text-[13px]">Ask</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsOpen(!isOpen)}
+              aria-expanded={isOpen}
+              aria-controls="mobile-menu"
+              aria-label={isOpen ? 'Close menu' : 'Open menu'}
+              className="-mr-1.5 p-2 text-[var(--foreground)] lg:hidden"
+            >
+              <div className="flex h-3.5 w-[18px] flex-col justify-between">
+                <span className={`h-[1.5px] w-full origin-left bg-current transition-transform duration-300 ${isOpen ? 'translate-x-px rotate-45' : ''}`} />
+                <span className={`h-[1.5px] w-full bg-current transition-opacity duration-200 ${isOpen ? 'opacity-0' : ''}`} />
+                <span className={`h-[1.5px] w-full origin-left bg-current transition-transform duration-300 ${isOpen ? 'translate-x-px -rotate-45' : ''}`} />
+              </div>
+            </button>
+          </div>
+        </div>
+
+        {/*
+          Mobile sheet. Editions set large, because on a phone they are the
+          whole navigation; topics and the secondary pages beneath.
+        */}
+        <div
+          id="mobile-menu"
+          hidden={!isOpen}
+          className="animate-fade-in absolute inset-x-0 top-full h-[calc(100dvh-var(--header-h))] overflow-y-auto border-t border-[var(--border)] bg-[var(--background)] px-4 py-6 sm:px-6 lg:hidden"
+        >
+          <p className="eyebrow mb-3">Editions</p>
           <ul className="space-y-1">
             {EDITIONS.map((edition) => {
               const href = editionHref(edition);
@@ -177,140 +220,118 @@ export default function Navbar() {
                   <Link
                     href={href}
                     aria-current={active ? 'page' : undefined}
-                    className={`block py-1.5 font-display text-[22px] tracking-tight transition-colors ${
-                      active
-                        ? 'text-[var(--foreground)]'
-                        : 'text-[var(--foreground-subtle)]'
+                    className={`block py-1 font-display text-[34px] leading-tight transition-colors ${
+                      active ? 'text-[var(--foreground)]' : 'text-[var(--foreground-subtle)]'
                     }`}
                   >
                     {edition.name}
                   </Link>
-                  <p className="text-body-sm mb-1 text-[var(--foreground-subtle)]">
-                    {edition.rubric}
-                  </p>
+                  <p className="text-body-sm mb-2 text-[var(--foreground-subtle)]">{edition.rubric}</p>
                 </li>
               );
             })}
           </ul>
-        </nav>
 
-        <div className="mt-6 border-t border-[var(--border)] pt-5">
-          <p className="text-label mb-3 text-[var(--foreground-subtle)]">Topics</p>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-3">
-            {TOPICS.map((topic) => (
-              <Link
-                key={topic.slug}
-                href={topic.href}
-                className={`py-1.5 text-body-sm transition-colors ${
-                  pathname === topic.href
-                    ? 'text-[var(--accent)]'
-                    : 'text-[var(--foreground-muted)]'
-                }`}
-              >
-                {topic.name}
+          <Link
+            href="/briefing"
+            className="mt-5 flex items-center justify-between rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface-elevated)] p-4"
+          >
+            <span>
+              <span className="font-display block text-[26px] leading-tight text-[var(--foreground)]">The Briefing</span>
+              <span className="text-body-sm text-[var(--foreground-subtle)]">Today&rsquo;s confirmed stories in two minutes</span>
+            </span>
+            <AskSparkle className="text-[var(--accent)]" />
+          </Link>
+
+          <div className="mt-6 border-t border-[var(--border)] pt-5">
+            <p className="eyebrow mb-3">Topics</p>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-3">
+              {TOPICS.map((topic) => (
+                <Link
+                  key={topic.slug}
+                  href={topic.href}
+                  className={`text-body-md py-1.5 transition-colors ${
+                    pathname === topic.href
+                      ? 'text-[var(--foreground)]'
+                      : 'text-[var(--foreground-muted)]'
+                  }`}
+                >
+                  {topic.name}
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-6 flex gap-5 border-t border-[var(--border)] pt-5">
+            {SECONDARY.map((item) => (
+              <Link key={item.href} href={item.href} className="text-body-sm text-[var(--foreground-muted)]">
+                {item.name}
               </Link>
             ))}
           </div>
         </div>
-
-        <nav
-          aria-label="Secondary"
-          className="mt-6 flex gap-5 border-t border-[var(--border)] pt-5"
-        >
-          {PRIMARY.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="text-body-sm text-[var(--foreground-muted)]"
-            >
-              {item.name}
-            </Link>
-          ))}
-        </nav>
-      </div>
-    </header>
+      </nav>
+    </>
   );
 }
 
-function TopicsMenu({
-  isOpen,
-  setIsOpen,
-  isActive,
-  pathname,
+function BarLink({
+  href,
+  active,
+  strong = false,
+  children,
 }: {
-  isOpen: boolean;
-  setIsOpen: (v: boolean) => void;
-  isActive: boolean;
-  pathname: string;
+  href: string;
+  active: boolean;
+  strong?: boolean;
+  children: React.ReactNode;
 }) {
+  return (
+    <li className="shrink-0">
+      <Link
+        href={href}
+        aria-current={active ? 'page' : undefined}
+        className={`relative flex h-[var(--header-h)] items-center whitespace-nowrap px-2.5 text-[13px] transition-colors after:absolute after:inset-x-2.5 after:bottom-[-1px] after:h-[2px] after:origin-left after:rounded-full after:bg-[var(--foreground)] after:transition-transform after:duration-300 after:ease-[var(--ease-out)] ${
+          active
+            ? 'text-[var(--foreground)] after:scale-x-100'
+            : 'text-[var(--foreground-muted)] after:scale-x-0 hover:text-[var(--foreground)] hover:after:scale-x-50'
+        } ${strong ? 'font-medium' : ''}`}
+      >
+        {children}
+      </Link>
+    </li>
+  );
+}
+
+/**
+ * Today's date, as a broadsheet dateline.
+ *
+ * Rendered after mount: the page is statically generated and cached, so a
+ * server-rendered date would be the build's date, not the reader's.
+ */
+function TodayLine() {
+  const [now, setNow] = useState<Date | null>(null);
+
   useEffect(() => {
-    if (!isOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setIsOpen(false);
-    };
-    const onPointerDown = (e: MouseEvent) => {
-      if (!(e.target as HTMLElement).closest('[data-topics-menu]')) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener('keydown', onKey);
-    document.addEventListener('mousedown', onPointerDown);
+    const t = setTimeout(() => setNow(new Date()), 0);
+    const id = setInterval(() => setNow(new Date()), 60_000);
     return () => {
-      document.removeEventListener('keydown', onKey);
-      document.removeEventListener('mousedown', onPointerDown);
+      clearTimeout(t);
+      clearInterval(id);
     };
-  }, [isOpen, setIsOpen]);
+  }, []);
 
   return (
-    <div className="relative" data-topics-menu>
-      <button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        aria-expanded={isOpen}
-        aria-haspopup="menu"
-        className={`text-body-sm flex items-center gap-1 transition-colors ${
-          isActive || isOpen
-            ? 'text-[var(--foreground)]'
-            : 'text-[var(--foreground-muted)] hover:text-[var(--foreground)]'
-        }`}
-      >
-        Topics
-        <svg
-          width="12"
-          height="12"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          aria-hidden="true"
-          className={`transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
-        >
-          <path d="m6 9 6 6 6-6" />
-        </svg>
-      </button>
-
-      {isOpen && (
-        <div
-          role="menu"
-          className="animate-fade-in-up absolute left-0 top-full z-50 mt-3 w-52 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface-elevated)] p-1.5 shadow-[var(--shadow-lg)]"
-        >
-          {TOPICS.map((topic) => (
-            <Link
-              key={topic.slug}
-              href={topic.href}
-              role="menuitem"
-              className={`block rounded-[var(--radius-chip)] px-3 py-2 text-body-sm transition-colors ${
-                pathname === topic.href
-                  ? 'bg-[var(--surface)] text-[var(--foreground)]'
-                  : 'text-[var(--foreground-muted)] hover:bg-[var(--surface)] hover:text-[var(--foreground)]'
-              }`}
-            >
-              {topic.name}
-            </Link>
-          ))}
-        </div>
-      )}
+    <div className="hidden leading-tight sm:block" aria-hidden={now === null}>
+      <p className="text-[13px] font-medium text-[var(--foreground)]" suppressHydrationWarning>
+        {now
+          ? now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+          : ' '}
+      </p>
+      <p className="mt-0.5 flex items-center gap-1.5 text-[12px] text-[var(--foreground-subtle)]">
+        <span className="live-dot" aria-hidden="true" />
+        Live wire · independent outlets, counted
+      </p>
     </div>
   );
 }

@@ -26,7 +26,7 @@ export default function SourceLedger({ articles }: { articles: StoryArticle[] })
 
   return (
     <section aria-labelledby="ledger-heading" className="border-t border-[var(--border)] py-12">
-      <h2 id="ledger-heading" className="text-display-md font-display text-[var(--foreground)]">
+      <h2 id="ledger-heading" className="text-display-lg font-display text-[var(--foreground)]">
         Every source
       </h2>
       <p className="text-body-sm measure mb-8 mt-1.5 text-[var(--foreground-muted)]">

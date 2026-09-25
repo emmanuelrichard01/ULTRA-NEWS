@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 import CorroborationMeter from '@/components/CorroborationMeter';
+import { ArrowRight } from '@/components/icons';
 
 /**
  * About — the method, stated plainly, including its limits.
@@ -37,6 +38,33 @@ const SECTIONS = [
 
 type SectionId = (typeof SECTIONS)[number]['id'];
 
+const PIPELINE = [
+  {
+    title: 'Ingest',
+    cadence: 'every 15 min',
+    body: 'Feeds are polled with conditional requests; only new articles are fetched in full.',
+    ai: false,
+  },
+  {
+    title: 'Cluster',
+    cadence: 'every 3 min',
+    body: 'Each article is embedded locally and joined to a story only above a measured similarity threshold.',
+    ai: false,
+  },
+  {
+    title: 'Count',
+    cadence: 'on every join',
+    body: 'Distinct publishers are recounted from the database. Feeds from one newsroom count once.',
+    ai: false,
+  },
+  {
+    title: 'Brief',
+    cadence: 'when outlets join',
+    body: 'A model summarises agreement, flags contradictions, and must cite only outlets in the story.',
+    ai: true,
+  },
+] as const;
+
 function Section({
   id,
   title,
@@ -46,22 +74,13 @@ function Section({
   title: string;
   children: React.ReactNode;
 }) {
-  const index = SECTIONS.findIndex((s) => s.id === id) + 1;
 
   return (
     // `scroll-mt` clears the sticky header: without it, jumping to a section
     // from the index lands with its heading hidden behind the navbar.
-    <section id={id} className="scroll-mt-20 border-t border-[var(--border)] py-9">
-      <h2 className="text-display-md font-display mb-4 flex gap-3 text-[var(--foreground)]">
-        <span
-          className="font-data pt-[6px] text-[12px] tabular-nums text-[var(--foreground-subtle)]"
-          aria-hidden="true"
-        >
-          {String(index).padStart(2, '0')}
-        </span>
-        {title}
-      </h2>
-      <div className="text-body-md measure space-y-4 text-[var(--foreground-muted)]">
+    <section id={id} className="scroll-mt-[calc(var(--header-h)+2rem)] border-t border-[var(--border)] py-12">
+      <h2 className="text-display-lg font-display mb-5 text-[var(--foreground)]">{title}</h2>
+      <div className="text-body-lg measure space-y-4 text-[var(--foreground-muted)]">
         {children}
       </div>
     </section>
@@ -70,52 +89,84 @@ function Section({
 
 export default function AboutPage() {
   return (
-    <div className="mx-auto max-w-3xl">
-      <header className="border-b-2 border-[var(--foreground)] pb-7">
-        <h1 className="text-display-2xl font-display text-[var(--foreground)]">
-          How this works
+    <div className="mx-auto max-w-6xl">
+      <header className="border-b border-[var(--border)] pb-12">
+        <h1 className="text-display-3xl font-display animate-fade-in-up max-w-4xl text-balance text-[var(--foreground)]">
+          One number, <span className="italic text-[var(--foreground-muted)]">explained honestly.</span>
         </h1>
-        <p className="text-body-lg measure mt-3 text-[var(--foreground-muted)]">
+        <p className="text-body-lg measure mt-6 text-[var(--foreground-muted)]">
           Ultra News groups coverage of the same event from different newsrooms
-          and tells you how many independent outlets stand behind it. That number
-          is the whole product, so it&rsquo;s worth explaining exactly what it
-          measures.
+          and tells you how many independent outlets stand behind it. That
+          number is the whole product, so it&rsquo;s worth explaining exactly
+          what it measures — and what it cannot.
         </p>
       </header>
 
       {/*
-        A contents index.
-
-        This page is six sections of continuous prose and had no wayfinding at
-        all: a reader who arrived wanting one specific answer — usually "what
-        does this number NOT mean" — had to scroll and skim to find it. The
-        index costs eight lines and makes the page's shape visible before the
-        reading starts.
+        The pipeline, drawn. Four stages a reader can hold in their head before
+        reading six sections of prose about them — and the fourth is marked as
+        the only one a language model touches, because readers assume the
+        opposite.
       */}
-      <nav aria-labelledby="contents-heading" className="border-b border-[var(--border)] py-6">
-        <h2 id="contents-heading" className="text-label mb-3 text-[var(--foreground-subtle)]">
-          Contents
-        </h2>
-        <ol className="grid gap-x-8 gap-y-2 sm:grid-cols-2">
-          {SECTIONS.map((section, i) => (
-            <li key={section.id} className="flex gap-3">
-              <span
-                className="font-data text-[12px] tabular-nums text-[var(--foreground-subtle)]"
-                aria-hidden="true"
-              >
-                {String(i + 1).padStart(2, '0')}
+      <section aria-labelledby="pipeline-heading" className="border-b border-[var(--border)] py-12">
+        <h2 id="pipeline-heading" className="eyebrow mb-6">How a story is made</h2>
+        <ol className="stagger grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {PIPELINE.map((step, i) => (
+            <li
+              key={step.title}
+              className={`relative flex flex-col rounded-[var(--radius-card)] border p-5 ${
+                step.ai
+                  ? 'ai-border bg-[var(--surface-elevated)]'
+                  : 'border-[var(--border)] bg-[var(--surface-elevated)]'
+              }`}
+            >
+              <span className="font-data text-[11px] text-[var(--foreground-subtle)]">
+                {String(i + 1).padStart(2, '0')} · {step.cadence}
               </span>
-              <a
-                href={`#${section.id}`}
-                className="text-body-sm text-[var(--foreground-muted)] underline decoration-[var(--border)] underline-offset-4 transition-colors hover:text-[var(--foreground)] hover:decoration-[var(--border-hover)]"
+              <span className="font-display mt-3 text-[30px] leading-none text-[var(--foreground)]">{step.title}</span>
+              <span className="text-body-sm mt-3 text-[var(--foreground-muted)]">{step.body}</span>
+              <span
+                className={`font-data mt-auto pt-4 text-[11px] ${
+                  step.ai ? 'text-[var(--accent)]' : 'text-[var(--foreground-subtle)]'
+                }`}
               >
-                {section.title}
-              </a>
+                {step.ai ? 'Language model · optional' : 'No language model'}
+              </span>
+              {i < PIPELINE.length - 1 && (
+                <span aria-hidden="true" className="absolute -right-2.5 top-1/2 z-10 hidden h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--background)] text-[11px] text-[var(--foreground-subtle)] lg:flex">
+                  <ArrowRight size={11} />
+                </span>
+              )}
             </li>
           ))}
         </ol>
-      </nav>
+      </section>
 
+      <div className="grid gap-10 lg:grid-cols-[14rem_minmax(0,1fr)] lg:gap-16">
+        {/*
+          A contents index, sticky beside the prose. This page is six sections
+          of continuous text; a reader who arrived wanting one answer —
+          usually "what does this number NOT mean" — can go straight to it.
+        */}
+        <nav aria-labelledby="contents-heading" className="pt-12 lg:sticky lg:top-[calc(var(--header-h)+1.5rem)] lg:self-start">
+          <h2 id="contents-heading" className="eyebrow mb-4">
+            Contents
+          </h2>
+          <ol className="space-y-1 border-l border-[var(--border)]">
+            {SECTIONS.map((section) => (
+              <li key={section.id}>
+                <a
+                  href={`#${section.id}`}
+                  className="-ml-px flex gap-3 border-l-2 border-transparent py-1.5 pl-3.5 text-[13px] text-[var(--foreground-muted)] transition-colors hover:border-[var(--foreground)] hover:text-[var(--foreground)]"
+                >
+                  {section.title}
+                </a>
+              </li>
+            ))}
+          </ol>
+        </nav>
+
+        <div className="min-w-0 max-w-3xl">
       <Section id="the-number" title="What the number means">
         <p>
           Every story carries a count of{' '}
@@ -183,6 +234,17 @@ export default function AboutPage() {
           the newsroom that did the work.
         </p>
         <p>
+          Briefs are checked before they are shown: a fact or claim attributed
+          to an outlet that is not actually covering the story is removed, and
+          so is any comparison with official documents when none were in the
+          reporting. The daily{' '}
+          <Link href="/briefing" className="text-[var(--accent)] underline underline-offset-2">
+            Briefing
+          </Link>{' '}
+          follows the same rules and includes only stories a second newsroom
+          has confirmed.
+        </p>
+        <p>
           Ultra News does not republish anyone&rsquo;s article. Every story shows
           a short excerpt and sends you to the original.
         </p>
@@ -216,7 +278,7 @@ export default function AboutPage() {
           href="https://github.com/emmanuelrichard01/ULTRA-NEWS"
           target="_blank"
           rel="noopener noreferrer"
-          className="text-body-sm mt-2 inline-flex items-center gap-2 rounded-[var(--radius-card)] border border-[var(--border)] px-4 py-2.5 text-[var(--foreground)] transition-colors hover:border-[var(--border-hover)]"
+          className="pill pill-solid group mt-2"
         >
           View the source
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -224,6 +286,8 @@ export default function AboutPage() {
           </svg>
         </a>
       </Section>
+        </div>
+      </div>
     </div>
   );
 }

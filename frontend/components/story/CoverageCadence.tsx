@@ -165,7 +165,8 @@ export default function CoverageCadence({ articles }: CoverageCadenceProps) {
 
   return (
     <section aria-labelledby="cadence-heading" className="border-t border-[var(--border)] py-12">
-      <h2 id="cadence-heading" className="text-display-md font-display text-[var(--foreground)]">
+      <p className="eyebrow mb-3">Evidence · pickup pattern</p>
+      <h2 id="cadence-heading" className="text-display-lg font-display text-[var(--foreground)]">
         How corroboration built up
       </h2>
       <p className="text-body-sm measure mb-6 mt-1.5 text-[var(--foreground-muted)]">

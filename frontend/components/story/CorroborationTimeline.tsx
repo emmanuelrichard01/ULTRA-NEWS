@@ -59,8 +59,9 @@ export default function CorroborationTimeline({ articles }: CorroborationTimelin
 
   return (
     <section aria-labelledby="timeline-heading" className="border-t border-[var(--border)] py-12">
+      <p className="eyebrow mb-3">Evidence · publication order</p>
       <div className="mb-1 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <h2 id="timeline-heading" className="text-display-md font-display text-[var(--foreground)]">
+        <h2 id="timeline-heading" className="text-display-lg font-display text-[var(--foreground)]">
           How this was corroborated
         </h2>
         <span className="font-data text-[12px] text-[var(--foreground-subtle)]">

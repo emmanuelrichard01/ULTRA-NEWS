@@ -22,14 +22,14 @@ export default function Loading() {
       <div className="mb-6">
         <div className="flex items-end justify-between gap-4 border-b border-[var(--border)] pb-3">
           <div className="skeleton h-6 w-64 rounded" />
-          <div className="skeleton h-9 w-44 rounded-[var(--radius-card)]" />
+          <div className="skeleton h-9 w-44 rounded-[var(--radius-pill)]" />
         </div>
         <div className="skeleton mt-3 h-4 w-full max-w-lg rounded" />
       </div>
 
       {/* Controls: corroboration segment, then topics. */}
       <div className="mb-6 space-y-3">
-        <div className="skeleton h-9 w-72 rounded-[var(--radius-card)]" />
+        <div className="skeleton h-9 w-72 rounded-[var(--radius-pill)]" />
         <div className="skeleton h-7 w-full max-w-2xl rounded" />
       </div>
 

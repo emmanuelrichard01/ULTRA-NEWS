@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 
+import { AskSparkle } from "./AskTrigger";
+import { useAsk } from "./AskProvider";
 import CorroborationMeter from "./CorroborationMeter";
 import { describeCorroboration } from "@/lib/corroboration";
 
@@ -17,6 +19,8 @@ interface StickyStoryNavProps {
   title: string;
   /** Independent publishers. */
   sourceCount: number;
+  /** Enables "Ask about this story", which scopes retrieval to this cluster. */
+  slug?: string;
 }
 
 /*
@@ -27,7 +31,8 @@ interface StickyStoryNavProps {
  * live. Two call sites computing thresholds by hand is how the vocabulary
  * drifts.
  */
-export default function StickyStoryNav({ title, sourceCount }: StickyStoryNavProps) {
+export default function StickyStoryNav({ title, sourceCount, slug }: StickyStoryNavProps) {
+  const { open } = useAsk();
   const [isVisible, setIsVisible] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -73,13 +78,16 @@ export default function StickyStoryNav({ title, sourceCount }: StickyStoryNavPro
   return (
     <div
       aria-hidden={!isVisible}
-      className={`fixed inset-x-0 top-0 z-40 transition-transform duration-300 ease-out ${
-        isVisible ? "translate-y-0" : "-translate-y-full"
+      // Sits directly under the sticky section bar (z-50 at top-0) rather than
+      // at top-0 itself, where it would slide in behind the bar and never be
+      // seen. The hidden state tucks it up under the bar.
+      className={`fixed inset-x-0 top-[calc(var(--header-h)-1px)] z-40 transition-all duration-300 ease-[var(--ease-out)] ${
+        isVisible ? "translate-y-0 opacity-100" : "pointer-events-none -translate-y-full opacity-0"
       }`}
     >
-      <div className="border-b border-[var(--border)] bg-[var(--background)]/95 backdrop-blur supports-[backdrop-filter]:bg-[var(--background)]/85">
-        <div className="mx-auto flex max-w-3xl items-center gap-4 px-4 py-2.5 sm:px-6">
-          <h2 className="min-w-0 flex-1 truncate font-display text-[15px] text-[var(--foreground)]">
+      <div className="relative border-b border-[var(--border)] bg-[var(--background)]/95 backdrop-blur supports-[backdrop-filter]:bg-[var(--background)]/85">
+        <div className="mx-auto flex h-11 max-w-6xl items-center gap-3 px-4 sm:gap-4 sm:px-6">
+          <h2 className="min-w-0 flex-1 truncate text-[14px] font-medium text-[var(--foreground)]">
             {title}
           </h2>
 
@@ -93,12 +101,30 @@ export default function StickyStoryNav({ title, sourceCount }: StickyStoryNavPro
             </span>
           </div>
 
+          {slug && (
+            <button
+              type="button"
+              onClick={() => open({ story: { slug, title } })}
+              tabIndex={isVisible ? 0 : -1}
+              className="ai-border flex shrink-0 items-center gap-1.5 rounded-[var(--radius-pill)] bg-[var(--surface)] px-3 py-1.5 text-[12px] text-[var(--foreground)]"
+            >
+              <AskSparkle className="text-[var(--accent)]" />
+              <span className="hidden sm:inline">Ask about this</span>
+              <span className="sm:hidden">Ask</span>
+            </button>
+          )}
           <button
             onClick={handleShare}
-            className="text-label shrink-0 rounded-[var(--radius-chip)] border border-[var(--border)] px-2.5 py-1.5 text-[var(--foreground-muted)] transition-colors hover:border-[var(--border-hover)] hover:text-[var(--foreground)]"
+            tabIndex={isVisible ? 0 : -1}
+            className="pill pill-outline shrink-0 !px-3 !py-1.5 text-[12px] text-[var(--foreground-muted)]"
           >
             {copied ? "Copied" : "Share"}
           </button>
+        </div>
+        {/* Reading progress, driven by the page's scroll timeline rather than
+            a scroll listener. */}
+        <div className="absolute inset-x-0 -bottom-px h-[2px] overflow-hidden" aria-hidden="true">
+          <div className="read-progress h-full w-full bg-[var(--accent)]" />
         </div>
       </div>
     </div>

@@ -3,6 +3,8 @@ import { notFound } from 'next/navigation';
 import { Suspense } from 'react';
 
 import FeedPage from '@/components/FeedPage';
+import JsonLd, { breadcrumbList } from '@/components/JsonLd';
+import { IS_INDEXABLE, absoluteUrl } from '@/lib/site';
 import { fetchStories, fetchLeadStories } from '@/lib/api';
 import { EDITIONS_BY_SLUG } from '@/lib/editions';
 import { CATEGORY_MAP } from '@/lib/types';
@@ -34,6 +36,7 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
     openGraph: {
       title: `${info.displayName} — Ultra News`,
       description: info.description,
+      url: `/${category}`,
     },
   };
 }
@@ -60,8 +63,36 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
     fetchLeadStories({ category, limit: 4 }),
   ]);
 
+  const structuredData = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'CollectionPage',
+        '@id': absoluteUrl(`/${category}#page`),
+        url: absoluteUrl(`/${category}`),
+        name: `${info.displayName} — Ultra News`,
+        description: info.description,
+        isPartOf: { '@id': absoluteUrl('/#website') },
+        mainEntity: {
+          '@type': 'ItemList',
+          itemListElement: initialStories.items.slice(0, 10).map((story, i) => ({
+            '@type': 'ListItem',
+            position: i + 1,
+            url: absoluteUrl(`/story/${story.slug}`),
+            name: story.title,
+          })),
+        },
+      },
+      breadcrumbList([
+        ['The Wire', '/'],
+        [info.displayName, `/${category}`],
+      ]),
+    ],
+  };
+
   return (
     <Suspense fallback={null}>
+      {IS_INDEXABLE && <JsonLd data={structuredData} />}
       <FeedPage
         edition={edition}
         category={category}
