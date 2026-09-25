@@ -46,11 +46,21 @@ def scrape_single_source(self, source_id):
     count = 0
 
     try:
-        # Hand the scraper the URLs we already have so it deep-fetches only new
-        # articles instead of re-downloading the whole feed every 30 minutes.
-        known_urls = set(
-            Article.objects.filter(source=source).values_list('url', flat=True)
-        )
+        # The scraper asks which of THIS feed's URLs we already hold, so it
+        # deep-fetches only new articles.
+        #
+        # It used to be handed every URL this source had ever produced, loaded
+        # up front — tens of thousands of rows, per source, every 30 minutes,
+        # and before the conditional GET, so even a 304 paid for them. From a
+        # CI runner to a hosted database that transfer is metered, and it was
+        # the largest single draw on the monthly allowance Neon cut off in
+        # August 2026. A lookup of the feed's few dozen URLs through the unique
+        # index costs a few kilobytes, and only on a feed that actually changed.
+        def known_urls(candidates: list[str]) -> set[str]:
+            return set(
+                Article.objects.filter(url__in=candidates).values_list('url', flat=True)
+            )
+
         try:
             result = service.scrape_source(source, skip_urls=known_urls)
         except FeedNotModified:
@@ -119,6 +129,16 @@ def scrape_single_source(self, source_id):
         return count
 
     except Exception as e:
+        from core.storage import is_database_error
+
+        if is_database_error(e):
+            # OUR database failed, not the publisher's feed. Recording it
+            # against the source is how September 2026's storage cap
+            # deactivated healthy feeds one by one through the circuit breaker
+            # — and recording it would need a write to the database that just
+            # refused one. Re-raise so the caller can stop the run instead.
+            logger.error("Database error while ingesting %s: %s", source.name, str(e)[:200])
+            raise
         logger.exception("Unexpected error scraping %s", source.name)
         ingest_outcomes.labels("failure").inc()
         _record_source_failure(source, f"{type(e).__name__}: {str(e)[:120]}")

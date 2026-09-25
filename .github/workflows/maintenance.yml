@@ -30,6 +30,12 @@ jobs:
       ALLOWED_HOSTS: localhost
       CACHE_BACKEND: locmem
       LLM_PROVIDER: none
+      # Sized for Neon's free tier — see docs/incidents/2026-09-neon-capacity.md.
+      # The code defaults (14/45/90 days) suit a VPS and outgrew 512 MB.
+      DATABASE_BUDGET_MB: '512'
+      RETENTION_RAW_DOCUMENT_DAYS: '3'
+      RETENTION_ARTICLE_PAYLOAD_DAYS: '14'
+      RETENTION_UNCORROBORATED_STORY_DAYS: '10'
 
     steps:
       - uses: actions/checkout@v4
@@ -52,3 +58,9 @@ jobs:
       # case where it becomes one.
       - name: Check source health
         run: python manage.py validate_sources || true
+      # Size against budget on every run, success or failure: a table on the
+      # run summary and a warning annotation past 80%. The first sign of the
+      # September 2026 outage was Neon's own "100% used" email.
+      - name: Database size report
+        if: always()
+        run: python manage.py db_report

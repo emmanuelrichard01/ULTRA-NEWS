@@ -39,6 +39,12 @@ jobs:
       # No worker exists here. run_pipeline sets this for itself too; stating it
       # in the environment covers anything else invoked in this job.
       CELERY_DISPATCH_ENABLED: '0'
+      # Sized for Neon's free tier — see docs/incidents/2026-09-neon-capacity.md.
+      # The code defaults (14/45/90 days) suit a VPS and outgrew 512 MB.
+      DATABASE_BUDGET_MB: '512'
+      RETENTION_RAW_DOCUMENT_DAYS: '3'
+      RETENTION_ARTICLE_PAYLOAD_DAYS: '14'
+      RETENTION_UNCORROBORATED_STORY_DAYS: '10'
       # Briefs are synthesised here rather than on the API host, so the key is
       # needed. Omit the secret and synthesis falls back to extraction — the
       # pipeline still succeeds.
@@ -79,3 +85,9 @@ jobs:
         # --synthesize bounds the AI portion. A 70B brief takes ~70s, so the
         # default of 10 would spend 12 minutes of a 25-minute budget on it.
         run: python manage.py run_pipeline --workers 8 --synthesize 4
+      # Size against budget on every run, success or failure: a table on the
+      # run summary and a warning annotation past 80%. The first sign of the
+      # September 2026 outage was Neon's own "100% used" email.
+      - name: Database size report
+        if: always()
+        run: python manage.py db_report

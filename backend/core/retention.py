@@ -47,6 +47,10 @@ from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
+# Rows per UPDATE when blanking payloads. Small enough that each batch's new
+# row versions fit in space the previous batch (and VACUUM) freed.
+PAYLOAD_BATCH = 2000
+
 
 def _days(name: str, default: int) -> int:
     return int(getattr(settings, name, default))
@@ -85,7 +89,16 @@ def clear_stale_article_payloads(dry_run: bool = False) -> int:
     )
     count = qs.count()
     if count and not dry_run:
-        qs.update(embedding=None, content="")
+        # Batched, and deliberately LAST in run_retention. An UPDATE writes a
+        # new row version before the old one is reclaimed, so one statement
+        # over tens of thousands of rows needs that much free space at once —
+        # at a storage cap, that is the statement that fails. In batches, after
+        # the DELETEs and a VACUUM, each batch reuses space the last one freed.
+        while True:
+            ids = list(qs.values_list("pk", flat=True)[:PAYLOAD_BATCH])
+            if not ids:
+                break
+            Article.objects.filter(pk__in=ids).update(embedding=None, content="")
     return count
 
 
@@ -120,20 +133,55 @@ def delete_uncorroborated_stories(dry_run: bool = False) -> int:
     return count
 
 
+class RetentionIncomplete(Exception):
+    """One or more retention steps failed; the others still ran."""
+
+    def __init__(self, result: dict):
+        self.result = result
+        super().__init__(f"Retention steps failed: {', '.join(result['errors'])}")
+
+
 def run_retention(dry_run: bool = False) -> dict:
-    """Apply every retention rule. Returns what was (or would be) affected."""
+    """
+    Apply every retention rule. Returns what was (or would be) affected.
+
+    **Order is chosen for a full database.** DELETEs first: marking rows dead
+    writes in place and does not need to grow a file, so they succeed even at a
+    storage cap. Then VACUUM, which makes that space reusable. Only then the
+    UPDATE that blanks old payloads, which does need room and now has it. The
+    previous order ran the UPDATE second; at the cap it crashed, and the
+    uncorroborated-story DELETE after it — the largest single saving — never
+    ran at all.
+
+    **Steps are isolated.** A failing step is recorded and the rest still run,
+    then RetentionIncomplete is raised so CI still goes red. One broken rule
+    must not leave the others undone.
+    """
     if not getattr(settings, "RETENTION_ENABLED", True):
         logger.info("Retention disabled; keeping everything.")
         return {"enabled": False}
 
-    result = {
-        "enabled": True,
-        "dry_run": dry_run,
-        "raw_documents_purged": purge_raw_documents(dry_run),
-        "article_payloads_cleared": clear_stale_article_payloads(dry_run),
-        "uncorroborated_stories_deleted": delete_uncorroborated_stories(dry_run),
-    }
+    result: dict = {"enabled": True, "dry_run": dry_run, "errors": []}
+
+    def step(key: str, fn) -> None:
+        try:
+            result[key] = fn(dry_run)
+        except Exception as e:  # noqa: BLE001 - record and continue by design
+            logger.exception("Retention step %s failed", key)
+            result[key] = None
+            result["errors"].append(f"{key}: {type(e).__name__}: {str(e)[:160]}")
+
+    step("uncorroborated_stories_deleted", delete_uncorroborated_stories)
+    step("raw_documents_purged", purge_raw_documents)
+    if not dry_run:
+        from core.storage import vacuum
+
+        result["vacuum_failed"] = vacuum(["core_rawdocument", "core_article", "core_story"])
+    step("article_payloads_cleared", clear_stale_article_payloads)
+
     logger.info("Retention pass: %s", result)
+    if result["errors"]:
+        raise RetentionIncomplete(result)
     return result
 
 

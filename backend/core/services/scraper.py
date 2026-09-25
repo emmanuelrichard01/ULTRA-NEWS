@@ -214,9 +214,14 @@ class RSSScraper(BaseScraper):
         etag: str = "",
         last_modified: str = "",
     ) -> FeedResult:
-        skip_urls = skip_urls or set()
-
         entries, new_etag, new_last_modified = self._parse_feed(url, etag, last_modified)
+
+        # `skip_urls` is either a set, or a lookup called with this feed's URLs
+        # only — resolved AFTER the conditional GET, so a 304 costs nothing.
+        candidate_urls = [e['url'] for e in entries if e['url']]
+        if callable(skip_urls):
+            skip_urls = skip_urls(candidate_urls) if candidate_urls else set()
+        skip_urls = skip_urls or set()
 
         pending = [e for e in entries if e['url'] and e['url'] not in skip_urls]
         skipped = len(entries) - len(pending)
@@ -462,7 +467,7 @@ class ScraperService:
 
         return scraper.fetch_articles(
             source.url,
-            skip_urls=set(skip_urls or ()),
+            skip_urls=skip_urls if callable(skip_urls) else set(skip_urls or ()),
             etag=source.etag,
             last_modified=source.last_modified,
         )

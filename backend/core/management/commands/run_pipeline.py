@@ -15,6 +15,7 @@ Two things make this one command rather than three:
   - **Ordering is not optional.** Clustering must see the articles ingestion just
     wrote, and momentum must see the clusters. Separate scheduled jobs would race.
 """
+import contextlib
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -81,6 +82,25 @@ class Command(BaseCommand):
                 summary = seed_database()
                 self.stdout.write(f"  seeded {len(summary['sources'])} sources")
 
+            # Feeds the circuit breaker switched off because OUR database was
+            # failing are restored before anything else. Cheap: one query
+            # over inactive sources.
+            from core.storage import (
+                is_database_capacity_error,
+                reactivate_sources_disabled_by_our_database,
+            )
+            try:
+                restored = reactivate_sources_disabled_by_our_database()
+            except Exception as e:
+                # Even this small write fails at the cap — go straight to
+                # recovery rather than scraping 41 feeds into a full database.
+                if not is_database_capacity_error(e):
+                    raise
+                self._capacity_error = e
+                self._recover_capacity()
+            if restored:
+                self.stdout.write(f"Reactivated {len(restored)} feeds disabled by database errors")
+
             source_ids = list(
                 Source.objects.filter(is_active=True).values_list('id', flat=True)
             )
@@ -89,6 +109,9 @@ class Command(BaseCommand):
             self.stdout.write(
                 f"  {ingested} new articles, {len(failed_sources)} sources failed"
             )
+
+            if self._capacity_error:
+                self._recover_capacity()
 
         self.stdout.write("Clustering…")
         from core.tasks import cluster_pending_articles
@@ -176,7 +199,38 @@ class Command(BaseCommand):
 
         return written
 
+    _capacity_error = None
+
+    def _recover_capacity(self):
+        """
+        The database refused writes for want of space. Clustering and synthesis
+        would fail the same way, so run retention now — it is ordered to work
+        at the cap (see core.retention.run_retention) — and end the run red
+        with a message that names the actual problem.
+        """
+        from core.retention import RetentionIncomplete, run_retention
+        from core.storage import database_report
+
+        self.stderr.write(self.style.ERROR(
+            f"Database at capacity: {str(self._capacity_error)[:200]}\n"
+            "Running retention now rather than waiting for the maintenance job."
+        ))
+        try:
+            result = run_retention(dry_run=False)
+            self.stdout.write(f"  retention: {result}")
+        except RetentionIncomplete as e:
+            self.stderr.write(f"  retention incomplete: {e.result}")
+        # Reporting must not mask the cause.
+        with contextlib.suppress(Exception):
+            self.stdout.write(f"  database now: {database_report(top=5)}")
+        raise SystemExit(
+            "Pipeline stopped: the database is at its storage limit. Retention has "
+            "run; the next pipeline run should succeed if it freed enough space. "
+            "See docs/incidents/2026-09-neon-capacity.md."
+        )
+
     def _ingest(self, source_ids, workers):
+        from core.storage import is_database_capacity_error
         from core.tasks import scrape_single_source
 
         def scrape(source_id):
@@ -199,5 +253,7 @@ class Command(BaseCommand):
                 if error is not None:
                     failures.append(source_id)
                     self.stderr.write(f"  source {source_id}: {str(error)[:120]}")
+                    if self._capacity_error is None and is_database_capacity_error(error):
+                        self._capacity_error = error
 
         return total, failures
