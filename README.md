@@ -30,6 +30,16 @@ earlier design split these as three separate feeds by a static count, which put
 "Developing" ranks by outlets that picked a story up inside a rolling window, so
 a story appears while coverage is accelerating and leaves once it settles.
 
+**The Briefing** (`/briefing`) answers the question the editions do not: *what
+happened today, in two minutes?* It is an hourly, machine-written digest of
+stories at least two independent newsrooms have filed on — every line cites the
+story behind it, and it works without an AI key.
+
+**Ask the Wire Room** answers questions from the clustered reporting, streamed
+token by token, with numbered citations that link to the stories they came
+from. It can be scoped to one story, and it holds a conversation: follow-ups
+understand what was asked before.
+
 ---
 
 ## Architecture at a Glance
@@ -181,7 +191,8 @@ else, and `/ask` is never exempt because it can call a paid model provider.
 | `/news` | GET | — | List articles. Full-text search via `q=`, category filter. |
 | `/articles/{slug}` | GET | — | Single article detail (excerpt + outbound link). |
 | `/sources` | GET | — | Source registry: all feeds with tier, region, health, article counts, `publisher_domain`, and the trust metrics from `core/trust.py` (`articles_broken_first`, `corroboration_rate`). |
-| `/ask` | POST | — | Question answering over clustered reporting. Story-level retrieval, semantic answer cache, degrades to source-derived output without a model. |
+| `/ask` | POST | — | Question answering over clustered reporting, **streamed over SSE**. The first event carries a citation table; answers cite stories as `[n]`. Optional `story` (scope to one story) and `history` (up to three earlier turns). Semantic answer cache; degrades to source-derived output without a model. |
+| `/briefing` | GET | — | The Briefing: today's stories confirmed by 2+ independent newsrooms, an overview and one cited line each, plus a "what to watch" list. Cached per hour and per story set. |
 | `/health/live` | GET | — | Liveness only: is the process serving HTTP? Touches nothing, always 200. Point platform health checks and uptime monitors here. |
 | `/health` | GET | — | DB, cache, ingest freshness, clustering backlog, failing sources. **Returns 503 when degraded.** For monitoring, not for orchestrators — a restart cannot fix stale ingest. |
 | `/metrics` | GET | Token/IP | Prometheus metrics. Access-controlled. |
@@ -243,6 +254,9 @@ make momentum          # Recompute the Developing edition's momentum column
 make retention         # Report what retention WOULD delete (dry run)
 make retention-apply   # Apply tiered retention — deletes data
 make sources           # Check every feed in the registry resolves
+# Database budget — what CI runs after every pipeline and maintenance job
+python manage.py db_report                 # size vs DATABASE_BUDGET_MB, live data vs reusable
+python manage.py retention --apply --compact   # retention, then VACUUM FULL where it provably fits
 make recategorize      # Re-run semantic topic assignment
 
 # Calibration — measure, don't guess
@@ -297,6 +311,10 @@ Copy `.env.example` to `.env` and configure:
 | `WEB_CONCURRENCY` | — | Gunicorn workers (default `1`). Each loads its own copy of the embedding model: 349 MiB for one, 587 MiB for two. Raise it only when the host has the memory. |
 | `MAX_ASK_DAILY_REQUESTS` | — | Daily `/ask` spend ceiling (default `500`). |
 | `MAX_SYNTHESIS_DAILY_REQUESTS` | — | Daily background-synthesis ceiling (default `200`). |
+| `RETENTION_RAW_DOCUMENT_DAYS` | — | Days to keep full extracted text (default `14`; `3` on the Neon free tier). |
+| `RETENTION_ARTICLE_PAYLOAD_DAYS` | — | Days before an article's body and embedding are cleared (default `45`; `14` on Neon). |
+| `RETENTION_UNCORROBORATED_STORY_DAYS` | — | Days before a story no second newsroom picked up is deleted (default `90`; `10` on Neon). The defaults suit a VPS; on a 512 MB database they are what filled it — see [the incident report](docs/incidents/2026-09-neon-capacity.md). |
+| `DATABASE_BUDGET_MB` | — | Storage ceiling in MB (`512` on Neon free). Enables the `db_report` warning at 80% of **live** data and lets `retention --compact` prove a table rewrite fits before running it. Unset means unbounded. |
 | `INTERNAL_API_TOKEN` | — | Exempts a trusted caller from per-IP rate limiting on the public **read** endpoints, and nothing else. Set it here and in the frontend's server environment, or a `next build` — 100+ requests in seconds from one IP — exhausts the 60/min budget and the pages meant to be static prerender empty. Leave blank to meter every caller. `/ask` is never exempt. |
 
 ### Frontend
@@ -308,6 +326,8 @@ Copy `.env.example` to `.env` and configure:
 | `INTERNAL_API_TOKEN` | — | Must match the backend's. Sent on **server-side** fetches only, so builds and ISR revalidation are not rate limited. Deliberately not `NEXT_PUBLIC_` — that prefix would inline it into the client bundle and hand every visitor a key that switches off the rate limiter. Next reads `.env` from the Next project root, so for a host-run `npm run build` it must be in `frontend/.env` or exported. |
 | `REVALIDATE_SECRET` | — | Must match the backend. The purge route returns 503 when unset — it fails closed. |
 | `IMAGE_HOST_ALLOWLIST` | — | Comma-separated `next/image` host allowlist. Defaults to the CDNs used by the source registry. Never set to `**` — that makes the deployment an open image proxy. |
+| `NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION` | — | Google Search Console ownership token. Emitted as a meta tag only when set. |
+| `NEXT_PUBLIC_BING_SITE_VERIFICATION` | — | Bing Webmaster Tools token (`msvalidate.01`). Emitted only when set. |
 
 ---
 
@@ -361,8 +381,10 @@ which turns an upstream release into a red build with no code change behind it.
 
 ## Project Status
 
-Verified on a live stack: **126 tests passing** (1 skipped), 41/41 feeds healthy, clean
-typecheck, zero lint errors, frontend builds.
+Verified on a live stack: **180 tests passing** (1 skipped), clean typecheck,
+zero lint errors, frontend builds. Production recovered from the September 2026
+Neon storage incident ([report](docs/incidents/2026-09-neon-capacity.md)) and
+now reports its database budget on every CI run.
 
 Runs at **$0** with every feature intact.
 **[GO-LIVE.md](GO-LIVE.md)** is the step-by-step walkthrough;
@@ -380,19 +402,33 @@ reference behind it.
   word is read, alongside a momentum ranking drawn from `momentum_outlets`
 - Feed cards compare how each outlet worded the same event, marking the words
   unique to one of them
-- Story pages: verification statement, conflicts-first brief, corroboration
-  timeline, a cumulative curve of independent newsrooms over time that marks
-  when a story crossed into confirmed and corroborated, framing matrix, source
-  ledger
-- `robots.txt`, `sitemap.xml` and per-route canonicals, with previews and branch
-  deployments excluded from indexing
+- Story pages: a sticky evidence rail (independent newsrooms, pickup span, who
+  broke it, scroll-spy contents), verification statement, conflicts-first brief
+  with key facts and a dated timeline, listen-to-brief via on-device speech,
+  suggested questions, corroboration timeline, pickup-pattern curve, framing
+  matrix, source ledger
+- An editorial front page: live ticker, lead bento, fastest-moving ranking,
+  confirmed-vs-unconfirmed split and a topic browser
+- The Briefing, topic insights (corroboration mix, most active newsrooms), a
+  searchable and sortable source directory
+- Briefs validated before display: claims or facts attributed to outlets outside
+  the story are dropped
+- SEO: generated share cards per page (a story's card carries its newsroom
+  count), JSON-LD graphs with breadcrumbs, evidence-first descriptions, sitemap
+  with images, real RSS alternates, `llms.txt`, `security.txt`, SVG favicon and
+  a manifest with shortcuts; previews and branch deployments excluded from
+  indexing
 - Semantic topic classification (98% coverage, up from 53% with keywords)
 - Source health with circuit breaker, conditional GET and transient-error retry
-- Question answering with story-level retrieval and a semantic answer cache
+- Question answering with story-level retrieval, streamed answers, numbered
+  citations, story scope, follow-up conversations and a semantic answer cache
 - Outbound RSS per edition
-- Tiered retention, Prometheus metrics, request correlation
+- Tiered retention ordered to run at a storage cap, safe compaction, a database
+  budget report on every CI run, Prometheus metrics, request correlation
 - Pluggable LLM providers with presets and per-model fallback chains, so free-tier
-  quota exhaustion degrades answer quality instead of removing the feature
+  quota exhaustion degrades answer quality instead of removing the feature. The
+  Groq preset runs `openai/gpt-oss-120b` → `gpt-oss-20b` (the Llama models it
+  used were retired on 2026-08-16), with reasoning-model handling
 - Runs with no Celery worker (`manage.py run_pipeline`), which is what makes the
   zero-cost deployment possible without dropping anything
 
@@ -425,6 +461,7 @@ why.
 | [docs/ROADMAP.md](docs/ROADMAP.md) | What is deliberately not done, and why |
 | [docs/SOP.md](docs/SOP.md) | Working conventions |
 | [DEPLOYMENT.md](DEPLOYMENT.md) | Running it, both topologies |
+| [docs/incidents/2026-09-neon-capacity.md](docs/incidents/2026-09-neon-capacity.md) | The Neon storage and transfer incident: timeline, causes, fixes, runbook |
 
 ---
 
