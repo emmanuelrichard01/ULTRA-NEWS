@@ -19,6 +19,21 @@ from django.utils import timezone
 from core.models import Article, Story
 
 
+def _in_batches(queryset, size):
+    """
+    Rows in primary-key batches, each its own short query.
+
+    Not .iterator(): that holds a server-side cursor open across the loop, and
+    behind Neon's transaction-pooling endpoint the cursor is gone as soon as
+    the first write commits ("cursor _django_curs_… does not exist").
+    """
+    ids = list(queryset.order_by("pk").values_list("pk", flat=True))
+    for i in range(0, len(ids), size):
+        yield from queryset.model.objects.filter(pk__in=ids[i:i + size]).select_related(
+            *(["source"] if queryset.model.__name__ == "Article" else [])
+        ).order_by("pk")
+
+
 class Command(BaseCommand):
     help = "Re-assign article and story topics (editorial + semantic evidence, story consensus)."
 
@@ -47,7 +62,7 @@ class Command(BaseCommand):
             .select_related("source")
         )
         processed = 0
-        for article in articles.iterator(chunk_size=opts["batch"]):
+        for article in _in_batches(articles, opts["batch"]):
             if opts["apply"]:
                 _assign_topics(article)
             else:
@@ -68,7 +83,7 @@ class Command(BaseCommand):
         counts = Counter()
         tagged = 0
         if opts["apply"]:
-            for story in stories.iterator(chunk_size=opts["batch"]):
+            for story in _in_batches(stories, opts["batch"]):
                 refresh_story_topics(story)
             for story in stories.prefetch_related("categories"):
                 slugs = [c.slug for c in story.categories.all()]
