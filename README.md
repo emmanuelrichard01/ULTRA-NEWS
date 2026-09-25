@@ -422,6 +422,11 @@ reference behind it.
 - Source health with circuit breaker, conditional GET and transient-error retry
 - Question answering with story-level retrieval, streamed answers, numbered
   citations, story scope, follow-up conversations and a semantic answer cache
+- Built for phones: Ask opens as a swipe-to-dismiss bottom sheet with the
+  follow-up box pinned within thumb reach, ask by voice and listen to answers
+  (on-device speech APIs, hidden where unsupported), a floating Ask button that
+  tucks away while reading, the story's evidence as a swipeable strip, touch-
+  sized citations, 16px inputs (no iOS zoom) and safe-area padding
 - Outbound RSS per edition
 - Tiered retention ordered to run at a storage cap, safe compaction, a database
   budget report on every CI run, Prometheus metrics, request correlation

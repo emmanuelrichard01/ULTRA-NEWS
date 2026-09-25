@@ -149,6 +149,9 @@ export const viewport: Viewport = {
     { media: "(prefers-color-scheme: dark)", color: "#0c0d0f" },
   ],
   colorScheme: "light dark",
+  // Lets the page draw under the notch and home indicator; the fixed Ask
+  // button and the Ask sheet pad themselves with env(safe-area-inset-*).
+  viewportFit: "cover",
 };
 
 /**

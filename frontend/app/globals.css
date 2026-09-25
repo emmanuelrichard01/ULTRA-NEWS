@@ -843,8 +843,10 @@ a {
     opacity 500ms var(--ease-out), filter var(--duration-media) var(--ease-out);
 }
 
-.group:hover .media-frame img {
-  transform: scale(1.045);
+@media (hover: hover) {
+  .group:hover .media-frame img {
+    transform: scale(1.045);
+  }
 }
 
 /* A hairline inner edge, so a white-background publisher image does not bleed
@@ -886,10 +888,18 @@ a {
     box-shadow var(--duration-normal) var(--ease-out),
     border-color var(--duration-normal) var(--ease-out);
 }
-.card-lift:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
-  border-color: var(--border-strong);
+@media (hover: hover) {
+  .card-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+    border-color: var(--border-strong);
+  }
+}
+/* Touch gets a press state instead: the card dips as the finger lands. */
+@media (hover: none) {
+  .card-lift:active {
+    transform: scale(0.985);
+  }
 }
 
 /* --- Scroll reveal ---
@@ -1163,6 +1173,45 @@ button:hover > .nudge-arrow {
 }
 
 /* --------------------------------------------
+   Mobile
+
+   The bottom sheet's entrance, touch-sized citation chips, and safe-area
+   padding for phones with a home indicator.
+   -------------------------------------------- */
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+
+.animate-sheet-up {
+  animation: sheet-up 420ms var(--ease-out) both;
+}
+
+/* A citation is something a thumb has to hit inside running text; 18px is a
+   mouse target. Coarse pointers get a larger chip with the same look. */
+@media (pointer: coarse) {
+  .cite-chip {
+    min-width: 1.75rem;
+    height: 1.5rem;
+    font-size: 0.72rem;
+  }
+}
+
+.pb-safe {
+  padding-bottom: max(env(safe-area-inset-bottom), 1rem);
+}
+
+/* Taps should not flash the platform's grey highlight over custom states. */
+a,
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* --------------------------------------------
    Reduced motion
    -------------------------------------------- */
 @media (prefers-reduced-motion: reduce) {
@@ -1171,6 +1220,7 @@ button:hover > .nudge-arrow {
   }
 
   .animate-marquee,
+  .animate-sheet-up,
   .skeleton::after,
   .live-dot::after,
   .stream-caret::after,

@@ -6,6 +6,8 @@ import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { AskSparkle } from './AskTrigger';
 import type { AskRequest } from './AskProvider';
 import CorroborationMeter from './CorroborationMeter';
+import ListenButton from './story/ListenButton';
+import VoiceInput from './VoiceInput';
 import { BROWSER_API_URL } from '@/lib/api';
 import { relativeTime } from '@/lib/time';
 import { ArrowRight } from '@/components/icons';
@@ -278,6 +280,32 @@ export default function AskWireModal({
 
   const inputRef = useRef<HTMLInputElement>(null);
   const currentRef = useRef<HTMLParagraphElement>(null);
+
+  /**
+   * Swipe-to-dismiss for the mobile sheet. Only the grab handle starts a drag
+   * — dragging from the scrolling body would fight the reader's own scroll.
+   * Past a quarter of the way down it closes; short of that it springs back.
+   */
+  const [dragY, setDragY] = useState(0);
+  const dragStart = useRef<number | null>(null);
+  const onHandleDown = (e: React.PointerEvent) => {
+    dragStart.current = e.clientY;
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  };
+  const onHandleMove = (e: React.PointerEvent) => {
+    if (dragStart.current === null) return;
+    setDragY(Math.max(0, e.clientY - dragStart.current));
+  };
+  const onHandleUp = () => {
+    if (dragStart.current === null) return;
+    dragStart.current = null;
+    if (dragY > Math.min(160, window.innerHeight * 0.25)) {
+      setDragY(0);
+      onClose();
+    } else {
+      setDragY(0);
+    }
+  };
   const dialogRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const handledRequest = useRef<number>(0);
@@ -561,7 +589,9 @@ export default function AskWireModal({
 
   return (
     <div
-      className="animate-fade-in fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-[rgb(8_9_11/0.55)] p-3 pt-[7vh] backdrop-blur-[6px] sm:p-4 sm:pt-[9vh]"
+      // A bottom sheet on phones — within thumb reach, and the shape a phone
+      // reader expects from an overlay — and a centred dialog from sm up.
+      className="animate-fade-in fixed inset-0 z-[60] flex items-end justify-center bg-[rgb(8_9_11/0.55)] backdrop-blur-[6px] sm:items-start sm:overflow-y-auto sm:p-4 sm:pt-[9vh]"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div
@@ -569,8 +599,20 @@ export default function AskWireModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="ask-title"
-        className="ai-border animate-fade-in-up flex max-h-[84vh] w-full max-w-2xl flex-col overflow-hidden rounded-[20px] bg-[var(--background)] shadow-[var(--shadow-lg)]"
+        style={dragY ? { transform: `translateY(${dragY}px)`, transition: 'none' } : undefined}
+        className="ai-border animate-sheet-up sm:animate-fade-in-up flex h-[92dvh] w-full max-w-2xl flex-col overflow-hidden rounded-t-[24px] bg-[var(--background)] shadow-[var(--shadow-lg)] transition-transform duration-300 ease-[var(--ease-out)] sm:h-auto sm:max-h-[84vh] sm:rounded-[20px]"
       >
+        {/* Grab handle — mobile only. Drag down to dismiss. */}
+        <div
+          className="flex shrink-0 cursor-grab touch-none justify-center pb-1 pt-2.5 active:cursor-grabbing sm:hidden"
+          onPointerDown={onHandleDown}
+          onPointerMove={onHandleMove}
+          onPointerUp={onHandleUp}
+          onPointerCancel={onHandleUp}
+          aria-hidden="true"
+        >
+          <span className="h-1.5 w-10 rounded-full bg-[var(--border-strong)]" />
+        </div>
         <h2 id="ask-title" className="sr-only">
           Ask the wire room
         </h2>
@@ -613,6 +655,10 @@ export default function AskWireModal({
               aria-label="Your question"
               className="min-w-0 flex-1 bg-transparent text-[17px] text-[var(--foreground)] placeholder:text-[var(--foreground-subtle)] focus:outline-none"
             />
+            <VoiceInput
+              onTranscript={setQuery}
+              onFinal={(text) => (state && !state.streaming && asked ? followUp(text) : startOver(text))}
+            />
             <button
               type="submit"
               disabled={loading || !query.trim()}
@@ -634,7 +680,9 @@ export default function AskWireModal({
         </form>
 
         {/* ------------------------------------------------------ body */}
-        <div className="scroll-slim flex-1 overflow-y-auto px-4 py-5 sm:px-6" aria-live="polite">
+        {/* No bottom padding on phones: the pinned follow-up composer must sit on
+            the sheet's edge, or answer text shows through the gap beneath it. */}
+        <div className="scroll-slim flex-1 overflow-y-auto px-4 pb-0 pt-5 sm:px-6 sm:pb-5" aria-live="polite">
           {/* Earlier turns, quieter than the live one: the question, the
               answer with its citations still clickable, and a rule. */}
           {thread.map((turn, i) => {
@@ -767,6 +815,11 @@ export default function AskWireModal({
                       : 'Assembled directly from the stories above — no model involved.'}
                     {state.cached && ' · answered from cache'}
                   </p>
+                  <div className="flex items-center gap-2">
+                  <ListenButton
+                    text={state.answer.replace(/\[\d+(?:\s*,\s*\d+)*\]/g, '').replace(/\*\*|_/g, '')}
+                    label="Listen"
+                  />
                   <button
                     type="button"
                     onClick={copyAnswer}
@@ -783,18 +836,22 @@ export default function AskWireModal({
                       'Copy with sources'
                     )}
                   </button>
+                  </div>
                 </div>
               )}
 
               {/* Follow-up. Sent with the conversation so far, so "what did
                   they say in response?" retrieves the right story. */}
               {!state.streaming && state.answer && (
+                // Pinned to the bottom of the scrolling body, so on a phone the
+                // next question is always under the thumb, however long the
+                // answer above it runs.
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
                     followUp(followQuery);
                   }}
-                  className="flex items-center gap-2 rounded-[var(--radius-pill)] border border-[var(--border-strong)] bg-[var(--surface-elevated)] py-1.5 pl-4 pr-1.5 transition-colors focus-within:border-[var(--foreground)]"
+                  className="sticky bottom-0 -mx-4 flex items-center gap-1.5 border-t border-[var(--border)] bg-[var(--background)]/95 px-4 pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-3 backdrop-blur sm:static sm:mx-0 sm:rounded-[var(--radius-pill)] sm:border sm:border-[var(--border-strong)] sm:bg-[var(--surface-elevated)] sm:py-1.5 sm:pl-4 sm:pr-1.5 sm:transition-colors sm:focus-within:border-[var(--foreground)]"
                 >
                   <input
                     type="text"
@@ -803,8 +860,11 @@ export default function AskWireModal({
                     placeholder={thread.length >= 2 ? 'One more follow-up…' : 'Ask a follow-up…'}
                     maxLength={500}
                     aria-label="Follow-up question"
-                    className="min-w-0 flex-1 bg-transparent text-[15px] text-[var(--foreground)] placeholder:text-[var(--foreground-subtle)] focus:outline-none"
+                    // 16px on phones: iOS zooms the page into any input set
+                    // smaller, which throws the whole sheet off-screen.
+                    className="min-w-0 flex-1 rounded-[var(--radius-pill)] bg-[var(--surface)] px-4 py-2.5 text-[16px] text-[var(--foreground)] placeholder:text-[var(--foreground-subtle)] focus:outline-none sm:bg-transparent sm:px-0 sm:py-0 sm:text-[15px]"
                   />
+                  <VoiceInput onTranscript={setFollowQuery} onFinal={followUp} />
                   <button
                     type="submit"
                     disabled={!followQuery.trim()}
@@ -888,7 +948,11 @@ export default function AskWireModal({
         </div>
 
         {/* --------------------------------------------------- footer */}
-        <div className="flex items-center justify-between gap-3 border-t border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-[11px] text-[var(--foreground-subtle)] sm:px-5">
+        <div
+          className={`items-center justify-between gap-3 border-t border-[var(--border)] bg-[var(--surface)] px-4 pb-[max(env(safe-area-inset-bottom),0.625rem)] pt-2.5 text-[11px] text-[var(--foreground-subtle)] sm:flex sm:px-5 sm:pb-2.5 ${
+            state && !state.streaming && state.answer ? 'hidden' : 'flex'
+          }`}
+        >
           <span>Answers only from reporting already on the wire. Nothing is browsed live.</span>
           <span className="hidden shrink-0 items-center gap-1.5 sm:flex">
             <kbd className="font-data rounded border border-[var(--border)] bg-[var(--background)] px-1.5 py-0.5">esc</kbd>

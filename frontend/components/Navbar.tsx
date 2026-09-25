@@ -52,6 +52,21 @@ export default function Navbar() {
   const pathname = usePathname();
   const { open: openAsk } = useAsk();
   const mastheadRef = useRef<HTMLDivElement>(null);
+  const barRef = useRef<HTMLUListElement>(null);
+
+  // On a phone the section bar is wider than the screen, so the active item can
+  // start off to the right — on /sports the reader could not see where they
+  // were. Centre it, scrolling only the bar (scrollIntoView would also move
+  // the page).
+  useEffect(() => {
+    const bar = barRef.current;
+    const active = bar?.querySelector<HTMLElement>('[aria-current="page"]');
+    if (!bar || !active) return;
+    bar.scrollTo({
+      left: active.offsetLeft - bar.clientWidth / 2 + active.clientWidth / 2,
+      behavior: 'smooth',
+    });
+  }, [pathname]);
 
   // Close the menu on navigation. Adjusting state during render rather than in
   // an effect avoids painting the new route with the menu still open.
@@ -144,7 +159,12 @@ export default function Navbar() {
             <BrandMark size={16} markOnly />
           </Link>
 
-          <ul className="pb-scrollbar flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto">
+          {/* Fades at the edge on phones, so a bar that scrolls sideways looks
+              like it does rather than like it simply ends. */}
+          <ul
+            ref={barRef}
+            className="pb-scrollbar flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto [mask-image:linear-gradient(to_right,#000_85%,transparent)] sm:[mask-image:none]"
+          >
             {EDITIONS.map((edition) => (
               <BarLink
                 key={edition.slug || 'wire'}
@@ -171,13 +191,14 @@ export default function Navbar() {
 
           <div className="flex shrink-0 items-center gap-1 pl-1">
             {/* On desktop the masthead's Ask pill scrolls away with it; this
-                one arrives as it goes. On mobile it is always here, because
-                the masthead has no room for a labelled button. */}
+                one arrives as it goes. Phones use the floating Ask button
+                (AskFab) instead — the top of the screen is out of thumb reach,
+                and here it only crowded the topics. */}
             <button
               type="button"
               onClick={() => openAsk()}
               aria-label="Ask the wire room"
-              className="ai-border flex h-8 items-center gap-1.5 rounded-[var(--radius-pill)] bg-[var(--surface)] px-2.5 text-[var(--foreground)] transition-all duration-300 ease-[var(--ease-out)] sm:pointer-events-none sm:translate-x-2 sm:opacity-0 sm:group-data-[stuck=true]/bar:pointer-events-auto sm:group-data-[stuck=true]/bar:translate-x-0 sm:group-data-[stuck=true]/bar:opacity-100"
+              className="ai-border hidden h-8 items-center gap-1.5 rounded-[var(--radius-pill)] bg-[var(--surface)] px-2.5 text-[var(--foreground)] transition-all duration-300 ease-[var(--ease-out)] sm:flex sm:pointer-events-none sm:translate-x-2 sm:opacity-0 sm:group-data-[stuck=true]/bar:pointer-events-auto sm:group-data-[stuck=true]/bar:translate-x-0 sm:group-data-[stuck=true]/bar:opacity-100"
               tabIndex={0}
             >
               <AskSparkle className="shrink-0 text-[var(--accent)]" />

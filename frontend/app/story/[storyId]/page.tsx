@@ -9,6 +9,7 @@ import SourceLedger from '@/components/story/SourceLedger';
 import IntelligenceBrief from '@/components/IntelligenceBrief';
 import StickyStoryNav from '@/components/StickyStoryNav';
 import StoryRail, { type RailSection } from '@/components/story/StoryRail';
+import StoryGlanceMobile from '@/components/story/StoryGlanceMobile';
 import { KeyFacts, StoryUnfolding } from '@/components/story/BriefSections';
 import { groupByOutlet } from '@/lib/outlets';
 import JsonLd, { breadcrumbList } from '@/components/JsonLd';
@@ -290,6 +291,13 @@ export default async function StoryPage({ params }: StoryPageProps) {
       <div className="grid gap-12 lg:grid-cols-[minmax(0,1fr)_17.5rem] xl:gap-16">
         <article className="min-w-0 max-w-3xl">
           <StoryMasthead story={story} outletNames={outletNames} brokenBy={brokenBy} image={image} />
+          <StoryGlanceMobile
+            independentCount={story.independent_count}
+            articleCount={story.source_count}
+            firstSeenAt={story.first_seen_at}
+            lastUpdatedAt={story.last_updated_at}
+            brokenBy={brokenBy?.name}
+          />
 
           <div id="brief" className="scroll-mt-[calc(var(--header-h)+4rem)]">
             <IntelligenceBrief

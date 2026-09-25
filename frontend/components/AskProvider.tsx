@@ -9,6 +9,7 @@ import {
   useState,
 } from 'react';
 
+import AskFab from './AskFab';
 import AskWireModal from './AskWireModal';
 
 /**
@@ -92,6 +93,7 @@ export function AskProvider({ children }: { children: React.ReactNode }) {
     <AskContext.Provider value={value}>
       {children}
       <AskWireModal isOpen={isOpen} onClose={close} request={request} />
+      <AskFab onOpen={() => open()} hidden={isOpen} />
     </AskContext.Provider>
   );
 }

@@ -74,7 +74,7 @@ export default function SourceDirectory({ sources }: { sources: SourceInfo[] }) 
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search outlets or regions"
-            className="min-w-0 flex-1 bg-transparent text-[14px] text-[var(--foreground)] placeholder:text-[var(--foreground-subtle)] focus:outline-none"
+            className="min-w-0 flex-1 bg-transparent text-[16px] text-[var(--foreground)] sm:text-[14px] placeholder:text-[var(--foreground-subtle)] focus:outline-none"
           />
         </label>
 
