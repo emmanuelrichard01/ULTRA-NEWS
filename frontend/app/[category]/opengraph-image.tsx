@@ -10,6 +10,7 @@ export const alt = 'A topic on Ultra News, with its best-corroborated recent sto
 export const size = OG_SIZE;
 export const contentType = 'image/png';
 export const revalidate = 900;
+export const dynamicParams = false;
 
 export function generateStaticParams() {
   return Object.keys(CATEGORY_MAP).map((category) => ({ category }));

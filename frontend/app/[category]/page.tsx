@@ -27,7 +27,7 @@ interface CategoryPageProps {
 export async function generateMetadata({ params }: CategoryPageProps): Promise<Metadata> {
   const { category } = await params;
   const info = CATEGORY_MAP[category];
-  if (!info) return { title: 'Topic not found' };
+  if (!info) return { title: 'Topic not found', robots: { index: false } };
 
   return {
     title: info.displayName,
@@ -48,6 +48,15 @@ export function generateStaticParams() {
 // Prerendered per topic via generateStaticParams, revalidated on an interval.
 // See app/page.tsx for why the `searchParams` prop is deliberately absent.
 export const revalidate = 60;
+
+/**
+ * Topics are a fixed set, all listed by generateStaticParams. Anything else is
+ * a real 404, answered before rendering begins. Without this an unknown path
+ * like /nope rendered the not-found page with a 200 and "index, follow" — the
+ * root loading.tsx starts streaming before notFound() runs, so the status is
+ * already sent — and search engines index it as a thin duplicate page.
+ */
+export const dynamicParams = false;
 
 export default async function CategoryPage({ params }: CategoryPageProps) {
   const { category } = await params;
