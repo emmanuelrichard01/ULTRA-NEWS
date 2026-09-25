@@ -285,7 +285,7 @@ LLM_API_KEY=<key>
 
 | Provider | Free allowance | Notes |
 | --- | --- | --- |
-| **`groq`** *(default)* | ~14,400 req/day on `llama-3.1-8b-instant` | No card. The only tier generous enough for a public demo. |
+| **`groq`** *(default)* | Free tier on `openai/gpt-oss-120b` → `gpt-oss-20b` | No card. Generous enough for a public demo. Llama presets were retired by Groq on 2026-08-16. |
 | `cerebras` | comparable | Same OpenAI-compatible shape. |
 | `openrouter` | smaller | Access to `:free` model slugs. |
 | `gemini` | generous per-minute, small per-day | Fine locally; a public demo exhausts it. |
@@ -466,7 +466,7 @@ DB_DISABLE_SERVER_SIDE_CURSORS=1
 CACHE_BACKEND=locmem
 
 # Optional — omit and answers are assembled from sources instead.
-# groq is the default: 14,400 requests/day free, no card. The preset supplies
+# groq is the default: free tier, no card. The preset supplies
 # the base URL, the model and the fallback chain.
 LLM_PROVIDER=groq
 LLM_API_KEY=<console.groq.com/keys>
@@ -607,7 +607,7 @@ Check headroom with `python manage.py retention`.
 | Freshness | Capped by the cron interval — ~30 min instead of 15. |
 | Rate limiting | Per-process without Redis, so the effective limit multiplies by worker count. Immaterial at `WEB_CONCURRENCY=1`. |
 | Cold starts | Koyeb sleeps after 1 hour idle. The keepalive workflow prevents it; without that, expect a minute-plus first load. |
-| AI quota | Groq's free tier is ~14,400 requests/day, far past what a portfolio demo draws. Past it, answers degrade to extractive rather than failing. Keep the daily ceilings low so degradation is predictable rather than a surprise. |
+| AI quota | Groq's free tier is far past what a portfolio demo draws; check current per-model limits in the Groq console. Past it, answers degrade to extractive rather than failing. Keep the daily ceilings low so degradation is predictable rather than a surprise. |
 
 ### Before you share the link
 

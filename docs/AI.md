@@ -84,7 +84,8 @@ events — which is the one failure this product cannot absorb.
 
 ## 4. Ask the Wire Room — retrieval-augmented generation
 
-`POST /api/v1/ask` (`api/api.py`). Streams over SSE. The full path:
+`POST /api/v1/ask` (`api/api.py`, orchestration in `core/services/ask.py`).
+Streams over SSE, token by token. The full path:
 
 ```text
 question
@@ -93,22 +94,84 @@ question
    │
    ├─ embed query ──────────────────► 384d vector
    │
-   ├─ semantic answer cache lookup ──► HIT (≥0.95 similarity) → stream, done (~0.2s)
+   ├─ semantic answer cache lookup ──► HIT (≥0.95 similarity, same scope) → done (~0.2s)
    │                                   MISS ↓
+   ├─ story scope set? ── yes ──► that story's whole cluster first, + 2 neighbours
+   │                      no
    ├─ pgvector: 40 nearest ARTICLES, auto-publish sources only
    │
    ├─ group into stories · rerank · keep top 4
    │
-   ├─ build context: headlines + corroboration level + age
+   ├─ build context: [n]-numbered stories, headlines, one lede per outlet,
+   │                 corroboration level, age
    │
-   ├─ provider configured? ── no ──► extractive answer from sources
+   ├─ metadata event: citation table (slug, title, outlet count) — before any text
+   │
+   ├─ provider configured? ── no ──► extractive answer, same [n] citations
    │                          yes
    │                           ↓
-   └─ LLM (max 450 tokens) ── fails ──► extractive answer from sources
+   └─ open stream (fallback chain up to FIRST token) ── fails ──► extractive
                                ok
                                 ↓
-                        stream · cache by embedding
+            relay tokens · cache complete answers · flag truncated ones
 ```
+
+### Why it streams now, and why it did not before
+
+The endpoint always used an SSE content type, and never streamed. Two
+independent causes:
+
+1. It called the blocking `generate()` and emitted the finished answer as one
+   event, so the reader watched a spinner for the whole generation.
+2. It returned a *sync* generator from a view served under ASGI. Django cannot
+   iterate a sync generator on the event loop, so it reads the whole thing into
+   a list first and sends that — even a token-level generator would have arrived
+   in one piece.
+
+`core/services/ask.py` fixes both: the provider's `stream()` yields tokens, and
+an async generator pulls each one through `sync_to_async`. The response also
+sets `X-Accel-Buffering: no` so a buffering proxy does not undo it in transit.
+
+The fallback chain applies **up to the first token**. A model that fails to
+open costs one round trip and the next model answers; once text has reached the
+reader, switching model would splice two different answers together, so a
+mid-stream failure keeps what arrived, emits `truncated`, and is not cached.
+
+### Citations
+
+Context stories are numbered `[1]`…`[4]` and the model is told to cite every
+factual sentence with those numbers and never invent one. The first SSE event
+carries the citation table — slug, title, independent outlet count — so the
+client renders each `[n]` as a chip linking to the story, with its
+corroboration beside it. A number that resolves to no citation is dropped
+rather than rendered as a dead link. The extractive answer uses the same
+markers, so both paths look alike to the reader.
+
+### Conversations
+
+Ask keeps a thread. A follow-up is sent with up to three earlier turns
+(`history: [{q, a}]`, validated and length-capped server-side), and two things
+change:
+
+- **Retrieval embeds the previous question with the new one.** "What did they
+  say in response?" carries no topic of its own; embedded alone it retrieves
+  nothing useful. Embedded with the question before it, it finds the story.
+- **The model sees the conversation — as data.** Prior turns are fenced in a
+  `CONVERSATION SO FAR` block; earlier questions are the reader's words and are
+  treated exactly like the current one. The system prompt says the thread may
+  only be used to understand what the reader means: every fact must still come
+  from the retrieved context, with citations.
+
+Follow-ups bypass the semantic cache in both directions — the same words mean
+different things in different conversations.
+
+### Asking about one story
+
+`{"query": …, "story": "<slug>"}` scopes retrieval: the story's whole cluster
+(up to 10 outlets' headlines and ledes) is always `[1]`, followed by two
+nearby stories so "is this connected to X?" can be answered. Cached answers
+are keyed by scope as well as embedding — "what happens next?" about two
+different stories is the same vector and must not share an answer.
 
 ### Why retrieval is story-level
 
@@ -158,10 +221,12 @@ the correct behaviour is to say so.
 
 ### Prompt injection
 
-The reader's question is delimited (`<<<…>>>`) and labelled as data, with an
-explicit instruction never to follow instructions inside it and never to let it
-change the rules. Untrusted input sits next to instructions here, so the boundary
-is stated rather than implied by position.
+Instructions and data travel in different **roles**: the rules are the system
+message; the reader's question and the retrieved reporting are the user
+message. Both of those are text other people wrote — the reader, and every
+publisher whose excerpt reaches the context — so the system message says so,
+in a channel neither can write to. The question is additionally delimited
+(`<<<…>>>`), and briefs fence the reporting between `<<<REPORTING` markers.
 
 ### Semantic answer cache
 
@@ -189,18 +254,48 @@ only when the corroboration picture has actually moved: **+2 new independent
 outlets** since the last synthesis, and a **20-minute cooldown**. Regenerating on
 every cluster change would spend the daily budget on cosmetic updates.
 
-The model is asked for strict JSON:
+The model is asked for strict JSON, with JSON mode requested where the server
+supports it (a server that rejects `response_format` is retried without it):
 
 | Field | Purpose |
 | --- | --- |
 | `consensus_lead` | Two-sentence summary of confirmed facts. Promoted to `Story.summary`. |
 | `outlet_claims` | Per-outlet claim or angle. |
 | `discrepancies` | Explicit factual, numerical or timeline contradictions between outlets. |
+| `open_questions` | Up to three things the coverage explicitly leaves unresolved. |
 | `primary_alignment` | How coverage aligns with official primary sources, where one exists. |
 
 Primary sources (government and official documents) are separated in the context
 so the model can distinguish reporting *about* a document from the document
 itself.
+
+The context carries **one article per publisher** (the earliest), capped at 16
+outlets. Sending every article let one newsroom's twelve revisions fill the
+context and invited the model to report a publisher agreeing with itself.
+
+### Brief fields added for the story page
+
+| Field | Rendered as | Validation |
+| --- | --- | --- |
+| `key_facts` | "What the reporting establishes" — each fact with the outlets stating it | Outlets not in the cluster are removed; a fact left with none is dropped; sorted by number of outlets |
+| `timeline` | "How it unfolded" — dated developments | Needs a stated time, an event and a known outlet |
+| `suggested_questions` | Chips that open a story-scoped Ask | Capped at three, normalised to end in "?" |
+
+### Validation — refusing what cannot be true
+
+`validate_brief()` (`core/services/synthesis.py`) runs on every model brief:
+
+- **A claim attributed to an outlet outside the cluster is dropped.** Models
+  write "Reuters reports" because that is what a news sentence sounds like, for
+  clusters Reuters never touched. On a product whose claim is *who reported
+  what*, a fabricated attribution is the worst available error.
+- **`primary_alignment` is blanked when no primary document was in context** —
+  any alignment analysis would be invented.
+- Lists are type-checked and capped; a brief with no `consensus_lead` is
+  rejected and the extractive brief is used instead.
+
+The extractive brief no longer claims "Primary document verification active" —
+it verified nothing, so it now says nothing.
 
 `discrepancies` is the field worth understanding: where outlets disagree on a
 number or a timeline, the brief surfaces the disagreement rather than silently
@@ -213,11 +308,56 @@ retrying into the ceiling.
 
 ---
 
+## 5b. The Briefing
+
+`GET /api/v1/briefing` (`core/services/briefing.py`), rendered at `/briefing`.
+
+- **Only corroborated stories.** Stories first seen in the last 24 hours with
+  at least two independent outlets, ordered by outlet count. A quiet day widens
+  the window to 72 hours rather than publishing a two-item briefing, and the
+  payload says which window was used.
+- **Cited like Ask.** Stories are numbered; the overview cites them as `[n]`
+  and one line summarises each. Citations to numbers that do not exist are
+  removed. A story the model skips keeps its extractive line.
+- **Keyless fallback.** The overview is built from the counts and each line
+  from the story's own summary — with a headline repeated at the start
+  stripped, and video-playlist debris ("03:18 UP NEXT…") replaced by a plain
+  statement of who carried the story.
+- **Cost.** Cached per hour *and* per story set, warmed at :02 past each hour
+  by Celery beat and at the end of `run_pipeline`, and bounded by its own
+  daily ceiling (48).
+- **What to watch.** The three fastest-moving stories not already included,
+  from the momentum column — no model involved.
+
 ## 6. Providers, and why keyless is a first-class mode
 
 `LLM_PROVIDER` selects an adapter (`core/services/llm.py`). Presets supply base
 URL, model and a fallback chain, so provider + key is a complete configuration:
 `groq` · `cerebras` · `openrouter` · `gemini` · `openai` · `ollama` · `none`.
+
+| Preset | Chain (Sept 2026) |
+| --- | --- |
+| `groq` | `openai/gpt-oss-120b` → `openai/gpt-oss-20b` |
+| `cerebras` | `gpt-oss-120b` → `qwen-3.8-27b` |
+| `openrouter` | `google/gemma-4-31b-it:free` → `qwen/qwen3.8-27b:free` → `openrouter/free` |
+
+Groq retired `llama-3.3-70b-versatile` and `llama-3.1-8b-instant` on
+2026-08-16, and Cerebras and OpenRouter's free tier dropped their Llama ids in
+the same window — every call 404'd while the key looked fine. A test now pins
+that no preset points at a retired Llama id.
+
+### Reasoning models
+
+The gpt-oss replacements are reasoning models: they think before answering, and
+the thinking is billed against the same completion cap. Sent the old cap
+unchanged, a hard question could spend it all on reasoning and return an empty
+message. `ModelProfile` handles this per model: reasoning effort pinned `low`
+(this is summarisation over supplied context, not a maths problem), reasoning
+excluded from the payload, and headroom added to the cap so the visible answer
+keeps the budget the call site asked for. Vendor spellings differ (Groq's
+`include_reasoning`, OpenRouter's `reasoning.exclude`), so the profile is keyed
+on the preset as well as the model. An empty response with
+`finish_reason=length` is logged as *budget exhausted*, not as a broken key.
 
 Fallback chains run strongest-first, largest-daily-allowance-last, so free-tier
 quota exhaustion **degrades quality rather than removing the feature**.
@@ -284,7 +424,13 @@ Stated because they are structural, not because they are about to be fixed.
 | Rerank weights | `1.0` / `0.15` / `0.20` | `core/services/retrieval.py` |
 | Answer cache hit | ≥ `0.95` similarity | `core/services/answer_cache.py` |
 | Ask query cap | `500` chars | `api/api.py` |
-| Ask response cap | `450` tokens | `api/api.py` |
+| Ask response cap | `500` tokens (+768 headroom for reasoning models) | `core/services/ask.py`, `core/services/llm.py` |
+| Excerpt per outlet in Ask context | `280` chars | `core/services/retrieval.py` |
+| Scoped-story headlines | `10` | `core/services/retrieval.py` |
+| Outlets per brief | `16`, one article each | `core/services/synthesis.py` |
+| Brief response cap | `1600` tokens | `core/services/synthesis.py` |
+| Conversation history | `3` turns, answers trimmed to `600` chars in prompt | `core/services/ask.py` |
+| Briefing | `7` stories, `24h` window (`72h` fallback), `900` tokens, `48`/day | `core/services/briefing.py` |
 | Brief response cap | `1200` tokens | `core/services/synthesis.py` |
 | Resynthesis trigger | `+2` independent outlets | `core/clustering.py` |
 | Resynthesis cooldown | `20` minutes | `core/clustering.py` |

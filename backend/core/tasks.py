@@ -433,3 +433,14 @@ def synthesize_story_brief(self, story_id: int):
         raise self.retry(exc=exc, countdown=10) from exc
     finally:
         cache.delete(lock_id)
+
+
+@shared_task(queue='celery', soft_time_limit=120, time_limit=150)
+def warm_briefing():
+    """Build (and cache) the current Briefing. See core/services/briefing.py."""
+    from core.services.briefing import get_briefing_optional
+
+    briefing = get_briefing_optional()
+    if briefing is None:
+        return "Unavailable"
+    return f"{len(briefing['items'])} stories ({briefing['synthesis_type']})"

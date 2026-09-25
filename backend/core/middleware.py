@@ -12,6 +12,7 @@ import time
 import uuid
 
 import structlog
+from django.middleware.gzip import GZipMiddleware
 
 from core.observability import http_duration, http_requests
 
@@ -79,3 +80,32 @@ class RequestContextMiddleware:
         # Lets a reader correlate a slow page with a server-side log line.
         response["X-Request-ID"] = request_id
         return response
+
+
+# ==========================================================================
+# Compression that leaves event streams alone
+# ==========================================================================
+
+
+class StreamSafeGZipMiddleware(GZipMiddleware):
+    """
+    GZipMiddleware, except for `text/event-stream`.
+
+    Django's GZipMiddleware compresses an ASYNC streaming response one chunk at
+    a time with `compress_string`, so every SSE event goes out as its own
+    complete gzip member. Standard decoders — httpx, and most browsers' fetch —
+    stop at the end of the first member, so a reader of /ask received the
+    metadata event and then silence: no answer text, no `done`. It went
+    unnoticed only because the old /ask buffered its whole answer into a single
+    chunk, which made one member.
+
+    Compressing an event stream is wrong even when done correctly: a
+    compressor holds bytes back until it has enough to emit, which is the
+    opposite of what a stream of small, latency-sensitive events needs. So
+    event streams are sent uncompressed and everything else is unchanged.
+    """
+
+    def process_response(self, request, response):
+        if response.get("Content-Type", "").startswith("text/event-stream"):
+            return response
+        return super().process_response(request, response)

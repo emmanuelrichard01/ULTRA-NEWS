@@ -160,7 +160,7 @@ stories_promoted = _counter(
 llm_calls = _counter(
     "ultranews_llm_calls_total",
     "Model calls by purpose and outcome.",
-    ("purpose", "outcome"),  # ask|synthesis x success|fallback|failure
+    ("purpose", "outcome"),  # generate|stream x success|fallback|failure
 )
 
 llm_duration = _histogram(

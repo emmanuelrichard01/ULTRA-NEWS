@@ -126,6 +126,11 @@ class Command(BaseCommand):
 
         synthesized = self._synthesize(options['synthesize'])
 
+        # The Briefing is derived from the clusters just written; building it
+        # here means the $0 cron deployment (no Celery beat) still has one.
+        from core.services.briefing import get_briefing_optional
+        get_briefing_optional()
+
         elapsed = time.monotonic() - started
         self.stdout.write(self.style.SUCCESS(
             f"Pipeline complete in {elapsed:.1f}s — "

@@ -116,10 +116,11 @@ SITE_URL = os.environ.get('SITE_URL', 'http://localhost:3000')
 # degraded one: answers and briefs are then assembled from the retrieved
 # sources directly, with no inference spend at all.
 #
-# `groq` is the default because it is the only option that is free at a volume
-# a public demo actually reaches: 14,400 requests/day on llama-3.1-8b-instant
-# against Gemini's low-hundreds. Base URL, model and fallback chain all come
-# from the preset in core/services/llm.py, so a working config is two variables.
+# `groq` is the default: a free tier with no card, generous enough for a public
+# demo, on openai/gpt-oss-120b falling back to gpt-oss-20b (Groq retired the
+# Llama models the preset used on 2026-08-16). Base URL, model and fallback
+# chain all come from the preset in core/services/llm.py, so a working config
+# is two variables.
 LLM_PROVIDER = os.environ.get('LLM_PROVIDER', 'groq')
 
 LLM_API_KEY = os.environ.get('LLM_API_KEY', '')
@@ -168,7 +169,9 @@ MIDDLEWARE = [
     # time spent in gzip and security middleware.
     'core.middleware.RequestContextMiddleware',
     'django.middleware.security.SecurityMiddleware',
-    'django.middleware.gzip.GZipMiddleware',
+    # Not Django's GZipMiddleware directly: it corrupts async event streams.
+    # See core.middleware.StreamSafeGZipMiddleware.
+    'core.middleware.StreamSafeGZipMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -342,6 +345,13 @@ CELERY_BEAT_SCHEDULE = {
     'apply-retention-daily': {
         'task': 'core.tasks.apply_retention',
         'schedule': crontab(hour=4, minute=30),  # Daily at 04:30 UTC
+        'options': {'queue': 'celery'},
+    },
+    # Warm the Briefing at the top of each hour, so the first reader of the hour
+    # gets a cached page rather than waiting on a model call.
+    'warm-briefing-hourly': {
+        'task': 'core.tasks.warm_briefing',
+        'schedule': crontab(minute=2),
         'options': {'queue': 'celery'},
     },
 }

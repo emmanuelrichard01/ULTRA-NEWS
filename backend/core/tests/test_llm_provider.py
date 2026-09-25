@@ -46,8 +46,23 @@ def test_groq_preset_supplies_url_and_models():
     assert provider.base_url == "https://api.groq.com/openai/v1"
     assert all("gemini" not in m for m in provider.models), provider.models
     # Strong model first, largest daily allowance last.
-    assert provider.models[0] == "llama-3.3-70b-versatile"
-    assert provider.models[-1] == "llama-3.1-8b-instant"
+    assert provider.models[0] == "openai/gpt-oss-120b"
+    assert provider.models[-1] == "openai/gpt-oss-20b"
+
+
+@pytest.mark.parametrize("name", ["groq", "cerebras", "openrouter"])
+def test_no_preset_points_at_a_retired_llama_model(name):
+    """
+    Groq retired llama-3.3-70b-versatile and llama-3.1-8b-instant on
+    2026-08-16; Cerebras and OpenRouter's free tier dropped theirs in the same
+    window. Every call 404'd while the logs said the key was fine. Pin that the
+    presets moved.
+    """
+    from core.services.llm import _PRESETS
+
+    preset = _PRESETS[name]
+    for model in (preset.model, *preset.fallbacks):
+        assert "llama-3" not in model and "llama3" not in model, (name, model)
 
 
 @override_settings(LLM_PROVIDER="groq", LLM_API_KEY="", LLM_MODEL="", LLM_FALLBACK_MODELS=[])
@@ -158,3 +173,142 @@ def test_base_url_trailing_slash_does_not_double_up():
         provider.generate("q", max_tokens=10)
 
     assert post.call_args.args[0] == "https://x/v1/chat/completions"
+
+
+# ==========================================================================
+# Reasoning models, roles and JSON mode
+# ==========================================================================
+
+def test_reasoning_model_gets_low_effort_and_headroom_on_groq():
+    """
+    gpt-oss thinks before it answers, and the thinking is billed against the
+    same cap. Sent the old cap unchanged, a hard question could spend it all on
+    reasoning and come back empty.
+    """
+    provider = OpenAICompatibleProvider(
+        api_key="k", model="openai/gpt-oss-120b", base_url="https://x/v1", flavor="groq",
+    )
+    with patch("httpx.post", return_value=_response(200, "ok")) as post:
+        provider.generate("q", max_tokens=400)
+
+    body = post.call_args.kwargs["json"]
+    assert body["reasoning_effort"] == "low"
+    assert body["include_reasoning"] is False
+    assert body["max_tokens"] > 400
+
+
+def test_plain_model_gets_no_reasoning_parameters():
+    """Unknown parameters are a 400 on strict servers; only send them where they apply."""
+    provider = OpenAICompatibleProvider(api_key="k", model="llama3", base_url="https://x/v1")
+    with patch("httpx.post", return_value=_response(200, "ok")) as post:
+        provider.generate("q", max_tokens=100)
+
+    body = post.call_args.kwargs["json"]
+    assert "reasoning_effort" not in body
+    assert body["max_tokens"] == 100
+
+
+def test_system_message_is_sent_in_its_own_role():
+    """Instructions and untrusted text must not share a role."""
+    provider = OpenAICompatibleProvider(api_key="k", model="m", base_url="https://x/v1")
+    with patch("httpx.post", return_value=_response(200, "ok")) as post:
+        provider.generate("reader text", max_tokens=10, system="rules")
+
+    messages = post.call_args.kwargs["json"]["messages"]
+    assert messages == [
+        {"role": "system", "content": "rules"},
+        {"role": "user", "content": "reader text"},
+    ]
+
+
+def test_json_mode_is_dropped_for_a_server_that_rejects_it():
+    """
+    Older local servers 400 on `response_format`. Losing the constraint is
+    recoverable — the brief parser tolerates fenced JSON — skipping a working
+    model is not.
+    """
+    provider = OpenAICompatibleProvider(api_key="", model="m", base_url="http://x/v1")
+    with patch("httpx.post", side_effect=[_response(400), _response(200, '{"a": 1}')]) as post:
+        result = provider.generate("q", max_tokens=10, json_mode=True)
+
+    assert result.text == '{"a": 1}'
+    first, second = (c.kwargs["json"] for c in post.call_args_list)
+    assert first["response_format"] == {"type": "json_object"}
+    assert "response_format" not in second
+
+
+# ==========================================================================
+# Streaming
+# ==========================================================================
+
+class _StreamCtx:
+    """Stands in for `httpx.stream(...)`: a context manager yielding a response."""
+
+    def __init__(self, status: int, lines: list[str] | None = None):
+        self.response = MagicMock()
+        self.response.status_code = status
+        self.response.iter_lines.return_value = iter(lines or [])
+        self.closed = False
+
+    def __enter__(self):
+        return self.response
+
+    def __exit__(self, *exc):
+        self.closed = True
+
+
+def _sse(content=None, reasoning=None):
+    import json
+
+    delta = {}
+    if content is not None:
+        delta["content"] = content
+    if reasoning is not None:
+        delta["reasoning"] = reasoning
+    return "data: " + json.dumps({"choices": [{"delta": delta}]})
+
+
+def test_stream_yields_content_and_drops_reasoning():
+    provider = OpenAICompatibleProvider(api_key="k", model="m", base_url="https://x/v1")
+    ctx = _StreamCtx(200, [
+        _sse(reasoning="thinking…"), _sse("Talks "), "", _sse("resumed [1]."), "data: [DONE]",
+    ])
+    with patch("httpx.stream", return_value=ctx):
+        stream = provider.stream("q", max_tokens=10)
+        text = "".join(stream)
+
+    assert stream.model == "m"
+    assert text == "Talks resumed [1]."
+    assert ctx.closed
+
+
+def test_stream_falls_back_before_the_first_token():
+    """A dead primary costs one round trip, not the answer."""
+    provider = OpenAICompatibleProvider(
+        api_key="k", model="big", base_url="https://x/v1", fallbacks=["small"],
+    )
+    dead, alive = _StreamCtx(429), _StreamCtx(200, [_sse("ok"), "data: [DONE]"])
+    with patch("httpx.stream", side_effect=[dead, alive]):
+        stream = provider.stream("q", max_tokens=10)
+        assert "".join(stream) == "ok"
+
+    assert stream.model == "small"
+    assert dead.closed
+
+
+def test_a_stream_that_opens_but_says_nothing_falls_through():
+    provider = OpenAICompatibleProvider(
+        api_key="k", model="big", base_url="https://x/v1", fallbacks=["small"],
+    )
+    silent = _StreamCtx(200, ["data: [DONE]"])
+    alive = _StreamCtx(200, [_sse("ok"), "data: [DONE]"])
+    with patch("httpx.stream", side_effect=[silent, alive]):
+        stream = provider.stream("q", max_tokens=10)
+
+    assert stream.model == "small"
+
+
+def test_stream_with_every_model_down_raises_unavailable():
+    provider = OpenAICompatibleProvider(api_key="k", model="m", base_url="https://x/v1")
+    with patch("httpx.stream", return_value=_StreamCtx(503)), pytest.raises(LLMUnavailable):
+        provider.stream("q", max_tokens=10)

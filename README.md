@@ -214,7 +214,8 @@ for when workers are running.
 **AI is optional.** With no key configured, briefs and `/ask` answers are built
 from the retrieved sources directly — a supported mode, not a broken one. To turn
 on generated answers, [get a free Groq key](https://console.groq.com/keys)
-(~14,400 requests/day, no card) and set two variables:
+(free tier, no card — the preset runs `openai/gpt-oss-120b` with
+`gpt-oss-20b` as fallback) and set two variables:
 
 ```bash
 LLM_PROVIDER=groq

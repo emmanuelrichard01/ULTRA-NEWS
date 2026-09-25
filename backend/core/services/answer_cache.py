@@ -74,8 +74,15 @@ def _cosine(a: list[float], b: list[float]) -> float:
     return float(va @ vb / denom) if denom else 0.0
 
 
-def lookup(query_vector: list[float]) -> dict | None:
-    """Return a cached answer for a semantically equivalent question, or None."""
+def lookup(query_vector: list[float], scope: str = "") -> dict | None:
+    """
+    Return a cached answer for a semantically equivalent question, or None.
+
+    `scope` is the story slug for a question asked from a story page. "What
+    happens next?" asked about two different stories is the same string and a
+    near-identical vector, and must not share an answer — so scoped and open
+    questions never match across scopes.
+    """
     try:
         index = cache.get(_INDEX_KEY) or []
     except Exception as e:
@@ -88,6 +95,8 @@ def lookup(query_vector: list[float]) -> dict | None:
 
     for entry in index:
         if entry.get("generation") != generation:
+            continue
+        if entry.get("scope", "") != scope:
             continue
         if now - entry.get("stored_at", 0) > ANSWER_TTL_SECONDS:
             continue
@@ -107,13 +116,17 @@ def lookup(query_vector: list[float]) -> dict | None:
         "answer": best["answer"],
         "context_sources": best["context_sources"],
         "synthesis_type": best["synthesis_type"],
+        "citations": best.get("citations", []),
+        "model": best.get("model"),
         "cached": True,
         "cached_similarity": round(best_similarity, 4),
     }
 
 
 def store(query: str, query_vector: list[float], answer: str,
-          context_sources: list[str], synthesis_type: str) -> None:
+          context_sources: list[str], synthesis_type: str, *,
+          citations: list[dict] | None = None, scope: str = "",
+          model: str | None = None) -> None:
     """Record an answer for reuse by later paraphrases of the same question."""
     if not answer.strip():
         return
@@ -124,6 +137,9 @@ def store(query: str, query_vector: list[float], answer: str,
         "answer": answer,
         "context_sources": context_sources,
         "synthesis_type": synthesis_type,
+        "citations": citations or [],
+        "scope": scope,
+        "model": model,
         "generation": current_generation(),
         "stored_at": time.time(),
     }

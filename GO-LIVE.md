@@ -86,15 +86,16 @@ That said, generated answers are the demo moment, and this tier is free:
 1. [console.groq.com/keys](https://console.groq.com/keys) → sign in → **Create API Key**
 2. Copy it (starts `gsk_`). Save as `LLM_API_KEY`.
 
-Free allowance, verified from live response headers:
+Free allowance (Groq publishes per-model limits in the console; the Llama
+models this table used to list were retired on 2026-08-16):
 
 | Model | Requests/day |
 | --- | --- |
-| `llama-3.3-70b-versatile` (primary) | 1,000 |
-| `llama-3.1-8b-instant` (fallback) | 14,400 |
+| `openai/gpt-oss-120b` (primary) | see Groq console |
+| `openai/gpt-oss-20b` (fallback) | see Groq console |
 
-The chain runs strongest-first. When the 70B model's daily budget is gone, the
-8B model answers instead — so a busy day costs you some answer quality rather
+The chain runs strongest-first. When the 120B model's budget is gone, the 20B
+model answers instead — so a busy day costs you some answer quality rather
 than the whole feature.
 
 ---

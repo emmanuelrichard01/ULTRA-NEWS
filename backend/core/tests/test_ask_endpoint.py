@@ -51,3 +51,29 @@ def test_ask_endpoint_rate_limiter():
         response = client.post("/ask", json={"query": "What is happening with rates?"})
         assert response.status_code == 429
         assert response.json() == {"detail": "Too Many Requests"}
+
+
+@pytest.mark.django_db
+def test_event_streams_are_never_gzipped():
+    """
+    Django gzips an async streaming response chunk by chunk, emitting one gzip
+    member per SSE event. Clients decode the first member and drop the rest, so
+    /ask delivered its metadata and then nothing. Event streams go uncompressed.
+    """
+    from django.http import HttpResponse, StreamingHttpResponse
+    from django.test import RequestFactory
+
+    from core.middleware import StreamSafeGZipMiddleware
+
+    async def events():
+        yield "data: {}\n\n" * 50
+
+    request = RequestFactory().get("/", HTTP_ACCEPT_ENCODING="gzip")
+    middleware = StreamSafeGZipMiddleware(lambda r: None)
+
+    sse = StreamingHttpResponse(events(), content_type="text/event-stream")
+    assert not middleware.process_response(request, sse).has_header("Content-Encoding")
+
+    # Everything else is still compressed.
+    page = HttpResponse("x" * 1000, content_type="application/json")
+    assert middleware.process_response(request, page)["Content-Encoding"] == "gzip"

@@ -23,8 +23,9 @@ similarity, corroboration and recency together.
 """
 import logging
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import timedelta
+from typing import Optional
 
 from django.utils import timezone
 
@@ -40,6 +41,16 @@ STORY_CONTEXT_LIMIT = 4
 # Headlines shown per story, to convey how outlets framed it without flooding
 # the prompt.
 HEADLINES_PER_STORY = 3
+
+# Excerpt characters per outlet in the grounding context. Enough for the lede
+# sentence, which is where wire copy puts the who/what/where.
+EXCERPT_CHARS = 280
+
+# A story-scoped question ("Ask about this story") gets the whole cluster rather
+# than three headlines: the reader is already looking at the story and wants
+# what its coverage says, outlet by outlet.
+SCOPED_HEADLINES = 10
+SCOPED_RELATED = 2
 
 # Recency half-life. A story twice this old contributes a quarter of the boost.
 RECENCY_HALF_LIFE_HOURS = 36.0
@@ -63,6 +74,11 @@ class RetrievedStory:
     similarity: float
     score: float
     headlines: list[tuple[str, str]]  # (outlet, headline)
+    # One excerpt per outlet, trimmed. Headlines alone tell the model how a story
+    # was framed; they rarely carry the number, the name or the place a reader
+    # is actually asking about.
+    excerpts: list[tuple[str, str]] = field(default_factory=list)
+    image_url: Optional[str] = None
 
     @property
     def outlets(self) -> list[str]:
@@ -124,10 +140,11 @@ def retrieve_stories(query_vector, limit: int = STORY_CONTEXT_LIMIT) -> list[Ret
             'story': story,
             'similarity': similarity,   # best-matching article represents the story
             'headlines': [],
+            'excerpts': [],
+            'image_url': None,
         })
         bucket['similarity'] = max(bucket['similarity'], similarity)
-        if len(bucket['headlines']) < HEADLINES_PER_STORY:
-            bucket['headlines'].append((article.source.name, article.title))
+        _collect(bucket, article, HEADLINES_PER_STORY)
 
     retrieved = []
     for bucket in grouped.values():
@@ -147,10 +164,110 @@ def retrieve_stories(query_vector, limit: int = STORY_CONTEXT_LIMIT) -> list[Ret
             similarity=bucket['similarity'],
             score=score,
             headlines=bucket['headlines'],
+            excerpts=bucket['excerpts'],
+            image_url=bucket['image_url'],
         ))
 
     retrieved.sort(key=lambda r: -r.score)
     return retrieved[:limit]
+
+
+def _collect(bucket: dict, article, max_headlines: int) -> None:
+    """Add one article's headline, excerpt and image to a story bucket."""
+    outlet = article.source.name
+    if len(bucket['headlines']) < max_headlines:
+        bucket['headlines'].append((outlet, article.title))
+    excerpt = (article.excerpt or "").strip()
+    if (
+        excerpt
+        and len(bucket['excerpts']) < max_headlines
+        and outlet not in {o for o, _ in bucket['excerpts']}
+    ):
+        bucket['excerpts'].append((outlet, _trim(excerpt, EXCERPT_CHARS)))
+    if bucket['image_url'] is None and getattr(article, 'image_url', None):
+        bucket['image_url'] = article.image_url
+
+
+def _trim(text: str, limit: int) -> str:
+    text = " ".join(text.split())
+    if len(text) <= limit:
+        return text
+    cut = text[:limit].rsplit(" ", 1)[0]
+    return cut.rstrip(",;:—-") + "…"
+
+
+def retrieve_for_story(story_slug: str, query_vector) -> list[RetrievedStory]:
+    """
+    Grounding for a question asked FROM a story page.
+
+    The scoped story always comes first, with its whole cluster rather than the
+    usual three headlines — a reader who opened "Ask about this story" is asking
+    about this story, and a better-scoring neighbour must not displace it. A
+    couple of nearby stories follow, because the honest answer to "is this
+    connected to X?" needs X in the context.
+
+    Returns [] for an unknown slug; the caller falls back to open retrieval.
+    """
+    from core.models import Article, Source, Story
+
+    story = Story.objects.filter(slug=story_slug).first()
+    if story is None:
+        return []
+
+    articles = (
+        Article.objects.filter(
+            story=story, source__trust_tier=Source.TrustTier.AUTO_PUBLISH,
+        )
+        .select_related('source')
+        .order_by('published_date', 'id')
+    )
+    bucket = {'headlines': [], 'excerpts': [], 'image_url': None}
+    for article in articles:
+        _collect(bucket, article, SCOPED_HEADLINES)
+
+    scoped = RetrievedStory(
+        story_id=story.id,
+        slug=story.slug,
+        title=story.title,
+        summary=story.summary or "",
+        independent_count=story.independent_count,
+        first_seen_at=story.first_seen_at,
+        similarity=1.0,
+        score=float('inf'),
+        headlines=bucket['headlines'],
+        excerpts=bucket['excerpts'],
+        image_url=bucket['image_url'],
+    )
+
+    neighbours = [
+        s for s in retrieve_stories(query_vector, limit=SCOPED_RELATED + 1)
+        if s.story_id != story.id
+    ][:SCOPED_RELATED]
+    return [scoped, *neighbours]
+
+
+def citations(stories: list[RetrievedStory]) -> list[dict]:
+    """
+    The citation table sent to the client alongside an answer.
+
+    Numbered to match the `[n]` markers in the context and therefore in the
+    answer, so every `[2]` the reader sees resolves to a real story they can
+    open — with its corroboration count attached, because a citation to a
+    single unconfirmed report is a different thing from a citation to a story
+    eight newsrooms stand behind, and the reader should see which it is.
+    """
+    return [
+        {
+            "n": i,
+            "slug": s.slug,
+            "title": s.title,
+            "independent_count": s.independent_count,
+            "outlets": s.outlets[:6],
+            "first_seen_at": s.first_seen_at.isoformat() if s.first_seen_at else None,
+            "image_url": s.image_url,
+        }
+        for i, s in enumerate(stories, start=1)
+    ]
 
 
 def build_extractive_answer(stories: list[RetrievedStory]) -> str:
@@ -168,14 +285,14 @@ def build_extractive_answer(stories: list[RetrievedStory]) -> str:
         return "Nothing on the wire matches that question yet."
 
     lines = ["Here is what the wire currently holds:\n"]
-    for story in stories:
+    for n, story in enumerate(stories, start=1):
         outlets = story.independent_count
         confidence = (
             f"corroborated by {outlets} independent outlets" if outlets >= 3
             else f"reported by {outlets} independent outlets" if outlets == 2
             else "single source, not independently confirmed"
         )
-        lines.append(f"**{story.title}** — {confidence}.")
+        lines.append(f"**{story.title}** — {confidence}. [{n}]")
         if story.summary and story.summary != story.title:
             lines.append(story.summary)
         if story.outlets:
@@ -216,7 +333,7 @@ def build_context(stories: list[RetrievedStory]) -> str:
         )
 
         lines = [
-            f"[STORY {i}] {story.title}",
+            f"[{i}] {story.title}",
             f"  First reported: {age_text}",
             f"  Corroboration: {confidence}",
         ]
@@ -225,6 +342,9 @@ def build_context(stories: list[RetrievedStory]) -> str:
         if story.headlines:
             lines.append("  How outlets headlined it:")
             lines.extend(f"    - {outlet}: {headline}" for outlet, headline in story.headlines)
+        if story.excerpts:
+            lines.append("  What the coverage says:")
+            lines.extend(f"    - {outlet}: {excerpt}" for outlet, excerpt in story.excerpts)
         blocks.append("\n".join(lines))
 
     return "\n\n".join(blocks)
