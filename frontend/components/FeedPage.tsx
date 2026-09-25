@@ -17,7 +17,7 @@ import TopicInsights from "@/components/TopicInsights";
 import WireRail from "@/components/WireRail";
 import WireStatus from "@/components/WireStatus";
 import { fetchStories } from "@/lib/api";
-import type { PaginatedResponse, StoryDetail } from "@/lib/types";
+import type { PaginatedResponse, StoryDetail, TopicPulse } from "@/lib/types";
 import { CATEGORY_MAP } from "@/lib/types";
 import { CORROBORATION_FILTERS } from "@/lib/corroboration";
 import type { Edition } from "@/lib/editions";
@@ -68,6 +68,8 @@ interface FeedPageProps {
    * complete in the first HTML. Present only on The Wire's root route.
    */
   frontPage?: { initialTopic: string; initialTopicStories: StoryDetail[] };
+  /** The beat's pulse, on topic pages. */
+  topicPulse?: TopicPulse | null;
 }
 
 /** Date sentinels break the feed into scannable runs, as a broadsheet would. */
@@ -101,7 +103,12 @@ export default function FeedPage({
   leadStories: serverLeads = [],
   momentumStories = [],
   frontPage,
+  topicPulse = null,
 }: FeedPageProps) {
+  // On a topic page every story is in that topic, so its pill says nothing.
+  // Cards show the OTHER topic a story carries instead, which does.
+  const inBeat = (story: StoryDetail): StoryDetail =>
+    category ? { ...story, categories: (story.categories ?? []).filter((c) => c !== category) } : story;
   const searchParams = useSearchParams();
   const initialCursor = searchParams.get("cursor") ?? undefined;
 
@@ -275,7 +282,7 @@ export default function FeedPage({
       {showLeadBlock && (
         <section aria-label="Lead stories" className="mb-10 space-y-4">
           <OverlayCard
-            story={leadStories[0]}
+            story={inBeat(leadStories[0])}
             size="hero"
             priority
             timeField={edition.timeField}
@@ -284,7 +291,7 @@ export default function FeedPage({
           {leadStories.length > 1 && (
             <div className="stagger grid gap-4 sm:grid-cols-3">
               {leadStories.slice(1, 4).map((story) => (
-                <OverlayCard key={story.slug} story={story} />
+                <OverlayCard key={story.slug} story={inBeat(story)} />
               ))}
             </div>
           )}
@@ -311,7 +318,7 @@ export default function FeedPage({
               <StoryCard
                 key={story.slug}
                 variant="standard"
-                {...cardProps(story, edition)}
+                {...cardProps(inBeat(story), edition)}
               />
             ))}
           </section>
@@ -324,7 +331,7 @@ export default function FeedPage({
             // The leads hold the top positions in a ranked edition, so the
             // list beneath them starts after however many were promoted.
             rank={edition.showRanks ? i + 1 + (showLeadBlock ? Math.min(leadStories.length, 4) : 0) : undefined}
-            {...cardProps(story, edition)}
+            {...cardProps(inBeat(story), edition)}
           />
         ))
       )}
@@ -363,7 +370,7 @@ export default function FeedPage({
 
       {/* A topic page describes its beat before listing it. */}
       {category && isDefaultView && !initialCursor && (
-        <TopicInsights category={category} stories={stories} totalCount={totalCount} />
+        <TopicInsights category={category} stories={stories} totalCount={totalCount} pulse={topicPulse} />
       )}
 
       {/* --------------------------------------------------------- controls
@@ -453,7 +460,8 @@ export default function FeedPage({
           </div>
         ) : null}
 
-        <TopicFilter active={activeCategory} onChange={setActiveCategory} />
+        {/* A topic page is already one topic; the section bar switches beats. */}
+        {!category && <TopicFilter active={activeCategory} onChange={setActiveCategory} />}
       </div>
 
       {/*

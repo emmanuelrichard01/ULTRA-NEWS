@@ -18,6 +18,7 @@ from ninja.security import APIKeyHeader, HttpBearer
 from pydantic import Field
 
 from core.models import Article, Source, Story
+from core.topics import topic_slugs
 
 # Must match the text search configuration used by the search_vector trigger in
 # migration 0013 — a mismatch here silently returns zero results.
@@ -728,7 +729,7 @@ def list_stories(
             "velocity_score": story.velocity_score,
             "status": story.status,
             "image_url": card.get("image_url"),
-            "categories": [cat.slug for cat in story.categories.all()],
+            "categories": topic_slugs(story),
             "sources": card.get("sources", []),
             "framing_preview": card.get("framing_preview", []),
             "video_outlets": card.get("video_outlets", 0),
@@ -822,7 +823,7 @@ def get_story(request, story_slug: str):
         "independent_count": story.independent_count,
         "velocity_score": story.velocity_score,
         "status": story.status,
-        "categories": list(story.categories.values_list('slug', flat=True)),
+        "categories": topic_slugs(story),
         "articles": articles,
     }
 
@@ -984,6 +985,18 @@ def get_article(request, slug: str):
 
 
 # ==========================================================================
+# Public API — Topic pulse
+# ==========================================================================
+
+@api.get("/topics", response=dict)
+def topics_pulse(request):
+    """Per-topic pulse: today vs the beat's norm, confirmed share, 7-day series, related beats."""
+    from core.services.topic_pulse import topic_pulse
+
+    return topic_pulse()
+
+
+# ==========================================================================
 # Public API — Sources (Registry & Health)
 # ==========================================================================
 
@@ -1106,7 +1119,7 @@ def get_related_stories(request, story_slug: str, limit: int = 5):
                 "independent_count": s.independent_count,
                 "status": s.status,
                 "image_url": first_article.image_url if first_article else None,
-                "categories": [cat.slug for cat in s.categories.all()],
+                "categories": topic_slugs(s),
             })
         
         return {"items": items}

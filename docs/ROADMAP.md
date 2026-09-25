@@ -72,6 +72,9 @@ state, with nothing surfacing the failure:
       downloadable card on desktop, UTM-tagged, no SDKs)
 - [x] Video badges from ingest-time detection, linking to the publisher's
       page; no re-hosting
+- [x] Topics rebuilt: editorial + semantic evidence, story topics by
+      publisher vote with a primary, commerce filtered, per-beat pulse and
+      identity hues
 - [ ] Click-to-load official embeds (YouTube nocookie) where a publisher
       embeds one; shareable Ask answers
 

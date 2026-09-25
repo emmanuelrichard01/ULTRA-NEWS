@@ -10,6 +10,11 @@ on:
   schedule:
     - cron: '17 4 * * *'   # off the hour: :00 is the busiest slot on GitHub's scheduler
   workflow_dispatch:
+    inputs:
+      retopic_days:
+        description: "Re-decide topics for stories updated in the last N days (0 = skip). Run after a classifier change."
+        required: false
+        default: "0"
 
 concurrency:
   group: maintenance
@@ -49,6 +54,12 @@ jobs:
       # Tiered: raw documents go first, then article payloads, then
       # uncorroborated stories. Story rows and counts survive, so the archive
       # stays navigable after the bodies are gone.
+      # Manual runs only, opt-in: re-scores articles and re-votes story topics
+      # with the current classifier (core.topics).
+      - name: Re-decide topics
+        if: github.event_name == 'workflow_dispatch' && inputs.retopic_days != '0'
+        run: python manage.py recategorize_all --apply --days ${{ inputs.retopic_days }}
+
       - name: Apply retention
         run: python manage.py retention --apply --compact
 

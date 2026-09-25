@@ -5,7 +5,7 @@ import { Suspense } from 'react';
 import FeedPage from '@/components/FeedPage';
 import JsonLd, { breadcrumbList } from '@/components/JsonLd';
 import { IS_INDEXABLE, absoluteUrl } from '@/lib/site';
-import { fetchStories, fetchLeadStories } from '@/lib/api';
+import { fetchStories, fetchLeadStories, fetchTopicPulse } from '@/lib/api';
 import { EDITIONS_BY_SLUG } from '@/lib/editions';
 import { CATEGORY_MAP } from '@/lib/types';
 
@@ -67,9 +67,10 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
 
   // Leads are scoped to the topic, so a Climate page leads with the newest
   // confirmed climate stories rather than with the front page's.
-  const [initialStories, leadStories] = await Promise.all([
+  const [initialStories, leadStories, pulse] = await Promise.all([
     fetchStories({ sort: edition.sort, minSources: edition.minSources, category }),
     fetchLeadStories({ category, limit: 4 }),
+    fetchTopicPulse(),
   ]);
 
   const structuredData = {
@@ -109,6 +110,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
         taglineOverride={info.description}
         initialStories={initialStories}
         leadStories={leadStories}
+        topicPulse={pulse?.topics[category] ?? null}
       />
     </Suspense>
   );

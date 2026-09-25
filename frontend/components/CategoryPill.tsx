@@ -1,6 +1,6 @@
 import Link from 'next/link';
 
-import { CATEGORY_MAP } from '@/lib/types';
+import { CATEGORY_MAP, topicHue } from '@/lib/types';
 
 /**
  * CategoryPill — topic chip.
@@ -35,9 +35,21 @@ export default function CategoryPill({
 }: CategoryPillProps) {
   // Slugs arrive from the API; show the human name where we know one.
   const display = CATEGORY_MAP[label]?.displayName ?? label;
+  const content = (
+    <>
+      {CATEGORY_MAP[label] && (
+        <span
+          aria-hidden="true"
+          className="h-1.5 w-1.5 shrink-0 rounded-full"
+          style={{ backgroundColor: isActive ? 'currentColor' : topicHue(label) }}
+        />
+      )}
+      {display}
+    </>
+  );
 
   const className = [
-    'inline-flex shrink-0 items-center rounded-[var(--radius-pill)] border',
+    'inline-flex shrink-0 items-center gap-1.5 rounded-[var(--radius-pill)] border',
     'font-data font-medium uppercase tracking-[0.07em] whitespace-nowrap',
     'transition-colors duration-150',
     SIZES[size],
@@ -49,7 +61,7 @@ export default function CategoryPill({
   if (href) {
     return (
       <Link href={href} className={`relative z-10 ${className}`}>
-        {display}
+        {content}
       </Link>
     );
   }
@@ -57,10 +69,10 @@ export default function CategoryPill({
   if (onClick) {
     return (
       <button type="button" onClick={onClick} aria-pressed={isActive} className={`relative z-10 ${className}`}>
-        {display}
+        {content}
       </button>
     );
   }
 
-  return <span className={className}>{display}</span>;
+  return <span className={className}>{content}</span>;
 }

@@ -9,7 +9,7 @@ import { ThemeToggle } from './ThemeToggle';
 import { AskSparkle } from './AskTrigger';
 import { useAsk } from './AskProvider';
 import { EDITIONS, editionHref } from '@/lib/editions';
-import { CATEGORY_MAP } from '@/lib/types';
+import { CATEGORY_MAP, topicHue } from '@/lib/types';
 
 /**
  * Masthead + section bar.
@@ -183,7 +183,7 @@ export default function Navbar() {
             </BarLink>
             <li aria-hidden="true" className="mx-2 h-4 w-px shrink-0 bg-[var(--border-strong)]" />
             {TOPICS.map((topic) => (
-              <BarLink key={topic.slug} href={topic.href} active={pathname === topic.href}>
+              <BarLink key={topic.slug} href={topic.href} active={pathname === topic.href} hue={topicHue(topic.slug)}>
                 {topic.name}
               </BarLink>
             ))}
@@ -300,11 +300,14 @@ function BarLink({
   href,
   active,
   strong = false,
+  hue,
   children,
 }: {
   href: string;
   active: boolean;
   strong?: boolean;
+  /** A beat's identity hue, for its underline. */
+  hue?: string;
   children: React.ReactNode;
 }) {
   return (
@@ -312,7 +315,8 @@ function BarLink({
       <Link
         href={href}
         aria-current={active ? 'page' : undefined}
-        className={`relative flex h-[var(--header-h)] items-center whitespace-nowrap px-2.5 text-[13px] transition-colors after:absolute after:inset-x-2.5 after:bottom-[-1px] after:h-[2px] after:origin-left after:rounded-full after:bg-[var(--foreground)] after:transition-transform after:duration-300 after:ease-[var(--ease-out)] ${
+        style={hue ? ({ '--bar-hue': hue } as React.CSSProperties) : undefined}
+        className={`relative flex h-[var(--header-h)] items-center whitespace-nowrap px-2.5 text-[13px] transition-colors after:absolute after:inset-x-2.5 after:bottom-[-1px] after:h-[2px] after:origin-left after:rounded-full after:bg-[var(--bar-hue,var(--foreground))] after:transition-transform after:duration-300 after:ease-[var(--ease-out)] ${
           active
             ? 'text-[var(--foreground)] after:scale-x-100'
             : 'text-[var(--foreground-muted)] after:scale-x-0 hover:text-[var(--foreground)] hover:after:scale-x-50'

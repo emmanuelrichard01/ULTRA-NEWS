@@ -182,6 +182,29 @@ export const CATEGORY_MAP: Record<string, CategoryInfo> = {
   sports: { slug: 'sports', displayName: 'Sports', description: 'Competition, athletes and the global arena.' },
 };
 
+/** The identity hue of a beat, as a CSS value. */
+export function topicHue(slug: string): string {
+  return CATEGORY_MAP[slug] ? `var(--topic-${slug})` : 'var(--foreground-subtle)';
+}
+
+/** One beat's pulse — see backend/core/services/topic_pulse.py. */
+export interface TopicPulse {
+  today: number;
+  confirmed_today: number;
+  daily_average: number;
+  /** today / daily_average - 1; null when there is no norm to compare against. */
+  change: number | null;
+  /** Seven daily counts, oldest first; the last is today. */
+  days: number[];
+  leading: { slug: string; title: string; independent_count: number } | null;
+  related: string[];
+}
+
+export interface TopicPulseResponse {
+  generated_at: string;
+  topics: Record<string, TopicPulse>;
+}
+
 // ==========================================================================
 // Briefing
 // ==========================================================================

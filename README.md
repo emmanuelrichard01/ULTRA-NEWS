@@ -427,7 +427,14 @@ reference behind it.
   embeds, feed media, /video/ pages) and counted per newsroom. Cards say a
   story has video and the source ledger links "Watch at <outlet>". Ultra News
   never re-hosts or plays publisher video
-- Semantic topic classification (98% coverage, up from 53% with keywords)
+- Topics from two signals and a vote: where the publisher filed the piece
+  (URL section, RSS categories, feed section, the outlet's beat) plus what
+  the text is about, then one vote per publisher to decide a story's primary
+  topic. Untagged live stories fell from 28%; coupon and promo-code pages are
+  dropped at ingest
+- Topic pages with a pulse: today against the beat's own norm, a week's
+  sparkline, how much is confirmed, the leading story, and the beats it runs
+  into (`/api/v1/topics`)
 - Source health with circuit breaker, conditional GET and transient-error retry
 - Question answering with story-level retrieval, streamed answers, numbered
   citations, story scope, follow-up conversations and a semantic answer cache

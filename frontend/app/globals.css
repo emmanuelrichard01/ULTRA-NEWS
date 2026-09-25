@@ -26,6 +26,18 @@
   /* Functional signal colours — corroboration state only */
   --signal-amber: #b0701a; /* 2 independent publishers */
   --verified-teal: #17557f; /* 3+ independent publishers */
+
+  /* Beat hues. Identity only, never meaning: corroboration keeps its own
+     amber/teal scale, and these stay muted enough not to compete with it. */
+  --topic-world: #2f62b8;
+  --topic-politics: #a8354a;
+  --topic-business: #1f7a55;
+  --topic-tech: #6a4bc4;
+  --topic-science: #0f7f8f;
+  --topic-climate: #4a7f2c;
+  --topic-health: #b03a78;
+  --topic-culture: #a36b12;
+  --topic-sports: #c2521b;
   --wire-red: #b3311d; /* Live / breaking — spend sparingly */
 
   /* Derived semantic tokens */
@@ -103,6 +115,16 @@
   --signal-amber: #e3a650;
   --verified-teal: #6aa8df;
   --wire-red: #ec7560;
+
+  --topic-world: #86a8f0;
+  --topic-politics: #ec8a99;
+  --topic-business: #6cc79c;
+  --topic-tech: #b39cf5;
+  --topic-science: #62c6d3;
+  --topic-climate: #9ccf7c;
+  --topic-health: #ee94c4;
+  --topic-culture: #e3b25e;
+  --topic-sports: #f59a6b;
 
   --background: var(--paper);
   --foreground: var(--ink);

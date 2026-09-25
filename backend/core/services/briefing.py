@@ -28,6 +28,8 @@ from typing import Any, Optional
 from django.core.cache import cache
 from django.utils import timezone
 
+from core.topics import topic_slugs
+
 logger = logging.getLogger(__name__)
 
 BRIEFING_STORIES = 7
@@ -115,7 +117,7 @@ def _story_payload(stories) -> list[dict]:
             "recent_outlets": story.momentum_outlets,
             "first_seen_at": story.first_seen_at.isoformat(),
             "last_updated_at": story.last_updated_at.isoformat(),
-            "categories": [c.slug for c in story.categories.all()],
+            "categories": topic_slugs(story),
             "sources": card['outlets'][:6],
             "image_url": card['image_url'],
             "_headlines": card['headlines'],

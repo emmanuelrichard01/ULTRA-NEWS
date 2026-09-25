@@ -164,6 +164,35 @@ _VIDEO_PAGE_PATH = re.compile(r"/(videos?|watch|video-news|clips?)(/|$)", re.IGN
 _EMBED_HOSTS = ("youtube.com/embed/", "youtube-nocookie.com/embed/", "player.vimeo.com/video/", "dailymotion.com/embed/")
 
 
+# Affiliate commerce: coupon pages, promo codes, deal roundups. Publishers run
+# them through the same feeds as their reporting (Wired's coupon pages arrive
+# in its main feed), and each one then sat on the Technology page as a
+# "story". They are not news, cannot be corroborated, and are dropped at the
+# door. Matched on the URL's own path segments or on unmistakable title
+# phrasing, so a news story ABOUT coupons ("FTC sues over fake coupons") stays.
+_COMMERCE_SEGMENT = re.compile(r"^(coupons?|promo-codes?|deals|shopping|affiliate)$", re.IGNORECASE)
+# "hoka-coupon-code", "ulta-coupon" — but not "ftc-fake-coupons", which is reporting.
+_COMMERCE_SLUG = re.compile(r"(^|-)(promo-codes?|coupon-codes?)(-|$)|^[a-z0-9]+-coupons?$", re.IGNORECASE)
+_COMMERCE_TITLE = re.compile(
+    r"\b(promo codes?|coupon codes?|coupons?)\b.*(\b\d+% off\b|\boff\b|\bdeals?\b)|"
+    r"\b\d+% off\b.*\b(promo|coupon)",
+    re.IGNORECASE,
+)
+
+
+def is_commerce(url: str, title: str = "") -> bool:
+    """True for affiliate coupon / promo-code / deals pages rather than reporting."""
+    try:
+        segments = [s for s in urlparse(url or "").path.split("/") if s]
+    except ValueError:
+        segments = []
+    if any(_COMMERCE_SEGMENT.match(seg) for seg in segments[:-1]):
+        return True
+    if segments and _COMMERCE_SLUG.search(segments[-1]):
+        return True
+    return bool(_COMMERCE_TITLE.search(title or ""))
+
+
 def looks_like_video_page(url: str) -> bool:
     """A URL whose path marks it as a video page (/video/, /videos/, /watch/)."""
     try:
@@ -290,6 +319,7 @@ class RSSScraper(BaseScraper):
 
         # `skip_urls` is either a set, or a lookup called with this feed's URLs
         # only — resolved AFTER the conditional GET, so a 304 costs nothing.
+        entries = [e for e in entries if not is_commerce(e['url'], e.get('title', ''))]
         candidate_urls = [e['url'] for e in entries if e['url']]
         if callable(skip_urls):
             skip_urls = skip_urls(candidate_urls) if candidate_urls else set()
@@ -422,6 +452,7 @@ class RSSScraper(BaseScraper):
             'published_date': published_date,
             'image_url': self._entry_image(entry),
             'video_url': self._entry_video(entry),
+            'feed_tags': self._entry_tags(entry),
             'deep_fetch_success': False,
         }
 
@@ -444,6 +475,16 @@ class RSSScraper(BaseScraper):
             if getattr(link, 'rel', '') == 'enclosure' and getattr(link, 'type', '').startswith('image/'):
                 return link.href
         return None
+
+    @staticmethod
+    def _entry_tags(entry) -> list[str]:
+        """The publisher's <category> terms: how their own desk filed the piece."""
+        tags = []
+        for tag in entry.get('tags') or []:
+            term = (tag.get('term') or '').strip()
+            if term and len(term) <= 40 and term not in tags:
+                tags.append(term)
+        return tags[:8]
 
     @classmethod
     def _entry_video(cls, entry) -> Optional[str]:
@@ -541,6 +582,7 @@ class RSSScraper(BaseScraper):
             # Pages whose URL says they are video (/video/, /watch/) count even
             # when no page was fetched — the feed item IS the clip.
             'video_url': entry.get('video_url') or (entry['url'] if looks_like_video_page(entry['url']) else None),
+            'feed_tags': entry.get('feed_tags') or [],
             'deep_fetch_success': entry['deep_fetch_success'],
         }
 

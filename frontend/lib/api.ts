@@ -14,6 +14,7 @@ import type {
   StoryDetailFull,
   PaginatedResponse,
   SourceInfo,
+  TopicPulseResponse,
 } from './types';
 
 /**
@@ -188,6 +189,23 @@ export async function fetchLeadStories(
     category: options.category,
   });
   return page.items;
+}
+
+/**
+ * Every beat's pulse. Null on failure: a topic page without its pulse is
+ * still a topic page, so this never throws.
+ */
+export async function fetchTopicPulse(): Promise<TopicPulseResponse | null> {
+  try {
+    const res = await fetch(`${API_URL}/api/v1/topics`, {
+      headers: serverHeaders(),
+      next: { revalidate: 600 },
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as TopicPulseResponse;
+  } catch {
+    return null;
+  }
 }
 
 // ==========================================================================

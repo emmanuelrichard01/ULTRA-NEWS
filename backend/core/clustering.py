@@ -299,29 +299,68 @@ def _update_centroid(story: Story, article: Article) -> None:
 
 def _assign_topics(article: Article) -> None:
     """
-    Classify the article semantically and attach the matching Category rows.
+    Classify the article and attach the matching Category rows.
 
-    Replaces keyword matching, which left 47% of a 619-article corpus untagged.
+    Two signals (core.topics): where the publisher filed it — URL section, RSS
+    categories, feed section, the outlet's beat — and what the text is about.
+    The evidence is kept on the article, because the story's topics are a
+    vote across its publishers (refresh_story_topics), not a union of tags.
+
     Failures are swallowed deliberately: a classification problem must not stop
     an article being clustered and published.
     """
-    if article.embedding is None:
-        return
-
     try:
         from core.models import Category
-        from core.topics import classify
+        from core.topics import editorial_hints, pick_topics, topic_evidence
 
-        chosen = classify(article.embedding)
-        if not chosen:
-            return
+        source = article.source
+        hints = editorial_hints(
+            article_url=article.url,
+            feed_url=source.url if source else "",
+            tags=article.feed_tags or (),
+            publisher_domain=(source.publisher_domain or "") if source else "",
+        )
+        from core.services.scraper import is_commerce
 
-        slugs = [slug for slug, _score in chosen]
-        categories = list(Category.objects.filter(slug__in=slugs))
-        if categories:
-            article.categories.set(categories)
+        # Coupon pages that predate the ingest filter get no topic, so they
+        # drop off every topic page.
+        evidence = {} if is_commerce(article.url, article.title) else topic_evidence(article.embedding, hints)
+        article.topic_scores = evidence or None
+        article.save(update_fields=['topic_scores'])
+
+        slugs = pick_topics(evidence)
+        article.categories.set(Category.objects.filter(slug__in=slugs) if slugs else [])
     except Exception as e:
         logger.warning("Topic classification failed for article %s: %s", article.pk, e)
+
+
+def refresh_story_topics(story: Story) -> None:
+    """
+    Re-decide a story's topics from every article in it, one vote per publisher.
+
+    Called whenever an article joins, so the topics can move as coverage does —
+    and can also shrink: an early off-angle report no longer tags the story
+    for good. The strongest topic becomes primary_category, listed first
+    wherever topics are shown.
+    """
+    try:
+        from core.models import Category
+        from core.topics import story_topics
+
+        rows = story.articles.values_list(
+            'topic_scores', 'source__publisher_domain', 'source__name',
+        )
+        votes = [(domain or name or '?', scores) for scores, domain, name in rows if scores]
+        slugs = story_topics(votes)
+        by_slug = {c.slug: c for c in Category.objects.filter(slug__in=slugs)}
+        ordered = [by_slug[s] for s in slugs if s in by_slug]
+        story.categories.set(ordered)
+        primary = ordered[0] if ordered else None
+        if story.primary_category_id != (primary.pk if primary else None):
+            story.primary_category = primary
+            story.save(update_fields=['primary_category'])
+    except Exception as e:
+        logger.warning("Story topic refresh failed for story %s: %s", story.pk, e)
 
 
 # A brief is only worth regenerating once this many NEW independent publishers
@@ -463,14 +502,6 @@ def cluster_article(article: Article, scorer: ClusterScorer = None) -> Story:
                 )
                 _update_centroid(best_match, article)
 
-                # Merge article categories into story categories
-                article_cats = set(article.categories.values_list('id', flat=True))
-                if article_cats:
-                    existing_cats = set(best_match.categories.values_list('id', flat=True))
-                    new_cats = article_cats - existing_cats
-                    if new_cats:
-                        best_match.categories.add(*new_cats)
-
                 # Narrow write: a bare save() clobbered every column, racing with
                 # the synthesis task's concurrent update of ai_summary/status.
                 best_match.save(update_fields=[
@@ -478,6 +509,7 @@ def cluster_article(article: Article, scorer: ClusterScorer = None) -> Story:
                     'status', 'embedding', 'last_updated_at',
                 ])
                 best_match.update_primary_source()
+                refresh_story_topics(best_match)
 
                 # Materialised momentum for the Developing edition. Refreshed
                 # here so a story that just gained an outlet ranks immediately,
@@ -531,10 +563,9 @@ def cluster_article(article: Article, scorer: ClusterScorer = None) -> Story:
                 velocity_score=0.0,
                 embedding=article.embedding,
             )
-            story.categories.set(article.categories.all())
-
             article.story = story
             article.is_primary_source = True  # Sole article in a new cluster.
             article.save(update_fields=['story', 'embedding', 'is_primary_source'])
+            refresh_story_topics(story)
 
             return story

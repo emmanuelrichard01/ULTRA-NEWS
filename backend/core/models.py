@@ -252,6 +252,12 @@ class Story(models.Model):
                   "the window slides, so a stale value silently overstates it.",
     )
     categories = models.ManyToManyField(Category, related_name='stories', blank=True)
+    primary_category = models.ForeignKey(
+        Category, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='primary_stories',
+        help_text="The story's main topic by publisher consensus (core.topics.story_topics). "
+                  "Listed first wherever topics are shown.",
+    )
     embedding = VectorField(dimensions=384, null=True, blank=True)
     # V3 Phase 3: centroid_embedding = VectorField(dimensions=768) — deferred
 
@@ -320,6 +326,15 @@ class Article(models.Model):
     # when it is a video page. Recorded so a story can say which outlets have
     # video and link to each publisher's own player — never streamed from here.
     video_url = models.URLField(max_length=1000, blank=True, null=True)
+    feed_tags = models.JSONField(
+        default=list, blank=True,
+        help_text="The publisher's own RSS <category> terms, kept as a topic hint.",
+    )
+    topic_scores = models.JSONField(
+        null=True, blank=True,
+        help_text="Topic evidence {slug: score} from core.topics.topic_evidence; "
+                  "the story's consensus is computed from these.",
+    )
     # V3: excerpt-only model — short excerpt for display, full text in RawDocument
     excerpt = models.TextField(
         blank=True,
