@@ -35,6 +35,20 @@ function recognitionCtor(): (new () => Recognition) | null {
 
 const subscribe = () => () => {};
 
+/**
+ * What each recognition error means to the reader. These used to be swallowed:
+ * the button flickered on and off and nothing said why — which is exactly how
+ * a site-wide `microphone=()` permissions policy went unnoticed.
+ */
+const ERROR_HINTS: Record<string, string> = {
+  'not-allowed': 'Microphone blocked — allow it in your browser’s site settings.',
+  'service-not-allowed': 'Voice input is turned off in this browser.',
+  'audio-capture': 'No microphone found.',
+  'no-speech': 'Didn’t catch that — tap and try again.',
+  network: 'Voice input needs a connection.',
+  'language-not-supported': 'Voice input isn’t available for your language.',
+};
+
 export default function VoiceInput({
   onTranscript,
   onFinal,
@@ -48,9 +62,23 @@ export default function VoiceInput({
 }) {
   const supported = useSyncExternalStore(subscribe, () => recognitionCtor() !== null, () => false);
   const [listening, setListening] = useState(false);
+  const [hint, setHint] = useState<string | null>(null);
   const recRef = useRef<Recognition | null>(null);
+  const hintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => () => recRef.current?.abort(), []);
+  useEffect(
+    () => () => {
+      recRef.current?.abort();
+      if (hintTimer.current) clearTimeout(hintTimer.current);
+    },
+    []
+  );
+
+  const showHint = (text: string) => {
+    setHint(text);
+    if (hintTimer.current) clearTimeout(hintTimer.current);
+    hintTimer.current = setTimeout(() => setHint(null), 4500);
+  };
 
   if (!supported) return null;
 
@@ -66,6 +94,8 @@ export default function VoiceInput({
     rec.interimResults = true;
     rec.continuous = false;
     let finalText = '';
+    let failed = false;
+    setHint(null);
     rec.onresult = (e) => {
       let interim = '';
       for (let i = e.resultIndex; i < e.results.length; i++) {
@@ -77,19 +107,26 @@ export default function VoiceInput({
     };
     rec.onend = () => {
       setListening(false);
-      if (finalText.trim()) onFinal(finalText.trim());
+      if (!failed && finalText.trim()) onFinal(finalText.trim());
     };
-    rec.onerror = () => setListening(false);
+    rec.onerror = (e) => {
+      failed = true;
+      setListening(false);
+      // "aborted" is our own stop on unmount; everything else is explained.
+      if (e.error !== 'aborted') showHint(ERROR_HINTS[e.error] ?? 'Voice input stopped — try again.');
+    };
     recRef.current = rec;
     try {
       rec.start();
       setListening(true);
     } catch {
       setListening(false);
+      showHint('Voice input could not start — try again.');
     }
   };
 
   return (
+    <span className="relative inline-flex">
     <button
       type="button"
       onClick={toggle}
@@ -108,5 +145,14 @@ export default function VoiceInput({
         <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
       </svg>
     </button>
+    {hint && (
+      <span
+        role="status"
+        className="animate-fade-in-up absolute right-0 top-full z-10 mt-2 w-56 rounded-[var(--radius-chip)] border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-2 text-[12px] leading-snug text-[var(--foreground)] shadow-[var(--shadow-md)]"
+      >
+        {hint}
+      </span>
+    )}
+    </span>
   );
 }

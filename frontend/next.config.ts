@@ -79,7 +79,11 @@ const nextConfig: NextConfig = {
           { key: "X-Frame-Options", value: "DENY" },
           {
             key: "Permissions-Policy",
-            value: "camera=(), microphone=(), geolocation=(), interest-cohort=()",
+            // microphone=(self), not (): "Ask by voice" needs it, and the
+            // empty list disabled the mic for our own pages too — speech
+            // recognition failed instantly with "not-allowed". `self` still
+            // denies it to any embedded third-party frame.
+            value: "camera=(), microphone=(self), geolocation=(), interest-cohort=()",
           },
         ],
       },
