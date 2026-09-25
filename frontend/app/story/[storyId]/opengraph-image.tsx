@@ -109,7 +109,7 @@ export default async function Image({ params }: { params: Promise<{ storyId: str
           <div style={{ display: 'flex', flexDirection: 'column', borderTop: `2px solid ${INK}`, paddingTop: 20 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
               <Meter outlets={count} />
-              <div style={{ display: 'flex', fontSize: 29, fontWeight: 500, color: levelColor(count), letterSpacing: '-0.01em' }}>
+              <div style={{ display: 'flex', fontSize: photo ? 24 : 29, fontWeight: 500, color: levelColor(count), letterSpacing: '-0.01em' }}>
                 {corroborationSentence(count)}
               </div>
             </div>
