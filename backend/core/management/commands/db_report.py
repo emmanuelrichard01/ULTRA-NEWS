@@ -32,10 +32,15 @@ class Command(BaseCommand):
 
         report = database_report()
         used = report["used_fraction"]
+        # Warnings key on LIVE data: on-disk size stays high after retention
+        # while most of it is reusable, and a warning that never clears is one
+        # nobody reads.
+        live = report["live_fraction"]
         budget = report["budget_mb"]
 
         headline = (
-            f"Database {report['size_mb']} MB of {budget} MB ({used:.0%})"
+            f"Database {report['size_mb']} MB of {budget} MB on disk ({used:.0%}) · "
+            f"{report['live_mb']} MB live data ({live:.0%}), {report['reusable_mb']} MB reusable"
             if budget else f"Database {report['size_mb']} MB (no budget set)"
         )
         self.stdout.write(self.style.MIGRATE_HEADING(headline))
@@ -45,7 +50,7 @@ class Command(BaseCommand):
             )
 
         in_actions = os.environ.get("GITHUB_ACTIONS") == "true"
-        if in_actions and used is not None and used >= WARN_AT:
+        if in_actions and live is not None and live >= WARN_AT:
             # Workflow command: surfaces as an annotation on the run page.
             self.stdout.write(
                 f"::warning title=Database near its storage budget::{headline}. "
@@ -60,8 +65,13 @@ class Command(BaseCommand):
             )
             bar = ""
             if used is not None:
-                filled = min(20, round(used * 20))
-                bar = f"`{'█' * filled}{'░' * (20 - filled)}` {used:.0%}\n\n"
+                # Live data solid, reusable space shaded, headroom empty.
+                live_cells = min(20, round(live * 20))
+                disk_cells = min(20, max(live_cells, round(used * 20)))
+                bar = (
+                    f"`{'█' * live_cells}{'▒' * (disk_cells - live_cells)}{'░' * (20 - disk_cells)}` "
+                    f"live {live:.0%} · on disk {used:.0%}\n\n"
+                )
             with open(summary_path, "a", encoding="utf-8") as fh:
                 fh.write(
                     f"### {headline}\n\n{bar}"
@@ -69,5 +79,5 @@ class Command(BaseCommand):
                     f"{rows}\n\n"
                 )
 
-        if opts["fail_at"] is not None and used is not None and used >= opts["fail_at"]:
+        if opts["fail_at"] is not None and live is not None and live >= opts["fail_at"]:
             raise CommandError(f"{headline} — at or above the {opts['fail_at']:.0%} limit")

@@ -89,6 +89,18 @@ All of it is covered by `core/tests/test_capacity.py`.
    it will keep less-aggressive windows. It cannot undo the workflow's deletes,
    but it will not help either.
 
+## After recovery (Sep 25)
+
+Maintenance on the fixed code deleted 16,051 single-source stories, purged 2,934
+raw documents, cleared 15,117 payloads and reactivated 9 feeds the breaker had
+wrongly disabled; the next pipeline run ingested 798 articles with no failures.
+
+On-disk size stayed at 92%: plain VACUUM makes freed space reusable but does not
+shrink files. So `db_report` now measures **live data** separately and warns on
+that, and maintenance runs `retention --apply --compact`, which rewrites a table
+with VACUUM FULL only when the rewrite provably fits in current headroom
+(smallest table first, so each success widens the room for the next).
+
 ## Follow-ups
 
 - Watch the `db_report` summaries for a week; steady state should settle well

@@ -50,7 +50,7 @@ jobs:
       # uncorroborated stories. Story rows and counts survive, so the archive
       # stays navigable after the bodies are gone.
       - name: Apply retention
-        run: python manage.py retention --apply
+        run: python manage.py retention --apply --compact
 
       # Reports feeds that no longer resolve. Deliberately does NOT fail the
       # run — publishers break their feeds regularly and that is not an

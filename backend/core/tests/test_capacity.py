@@ -231,3 +231,42 @@ def test_known_url_lookup_is_never_called_on_a_304():
         RSSScraper().fetch_articles("https://a.example/rss", skip_urls=lambda urls: called.append(urls) or set())
 
     assert called == []
+
+
+# ==========================================================================
+# Reporting and compaction
+# ==========================================================================
+
+@pytest.mark.django_db
+def test_report_distinguishes_live_data_from_disk(monkeypatch):
+    from core.storage import database_report
+
+    monkeypatch.setenv("DATABASE_BUDGET_MB", "512")
+    report = database_report()
+
+    assert report["live_mb"] <= report["size_mb"]
+    assert report["reusable_mb"] == round(report["size_mb"] - report["live_mb"], 1)
+    assert 0 <= report["live_fraction"] <= report["used_fraction"]
+
+
+@pytest.mark.django_db
+def test_compaction_needs_a_known_budget(monkeypatch):
+    """Without a ceiling there is no way to prove a rewrite fits — so none runs."""
+    from core.storage import compact_tables
+
+    monkeypatch.delenv("DATABASE_BUDGET_MB", raising=False)
+    assert compact_tables(["core_story"]) == []
+
+
+@pytest.mark.django_db
+def test_compaction_skips_a_rewrite_that_would_not_fit(monkeypatch):
+    """A VACUUM FULL that runs out of space at the cap is the one move it must never make."""
+    from core import storage
+
+    monkeypatch.setenv("DATABASE_BUDGET_MB", "1")  # far below the test database's size
+    monkeypatch.setattr(storage, "live_table_mb", lambda table: 50.0)
+    monkeypatch.setattr(storage, "COMPACT_MIN_GAIN_MB", -1000)
+
+    results = storage.compact_tables(["core_story"])
+
+    assert results and results[0]["action"] == "skipped: rewrite would not fit"

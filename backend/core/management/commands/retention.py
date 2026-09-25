@@ -24,6 +24,11 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument("--apply", action="store_true", help="Persist deletions.")
+        parser.add_argument(
+            "--compact", action="store_true",
+            help="After retention, VACUUM FULL tables whose rewrite fits in headroom "
+                 "(needs DATABASE_BUDGET_MB). See core.storage.compact_tables.",
+        )
 
     def handle(self, *args, **opts):
         stats = archive_stats()
@@ -66,6 +71,16 @@ class Command(BaseCommand):
                         f"  reactivated {len(restored)} feeds disabled by database errors: "
                         + ", ".join(restored)
                     ))
+
+        if opts["apply"] and opts["compact"]:
+            from core.storage import compact_tables
+
+            self.stdout.write(self.style.MIGRATE_HEADING("Compaction"))
+            for entry in compact_tables(["core_story", "core_rawdocument", "core_article"]):
+                self.stdout.write(
+                    f"  {entry['table']:20} {entry['total_mb']:>7} MB total  "
+                    f"{entry['live_mb']:>7} MB live  -> {entry['action']}"
+                )
 
         if failed:
             for err in result["errors"]:
