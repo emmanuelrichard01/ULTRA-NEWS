@@ -2,36 +2,30 @@
 Re-assign topics across the corpus: articles by evidence, stories by consensus.
 
 Articles are re-scored with both signals in core.topics (the publisher's own
-filing plus the text), then every story touched is re-voted, one vote per
-publisher. Reports story coverage before and after, which is the number that
-matters: an untagged story never appears on any topic page.
+filing plus the text), then every story is re-voted, one vote per publisher.
+Reports story coverage before and after, which is the number that matters: an
+untagged story never appears on any topic page.
 
     python manage.py recategorize_all                # report only
     python manage.py recategorize_all --apply
     python manage.py recategorize_all --apply --days 14
+
+Built for a remote database. The per-article path the pipeline uses costs
+four or five round trips an article; from a CI runner to Neon that ran past
+the maintenance job's 30-minute budget on a fortnight of stories. Here each
+batch of stories is one read of its articles, one bulk update of their
+evidence, and one rewrite of each topic join table, in a single transaction.
+Stories go newest first, so a run cut short has already fixed what readers
+see.
 """
-from collections import Counter
+from collections import Counter, defaultdict
 from datetime import timedelta
 
 from django.core.management.base import BaseCommand
+from django.db import transaction
 from django.utils import timezone
 
-from core.models import Article, Story
-
-
-def _in_batches(queryset, size):
-    """
-    Rows in primary-key batches, each its own short query.
-
-    Not .iterator(): that holds a server-side cursor open across the loop, and
-    behind Neon's transaction-pooling endpoint the cursor is gone as soon as
-    the first write commits ("cursor _django_curs_… does not exist").
-    """
-    ids = list(queryset.order_by("pk").values_list("pk", flat=True))
-    for i in range(0, len(ids), size):
-        yield from queryset.model.objects.filter(pk__in=ids[i:i + size]).select_related(
-            *(["source"] if queryset.model.__name__ == "Article" else [])
-        ).order_by("pk")
+from core.models import Article, Category, Story
 
 
 class Command(BaseCommand):
@@ -40,78 +34,100 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument("--apply", action="store_true", help="Persist changes.")
         parser.add_argument("--days", type=int, default=0, help="Only stories updated in the last N days (0 = all).")
-        parser.add_argument("--batch", type=int, default=500)
+        parser.add_argument("--batch", type=int, default=200, help="Stories per batch.")
 
     def handle(self, *args, **opts):
-        from core.clustering import _assign_topics, refresh_story_topics
-        from core.topics import editorial_hints, story_topics, topic_evidence
+        from core.services.scraper import is_commerce
+        from core.topics import editorial_hints, pick_topics, story_topics, topic_evidence
 
         stories = Story.objects.all()
         if opts["days"]:
             stories = stories.filter(last_updated_at__gte=timezone.now() - timedelta(days=opts["days"]))
-        total = stories.count()
+        story_ids = list(stories.order_by("-last_updated_at").values_list("pk", flat=True))
+        total = len(story_ids)
         if not total:
             self.stderr.write("No stories in range.")
             return
 
-        before_tagged = stories.filter(categories__isnull=False).distinct().count()
-        self.stdout.write(f"{total} stories · {before_tagged / total * 100:.1f}% tagged before\n")
+        StoryTopic = Story.categories.through
+        ArticleTopic = Article.categories.through
+        before = StoryTopic.objects.filter(story_id__in=story_ids).values("story_id").distinct().count()
+        self.stdout.write(f"{total} stories · {before / total * 100:.1f}% tagged before")
 
-        articles = (
-            Article.objects.filter(story__in=stories)
-            .select_related("source")
-        )
-        processed = 0
-        for article in _in_batches(articles, opts["batch"]):
-            if opts["apply"]:
-                _assign_topics(article)
-            else:
+        category_ids = dict(Category.objects.values_list("slug", "pk"))
+        tagged, articles_done = 0, 0
+        primaries = Counter()
+
+        for start in range(0, total, opts["batch"]):
+            batch = story_ids[start:start + opts["batch"]]
+            articles = list(
+                Article.objects.filter(story_id__in=batch)
+                .select_related("source")
+                .only(
+                    "pk", "story_id", "url", "title", "feed_tags", "embedding", "topic_scores",
+                    "source__url", "source__publisher_domain", "source__name",
+                )
+            )
+
+            votes = defaultdict(list)
+            article_topics = {}
+            for article in articles:
                 source = article.source
-                article.topic_scores = topic_evidence(
-                    article.embedding,
-                    editorial_hints(
-                        article_url=article.url,
-                        feed_url=source.url if source else "",
-                        tags=article.feed_tags or (),
-                        publisher_domain=(source.publisher_domain or "") if source else "",
-                    ),
-                ) or None
-                # Dry run: keep the evidence in memory only.
-                self._dry[article.pk] = (source.publisher_domain or source.name, article.topic_scores, article.story_id)
-            processed += 1
+                if is_commerce(article.url, article.title):
+                    evidence = {}
+                else:
+                    evidence = topic_evidence(
+                        article.embedding,
+                        editorial_hints(
+                            article_url=article.url,
+                            feed_url=source.url if source else "",
+                            tags=article.feed_tags or (),
+                            publisher_domain=(source.publisher_domain or "") if source else "",
+                        ),
+                    )
+                article.topic_scores = evidence or None
+                article_topics[article.pk] = pick_topics(evidence)
+                if evidence:
+                    publisher = (source.publisher_domain or source.name) if source else "?"
+                    votes[article.story_id].append((publisher, evidence))
 
-        counts = Counter()
-        tagged = 0
-        if opts["apply"]:
-            for story in _in_batches(stories, opts["batch"]):
-                refresh_story_topics(story)
-            for story in stories.prefetch_related("categories"):
-                slugs = [c.slug for c in story.categories.all()]
+            story_slugs = {sid: story_topics(votes.get(sid, [])) for sid in batch}
+
+            if opts["apply"]:
+                with transaction.atomic():
+                    Article.objects.bulk_update(articles, ["topic_scores"], batch_size=500)
+                    ArticleTopic.objects.filter(article_id__in=list(article_topics)).delete()
+                    ArticleTopic.objects.bulk_create([
+                        ArticleTopic(article_id=aid, category_id=category_ids[slug])
+                        for aid, slugs in article_topics.items()
+                        for slug in slugs if slug in category_ids
+                    ])
+                    StoryTopic.objects.filter(story_id__in=batch).delete()
+                    StoryTopic.objects.bulk_create([
+                        StoryTopic(story_id=sid, category_id=category_ids[slug])
+                        for sid, slugs in story_slugs.items()
+                        for slug in slugs if slug in category_ids
+                    ])
+                    by_primary = defaultdict(list)
+                    for sid, slugs in story_slugs.items():
+                        by_primary[category_ids.get(slugs[0]) if slugs else None].append(sid)
+                    for category_id, ids in by_primary.items():
+                        Story.objects.filter(pk__in=ids).update(primary_category_id=category_id)
+
+            articles_done += len(articles)
+            for slugs in story_slugs.values():
                 if slugs:
                     tagged += 1
-                    counts[story.primary_category.slug if story.primary_category else slugs[0]] += 1
-        else:
-            by_story: dict[int, list] = {}
-            for publisher, scores, story_id in self._dry.values():
-                if scores:
-                    by_story.setdefault(story_id, []).append((publisher, scores))
-            for votes in by_story.values():
-                slugs = story_topics(votes)
-                if slugs:
-                    tagged += 1
-                    counts[slugs[0]] += 1
+                    primaries[slugs[0]] += 1
+            self.stdout.write(f"  {min(start + opts['batch'], total)}/{total} stories")
 
         self.stdout.write("Primary topic per story:")
-        for slug, count in counts.most_common():
+        for slug, count in primaries.most_common():
             self.stdout.write(f"  {count:6}  {slug}")
         self.stdout.write("")
         self.stdout.write(
-            f"{'Applied' if opts['apply'] else 'Would apply'}: {processed} articles re-scored · "
+            f"{'Applied' if opts['apply'] else 'Would apply'}: {articles_done} articles re-scored · "
             f"{tagged / total * 100:.1f}% of stories tagged after ({total - tagged} untagged)"
         )
         if not opts["apply"]:
             self.stdout.write(self.style.WARNING("Dry run — pass --apply to write."))
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._dry: dict[int, tuple] = {}
