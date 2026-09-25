@@ -38,3 +38,20 @@ Thumbs.db
 
 # Node (frontend has its own .gitignore, but just in case)
 node_modules/
+
+# Tool caches (listed here rather than relied on from a global ignore)
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Agent tooling installed locally: skill packs are fetched by
+# `npx skills add …` / `npx impeccable install`, not part of the product.
+.agents/
+.claude/skills/
+.claude/settings.local.json
+skills-lock.json
+
+# Local design references (screenshots and mood boards, not shipped)
+inspo/
